@@ -16,12 +16,12 @@ Evolve the ReAct execution loop to read tasks directly from GitHub issues, run l
 
 ### Orchestration Loop
 
-#### [NEW] [repair.go](file:///Users/human/code/powerword/internal/review/repair.go)
+#### [NEW] [repair.go](../internal/review/repair.go)
 - Implement state manager to execute local test runners (`make test`), check code linting (`make lint`), and apply LLM patches.
 - Add GitHub comment posting logic using `gh issue comment <id> --body "..."` or direct API client.
 - Automatically update issue progress checklists and change state status to "closed" on task completion.
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](../internal/loop/loop.go)
 - Evolve the reasoning loop to coordinate Git status, webhook callbacks, local validation outputs, and issue comment updates.
 
 ---

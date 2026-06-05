@@ -1,47 +1,71 @@
 # Task 5.1: Structured Issue Templates & Local Critic Integration
 
-Define GitHub YAML Issue Forms to enforce structured planning schemas, and implement a `powerword review` sub-command to parse active issue fields and verify local Git diffs against plan goals.
+Configure a structured GitHub Issue Form template for project plans, and implement the local client engine in `powerword` to parse these issues and verify local workspace diffs against them before pushing.
 
 ## User Review Required
 
 > [!NOTE]
-> **Issue Template Configuration**:
-> We will configure a new GitHub YAML issue form template `.github/ISSUE_TEMPLATE/implementation_plan.yml` defining strict input fields: Goal Description, User Review Required, Proposed Changes, and Verification Plan.
+> **Issue Schema Format**:
+> We will define a GitHub Issue Form template in `.github/ISSUE_TEMPLATE/implementation-plan.yml`. This template uses structured fields to enforce key sections: `Goal`, `Proposed Changes`, and `Verification Plan`.
 
 > [!IMPORTANT]
-> **Local LLM Integration**:
-> We will configure a fallback local LLM target (e.g. Ollama or a local Llama-3 endpoint) specifically for pre-flight critics to avoid consuming commercial API tokens for rapid local checks.
+> **GitHub CLI (`gh`) Dependency**:
+> The local client will rely on the authenticated `gh` CLI tool (or direct HTTP client using `GITHUB_TOKEN`) to fetch and parse issue data as structured JSON.
+
+---
 
 ## Proposed Changes
 
 ### GitHub Issue Templates
 
-#### [NEW] [implementation_plan.yml](file:///Users/human/code/powerword/.github/ISSUE_TEMPLATE/implementation_plan.yml)
-- Define a structured YAML GitHub Issue Form for submitting implementation plans, enforcing sections for proposed changes, lints, and verification steps.
+#### [NEW] [implementation-plan.yml](../.github/ISSUE_TEMPLATE/implementation-plan.yml)
+- Define a structured YAML-based GitHub Issue Form. This ensures that when a new plan is created as an issue, it has distinct, parseable sections:
+  ```yaml
+  name: Implementation Plan
+  description: Design plan for a new task
+  body:
+    - type: textarea
+      id: goal
+      attributes:
+        label: Goal
+    - type: textarea
+      id: changes
+      attributes:
+        label: Proposed Changes
+    - type: textarea
+      id: verification
+      attributes:
+        label: Verification Plan
+  ```
 
-### Review Component
+### Review & Verification Component
 
-#### [NEW] [critic.go](file:///Users/human/code/powerword/internal/review/critic.go)
-- Implement issue retrieval using the `gh` CLI wrapper or direct GitHub API calls.
-- Parse the fetched issue's structured fields (Goal, Proposed Changes, Verification steps) into a target plan struct.
-- Fetch staging or HEAD Git diffs and use LLM to check if changes match the plan constraints and codebase rules.
+#### [NEW] [critic.go](../internal/review/critic.go)
+- Implement `LoadIssuePlan(issueID int)` to execute `gh issue view <id> --json body,comments` and parse the YAML/Markdown sections into a structured Go struct.
+- Implement `VerifyWorkspace(ctx context.Context, plan *Plan)`:
+  - Run the local validation suite (`make all`, which runs `make lint`, `make test`, `make vuln`, `make markdown-lint`).
+  - Extract the current git diff: `git diff HEAD`.
+  - Pass the plan, the local validation output, and the git diff to a local LLM client (configured via Ollama or a cost-effective API endpoint) to verify that all proposed changes have been implemented and verified.
+  - Return a detailed report of any omissions, bugs, or untested files.
 
-### Git Hooks & Build System
+### Git Hooks
 
-#### [NEW] [pre-push](file:///Users/human/code/powerword/scripts/git-hooks/pre-push)
-- Shell script running `make all` (executing markdown linting, plan validation, Go lints, vulnerability checks, unit tests, and coverage enforcement).
-- Aborts `git push` with non-zero exit status if any tool check fails.
+#### [NEW] [pre-push](../scripts/git-hooks/pre-push)
+- Shell script acting as a Git hook. It automatically executes `make all` and/or `powerword review --local` prior to any `git push`.
+- Aborts the push if any checks fail.
 
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
-- Add a new rule `make install-hooks` to copy `scripts/git-hooks/pre-push` to `.git/hooks/pre-push` and make it executable.
+#### [MODIFY] [Makefile](../Makefile)
+- Add an `install-hooks` target to copy `scripts/git-hooks/pre-push` into `.git/hooks/pre-push` and set executable permissions.
 
 ### Command Configuration
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/internal/config/config.go)
-- Add configurations for `Review` (defining local LLM model provider, prompt templates, and active GitHub repository details).
+#### [MODIFY] [config.go](../internal/config/config.go)
+- Add configuration parameters for local critic (e.g. local LLM endpoint, model name, and path to local rules).
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/internal/config/root.go)
-- Create and register `powerword review` command with flag support (`--issue <id>` and `--local`).
+#### [MODIFY] [root.go](../internal/config/root.go)
+- Create and register `powerword review` command with flags:
+  - `--issue`: GitHub issue ID containing the active plan.
+  - `--local`: Run local validation and ruleset verification only (without fetching a remote issue).
 
 ---
 
@@ -50,11 +74,11 @@ Define GitHub YAML Issue Forms to enforce structured planning schemas, and imple
 ### Automated Tests
 - Run command: `go test ./internal/review/...`
 - Unit tests verifying:
-  - Markdown/YAML issue payload parser (mapping raw text fields to struct properties).
-  - Mock git diff parsing.
-  - Critic prompt generation using templates.
+  - JSON/YAML parser for GitHub issue body content.
+  - Mock git diff extractor and parser.
+  - Critic prompt building and local LLM response handling.
 
 ### Manual Verification
-- Create a mockup implementation plan issue on a test repo.
-- Run `powerword review --issue <id>` and verify that the critic correctly fetches the plan, reads your local edits, and outputs suggestions.
-
+- Create a test issue using the new template.
+- Make a change in the workspace that violates a project rule or is missing from the plan.
+- Run `powerword review --issue <id>` and verify that the local critic flags the discrepancy and outputs recommendations.

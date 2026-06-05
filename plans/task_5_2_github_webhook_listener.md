@@ -16,20 +16,20 @@ Extend the HTTP listener daemon to handle webhook notifications for issue edits,
 
 ### Webhook Component
 
-#### [NEW] [listener.go](file:///Users/human/code/powerword/internal/review/listener.go)
+#### [NEW] [listener.go](../internal/review/listener.go)
 - Create HTTP handler to parse and validate GitHub webhook payloads for:
   - `issues` (triggered when plans are edited or closed).
   - `issue_comment` (triggered when users approve plans or comment on progress).
   - `pull_request_review_comment` (triggered when reviewer bots leave reviews).
 - Trigger local event broker handlers upon validation.
 
-#### [NEW] [mcp.go](file:///Users/human/code/powerword/internal/review/mcp.go)
+#### [NEW] [mcp.go](../internal/review/mcp.go)
 - Integrate with MCP server interface to expose webhook events as standard MCP notifications.
 - Expose resource schemas representing the active issues and PR reviews to the model context.
 
 ### CLI Bindings
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](../internal/config/config.go)
 - Add webhook secret and port configurations to Viper bindings.
 
 ---
