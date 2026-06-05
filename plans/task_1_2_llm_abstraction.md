@@ -2,6 +2,10 @@
 
 Define a uniform abstraction interface to interact with multiple LLM providers (Gemini, OpenAI, and Anthropic). Implement provider wrappers using their Go SDKs (the official SDKs for Gemini and Anthropic, and the popular community SDK for OpenAI).
 
+## User Review Required
+
+No review required as this task is completed.
+
 ## Actual Choices & Configurations
 
 - **Go Version Used**: Go 1.26.4

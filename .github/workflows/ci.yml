@@ -42,6 +42,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Run Markdown Linting & Plan Validation
+        run: make markdown-lint
+
       - name: Run Vulnerability Scan
         run: make vuln
 

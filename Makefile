@@ -1,4 +1,4 @@
-.PHONY: all build test lint fmt clean tidy vuln check-coverage
+.PHONY: all build test lint fmt clean tidy vuln check-coverage markdown-lint
 
 # Go parameters
 GOCMD=go
@@ -17,7 +17,7 @@ FS_PLUGIN=pw-mcp-fs
 GIT_PLUGIN=pw-mcp-git
 SHELL_PLUGIN=pw-mcp-shell
 
-all: lint vuln check-coverage build
+all: markdown-lint lint vuln check-coverage build
 
 build:
 	mkdir -p bin
@@ -32,6 +32,10 @@ test:
 
 check-coverage: test
 	@go tool cover -func=coverage.out | go run scripts/check_coverage.go $(MIN_COVERAGE)
+
+markdown-lint:
+	$(GOCMD) run scripts/lint_markdown/main.go
+	$(GOCMD) run scripts/lint_plans/main.go
 
 lint:
 	@if command -v golangci-lint >/dev/null; then \
