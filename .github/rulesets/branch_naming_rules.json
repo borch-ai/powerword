@@ -1,0 +1,24 @@
+{
+  "name": "Enforce Branch Naming Conventions",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/**"
+      ],
+      "exclude": [
+        "refs/heads/main"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "branch_name_pattern",
+      "parameters": {
+        "operator": "regex",
+        "pattern": "^(feature|docs|bugfix|chore|refactor|test)/[a-z0-9_\\-]+$"
+      }
+    }
+  ]
+}
