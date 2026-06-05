@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run Linter
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.12.2
+
+      - name: Run Markdown Linting & Plan Validation
+        run: make markdown-lint
+
+      - name: Run Vulnerability Scan
+        run: make vuln
+
+      - name: Run Tests & Check Coverage
+        run: make check-coverage
+
+      - name: Run Semantic Release
+        uses: go-semantic-release/action@v1
+        id: semrel
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build powerword Binaries
+        if: steps.semrel.outputs.version != ''
+        env:
+          VERSION: ${{ steps.semrel.outputs.version }}
+        run: |
+          mkdir -p dist
+          VERSION_NUM="${VERSION#v}"
+          VERSION_TAG="v${VERSION_NUM}"
+          echo "Building version ${VERSION_TAG}..."
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-darwin-amd64 ./cmd/powerword
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-darwin-arm64 ./cmd/powerword
+          GOOS=linux GOARCH=amd64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-linux-amd64 ./cmd/powerword
+          GOOS=linux GOARCH=arm64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-linux-arm64 ./cmd/powerword
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-windows-amd64.exe ./cmd/powerword
+
+      - name: Upload Binaries to Github Release
+        if: steps.semrel.outputs.version != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.semrel.outputs.version }}
+        run: |
+          VERSION_NUM="${VERSION#v}"
+          VERSION_TAG="v${VERSION_NUM}"
+          gh release upload "$VERSION_TAG" dist/*

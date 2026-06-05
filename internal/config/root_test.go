@@ -162,3 +162,24 @@ func TestExecute(t *testing.T) {
 		t.Fatalf("Execute returned error: %v", errExec)
 	}
 }
+
+func TestRootCmd_VersionFlag(t *testing.T) {
+	Version = "v1.2.3"
+	defer func() { Version = "dev" }()
+
+	cmd := NewRootCmd()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--version"})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("cmd.Execute returned unexpected error: %v", err)
+	}
+
+	expected := "powerword version v1.2.3\n"
+	if buf.String() != expected {
+		t.Errorf("expected version output %q, got %q", expected, buf.String())
+	}
+}
