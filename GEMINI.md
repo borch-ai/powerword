@@ -83,6 +83,13 @@ powerword/
 
 ---
 
+## Pull Request & Merging Workflow
+
+- **Pause Before Merging:** AI agents must **never** auto-merge pull requests. Always pause to request explicit user approval.
+- **Review Copilot Feedback:** Review and address all comments, suggestions, or issues flagged by the GitHub Copilot Code Review runner before finalizing a task.
+
+---
+
 ## Quick Reference Links
 
 - [VISION.md](file:///Users/human/code/powerword/VISION.md) - Project vision and core objectives.
