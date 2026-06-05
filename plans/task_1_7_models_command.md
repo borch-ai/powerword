@@ -16,6 +16,7 @@ Implement a `powerword models` subcommand to act as a pre-flight check for users
 - Added `TestOpenAIClient_ListModels_Success` and `TestOpenAIClient_ListModels_Error` to `openai_test.go`.
 - Added `TestGeminiClient_ListModels_Success` and `TestGeminiClient_ListModels_Error` to `gemini_test.go`.
 - Extended `mockLLMClient` in `internal/loop/loop_test.go` to satisfy the updated `LLMClient` interface.
+- Added `TestRootCmd_SubcommandConfigLoading` in `internal/config/root_test.go` to ensure correct loading of configuration when executing subcommands.
 - Verified test coverage is > 91% (`91.70%`).
 
 ## Environment
