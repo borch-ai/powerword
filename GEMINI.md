@@ -90,6 +90,7 @@ powerword/
 - **Review Copilot Feedback:** Review and address all comments, suggestions, or issues flagged by the GitHub Copilot Code Review runner before finalizing a task.
 - **Review Loop with Timer:** After opening or updating a Pull Request, the agent should pause (e.g., schedule a 2-minute timer) to allow Copilot Code Review comments to generate, fetch those comments via the API/CLI, apply necessary refactors, and push the fixes before presenting the final result to the user.
 - **Review Loop Iteration Requirement:** The review-and-fix process is iterative. The agent MUST repeat the timer-pause and comment-fetch loop for *every* commit pushed to the PR branch. The agent is forbidden from declaring a task complete or requesting user merge approval until a full timer loop has been completed on the *latest* commit with zero new comments returned.
+- **Update Implementation Plan:** Before declaring a task complete or requesting merge approval, the agent/contributor must update the corresponding implementation plan in the [plans/](file:///Users/human/code/powerword/plans) directory to reflect the final choices, actual configurations, testing updates, and final Go version used.
 
 ---
 
