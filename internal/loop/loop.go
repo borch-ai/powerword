@@ -33,11 +33,6 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		return nil
 	}
 
-	client, err := newClient(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to create LLM client: %w", err)
-	}
-
 	var session *Session
 	var messages []llm.Message
 
@@ -47,6 +42,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 			return fmt.Errorf("failed to load session %s: %w", cfg.Session, err)
 		}
 		messages = session.Messages
+	}
+
+	client, err := newClient(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create LLM client: %w", err)
 	}
 
 	messages = append(messages, llm.Message{

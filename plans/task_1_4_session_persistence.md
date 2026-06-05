@@ -46,4 +46,4 @@ Implement local session management and persistence schemas to store chat transcr
   - Added CLI flags `--session <id>` (to resume or create a named session) and `--list-sessions` (to view all sessions).
   - If `--session` is omitted, the session is ephemeral and not persisted to disk.
 - **Testing Updates:** Unit tests added in `session_test.go` and `loop_test.go` covering edge cases, directory creation errors, read-only file scenarios, and valid workflows. Overall coverage is >= 91%.
-- **Go Version:** Go 1.23+
+- **Go Version:** Go 1.26.4

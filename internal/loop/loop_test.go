@@ -141,7 +141,9 @@ func TestRunLoop_ListSessions(t *testing.T) {
 		Model:    "test",
 		Messages: []llm.Message{},
 	}
-	_ = SaveSession(session)
+	if err := SaveSession(session); err != nil {
+		t.Fatalf("failed to save dummy session: %v", err)
+	}
 
 	ctx := context.Background()
 	cfg := &config.Config{
@@ -213,11 +215,6 @@ func TestRunLoop_WithSession(t *testing.T) {
 func TestRunLoop_WithSessionLoadError(t *testing.T) {
 	dir := setupTestSessions(t)
 
-	importOSAndFilepath := func() {
-		// Just to ensure os and filepath are imported if not used elsewhere, but they are.
-	}
-	_ = importOSAndFilepath
-
 	// Need to manually create the invalid file
 	importOSDir := filepath.Join(dir, "sessions")
 	if err := os.MkdirAll(importOSDir, 0750); err != nil {
@@ -235,5 +232,8 @@ func TestRunLoop_WithSessionLoadError(t *testing.T) {
 	err := RunLoop(ctx, cfg, "test prompt")
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to unmarshal session") {
+		t.Errorf("expected error to contain 'failed to unmarshal session', got: %v", err)
 	}
 }

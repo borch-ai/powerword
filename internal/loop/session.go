@@ -53,8 +53,11 @@ func getSessionsDir() (string, error) {
 
 // SaveSession saves the given session to a JSON file.
 func SaveSession(session *Session) error {
-	if session == nil || session.ID == "" {
+	if session == nil {
 		return errors.New("invalid session")
+	}
+	if session.ID == "" || session.ID == "." || session.ID == ".." || strings.ContainsAny(session.ID, "/\\") {
+		return fmt.Errorf("invalid session ID: %q", session.ID)
 	}
 
 	dir, err := getSessionsDir()
@@ -80,8 +83,8 @@ func SaveSession(session *Session) error {
 
 // LoadSession loads a session by ID. If the file doesn't exist, it returns a new empty session.
 func LoadSession(id string) (*Session, error) {
-	if id == "" {
-		return nil, errors.New("empty session id")
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, "/\\") {
+		return nil, fmt.Errorf("invalid session ID: %q", id)
 	}
 
 	dir, err := getSessionsDir()

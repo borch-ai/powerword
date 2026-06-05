@@ -95,10 +95,11 @@ func TestListSessions(t *testing.T) {
 		if saveErr := SaveSession(&sCopy); saveErr != nil {
 			t.Fatalf("failed to save session: %v", saveErr)
 		}
+		time.Sleep(10 * time.Millisecond) // ensure deterministic timestamps
 	}
 
 	// Add an invalid file
-	if writeErr := os.WriteFile(filepath.Join(dir, "invalid.json"), []byte("not-json"), 0600); writeErr != nil {
+	if writeErr := os.WriteFile(filepath.Join(dir, "sessions", "invalid.json"), []byte("not-json"), 0600); writeErr != nil {
 		t.Fatalf("failed to write invalid file: %v", writeErr)
 	}
 
@@ -220,6 +221,6 @@ func TestGetSessionsDir_NoHome(t *testing.T) {
 	t.Setenv("USERPROFILE", "")
 	_, err := getSessionsDir()
 	if err == nil {
-		t.Log("expected error when HOME is empty, but got none")
+		t.Skip("expected error when HOME is empty, but got none (likely OS fallback)")
 	}
 }
