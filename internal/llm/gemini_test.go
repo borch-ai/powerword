@@ -123,7 +123,7 @@ func TestGeminiClient_Generate_ToolCall(t *testing.T) {
 		{Role: RoleUser, Content: "Call tool"},
 		{
 			Role:       RoleTool,
-			ToolCallID: "test_tool",
+			ToolCallID: "test_tool-0",
 			Content:    `{"result":"ok"}`,
 		},
 	}
@@ -138,7 +138,7 @@ func TestGeminiClient_Generate_ToolCall(t *testing.T) {
 	}
 
 	tc := msg.ToolCalls[0]
-	if tc.Name != "test_tool" || tc.ID != "test_tool" || tc.Arguments != `{"arg1":"val1"}` {
+	if tc.Name != "test_tool" || tc.ID != "test_tool-0" || tc.Arguments != `{"arg1":"val1"}` {
 		t.Errorf("unexpected tool call values: %+v", tc)
 	}
 }

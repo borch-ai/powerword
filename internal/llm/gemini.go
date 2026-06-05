@@ -153,8 +153,9 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 			if err != nil {
 				return nil, fmt.Errorf("failed to marshal function call args: %w", err)
 			}
+			callID := fmt.Sprintf("%s-%d", p.Name, len(assistantMsg.ToolCalls))
 			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, ToolCall{
-				ID:        p.Name, // Gemini doesn't have a distinct tool call ID, so we use the name
+				ID:        callID,
 				Name:      p.Name,
 				Arguments: string(argsData),
 			})

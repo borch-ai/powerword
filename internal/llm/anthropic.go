@@ -62,7 +62,9 @@ func (g *AnthropicClient) prepareParams(messages []Message, tools []ToolDefiniti
 		for _, tc := range msg.ToolCalls {
 			var input any
 			if tc.Arguments != "" {
-				_ = json.Unmarshal([]byte(tc.Arguments), &input)
+				if err := json.Unmarshal([]byte(tc.Arguments), &input); err != nil {
+					return anthropic.MessageNewParams{}, fmt.Errorf("failed to unmarshal arguments for tool call %s: %w", tc.Name, err)
+				}
 			}
 			content = append(content, anthropic.ContentBlockParamUnion{
 				OfToolUse: &anthropic.ToolUseBlockParam{

@@ -3,7 +3,6 @@ package llm
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -147,7 +146,10 @@ func TestOpenAIClient_Generate_EmptyChoices(t *testing.T) {
 	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
 
 	_, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
-	if !errors.Is(err, nil) && err.Error() != "openai chat completion error: empty response from OpenAI" && !strings.Contains(err.Error(), "empty response") {
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "empty response") {
 		t.Fatalf("expected empty response error, got: %v", err)
 	}
 }

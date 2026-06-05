@@ -12,7 +12,7 @@ Define a uniform abstraction interface to interact with multiple LLM providers (
   - `google.golang.org/api/option` (v0.283.0) for initializing Google client options
 
 - **The Abstraction Interface**:
-  - Defined in `internal/llm/client.go` with uniform structures `Role`, `Message`, `ToolCall`, `ToolResponse`, `ToolDefinition`, and `StreamChunk`.
+  - Defined in `internal/llm/client.go` with uniform structures `Role`, `Message`, `ToolCall`, `ToolDefinition`, and `StreamChunk`.
   - `LLMClient` Interface definition:
     ```go
     type LLMClient interface {
@@ -21,8 +21,8 @@ Define a uniform abstraction interface to interact with multiple LLM providers (
     }
     ```
   - Factory function `NewClient(cfg *config.Config) (LLMClient, error)` automatically resolves the target provider based on the configured model name:
-    - `"gemini-*"` model names route to the Gemini client wrapper.
-    - `"claude-*"` model names route to the Anthropic client wrapper.
+    - Model names containing `"gemini"` route to the Gemini client wrapper.
+    - Model names containing `"claude"` route to the Anthropic client wrapper.
     - Other models route to the OpenAI client wrapper.
 
 ## Proposed Changes
@@ -34,7 +34,7 @@ Define a uniform abstraction interface to interact with multiple LLM providers (
   - `Role` (`system`, `user`, `assistant`, `tool`).
   - `Message` representing role, text content, tool calls, and tool response associations.
   - `ToolDefinition` representing tool metadata.
-  - `ToolCall` and `ToolResponse` for function call payloads.
+  - `ToolCall` for function call payloads.
   - `StreamChunk` holding streamed content or stream errors.
 - Defines the `LLMClient` interface.
 - Implements `NewClient` resolver logic.
