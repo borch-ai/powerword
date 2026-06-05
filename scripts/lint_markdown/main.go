@@ -18,7 +18,7 @@ func main() {
 		if info.IsDir() {
 			// Skip hidden directories (like .git, .gemini, .github) and built artifacts
 			name := info.Name()
-			if strings.HasPrefix(name, ".") || name == "bin" || name == "vendor" {
+			if (strings.HasPrefix(name, ".") && path != ".") || name == "bin" || name == "vendor" {
 				return filepath.SkipDir
 			}
 			return nil

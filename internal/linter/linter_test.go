@@ -111,14 +111,13 @@ func TestLintMarkdown_OrderedListPrefix(t *testing.T) {
 			errorMsg:    "ordered list must start with 1, got 2",
 		},
 		{
-			name: "blank line resets list",
+			name: "blank line does not reset list (loose list valid)",
 			content: `
 1. item 1
 
 2. item 2
 `,
-			expectError: true,
-			errorMsg:    "ordered list must start with 1, got 2",
+			expectError: false,
 		},
 		{
 			name: "unordered list resets list",

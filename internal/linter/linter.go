@@ -11,7 +11,6 @@ import (
 var (
 	headerRegex = regexp.MustCompile(`^(#{1,6})\s+(.*)$`)
 	listRegex   = regexp.MustCompile(`^(\s*)(\d+)\.\s+(.*)$`)
-	uListRegex  = regexp.MustCompile(`^\s*[-*+]\s+(.*)$`)
 	planTitleRx = regexp.MustCompile(`^# Task \d+(\.\d+)*:.*$`)
 )
 
@@ -41,8 +40,6 @@ func LintMarkdown(filename string, content string) []string {
 		// Check for code block toggle
 		if strings.HasPrefix(trimmed, "```") {
 			inCodeBlock = !inCodeBlock
-			// Reset list context on code block
-			listStack = nil
 			continue
 		}
 
@@ -123,11 +120,9 @@ func LintMarkdown(filename string, content string) []string {
 		// Reset list block under specific conditions:
 		switch {
 		case trimmed == "":
-			listStack = nil
-		case uListRegex.MatchString(line):
-			listStack = nil
+			// Blank lines do not reset the list (supports loose lists)
 		case len(listStack) > 0:
-			// If we are in a list, check if the line indentation is smaller than any active indentations
+			// If we are in a list, check if the line indentation is smaller than or equal to any active indentations
 			lineIndent := ""
 			for _, char := range line {
 				if char == ' ' || char == '\t' {
@@ -136,15 +131,18 @@ func LintMarkdown(filename string, content string) []string {
 					break
 				}
 			}
-			// Pop from listStack if the current line has less indentation than a stack level
+			// Pop from listStack if the current line has less or equal indentation than a stack level
 			for i := len(listStack) - 1; i >= 0; i-- {
-				if len(lineIndent) < len(listStack[i].indent) {
+				if len(lineIndent) <= len(listStack[i].indent) {
 					listStack = listStack[:i]
 				}
 			}
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		errors = append(errors, fmt.Sprintf("%s: scanning error: %v", filename, err))
+	}
 	return errors
 }
 
@@ -190,6 +188,11 @@ func LintPlan(filename string, content string) []string {
 		case line == "## Verification Plan":
 			hasVerification = true
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		errors = append(errors, fmt.Sprintf("%s: scanning error: %v", filename, err))
+		return errors
 	}
 
 	if !hasTitle {
