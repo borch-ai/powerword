@@ -356,3 +356,94 @@ func TestTerminalFormatter_ErrorPropagation(t *testing.T) {
 		t.Errorf("expected underlying write error, got %v", err)
 	}
 }
+
+func TestTerminalFormatter_CJKAndEmojiWidth(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		width    int
+		expected string
+	}{
+		{
+			name:     "cjk characters exactly fit width",
+			input:    "こんにちは", // 5 Japanese characters, visual width 10
+			width:    10,
+			expected: "こんにちは\x1b[0m",
+		},
+		{
+			name:     "cjk characters wrap when exceeding width",
+			input:    "こんにちは世界", // 7 Japanese characters, visual width 14
+			width:    10,
+			expected: "こんにちは\n世界\x1b[0m",
+		},
+		{
+			name:     "emoji character width",
+			input:    "🧠🧠🧠🧠🧠", // 5 brain emojis, visual width 10
+			width:    10,
+			expected: "🧠🧠🧠🧠🧠\x1b[0m",
+		},
+		{
+			name:     "emoji characters wrap",
+			input:    "🧠🧠🧠🧠🧠🧠", // 6 brain emojis, visual width 12
+			width:    10,
+			expected: "🧠🧠🧠🧠🧠\n🧠\x1b[0m",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			formatter := NewTerminalFormatter(&buf, tc.width)
+			_, err := formatter.Write([]byte(tc.input))
+			if err != nil {
+				t.Fatalf("Write failed: %v", err)
+			}
+			_ = formatter.Flush()
+
+			actual := buf.String()
+			if actual != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, actual)
+			}
+		})
+	}
+}
+
+func TestTerminalFormatter_EdgeCases(t *testing.T) {
+	// 1. Control character (< 0x20), zero-width characters, combining marks, SIP CJK character
+	{
+		var buf bytes.Buffer
+		formatter := NewTerminalFormatter(&buf, 80)
+		// \x01 is control char, \u200B is zero width, \u0301 is combining mark, \U00020000 is SIP CJK
+		input := "\x01a\u200Bb\u0301\U00020000"
+		_, _ = formatter.Write([]byte(input))
+		_ = formatter.Flush()
+		plain := stripANSI(buf.String())
+		// \x01 should be visual width 0, \u200B visual width 0, \u0301 visual width 0, \U00020000 visual width 2
+		if !strings.Contains(plain, "a") || !strings.Contains(plain, "b") {
+			t.Errorf("expected plain text to contain 'a' and 'b', got %q", plain)
+		}
+	}
+
+	// 2. Code block header and footer with width <= 0 (defaults to 80)
+	{
+		var buf bytes.Buffer
+		formatter := NewTerminalFormatter(&buf, 0)
+		_, _ = formatter.Write([]byte("```go\nfmt.Println()\n```"))
+		_ = formatter.Flush()
+		plain := stripANSI(buf.String())
+		if !strings.Contains(plain, "│ fmt.Println()") {
+			t.Errorf("expected code block to render even with width 0, got %q", plain)
+		}
+	}
+
+	// 3. Write after error is set
+	{
+		formatter := NewTerminalFormatter(errorWriter{}, 80)
+		_, _ = formatter.Write([]byte("initial trigger error"))
+		// Verify writing again returns error
+		_, err := formatter.Write([]byte("more text"))
+		if err == nil {
+			t.Error("expected error writing when formatter has an active error state")
+		}
+	}
+}

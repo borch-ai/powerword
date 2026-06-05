@@ -14,7 +14,7 @@ import (
 var newClient = llm.NewClient
 
 // RunLoop runs the core execution and reasoning loop.
-func RunLoop(ctx context.Context, cfg *config.Config, prompt string) error {
+func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
 	client, err := newClient(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create LLM client: %w", err)
@@ -34,7 +34,12 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) error {
 
 	width := getTerminalWidth()
 	formatter := NewTerminalFormatter(os.Stdout, width)
-	defer func() { _ = formatter.Flush() }()
+	defer func() {
+		flushErr := formatter.Flush()
+		if err == nil && flushErr != nil {
+			err = fmt.Errorf("failed to flush output: %w", flushErr)
+		}
+	}()
 
 	for chunk := range chunks {
 		if chunk.Error != nil {
@@ -45,10 +50,6 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) error {
 				return fmt.Errorf("failed to write output: %w", err)
 			}
 		}
-	}
-
-	if err := formatter.Flush(); err != nil {
-		return fmt.Errorf("failed to flush output: %w", err)
 	}
 
 	return nil

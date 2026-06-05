@@ -11,9 +11,10 @@ import (
 // TerminalFormatter is a stateful streaming markdown and thinking block parser
 // designed to colorize and wrap text in real-time on the CLI.
 type TerminalFormatter struct {
-	writer io.Writer
-	width  int
-	err    error // Stores the first encountered write error
+	writer  io.Writer
+	width   int
+	err     error // Stores the first encountered write error
+	flushed bool  // Ensures Flush runs only once
 
 	// State variables
 	inCodeBlock        bool
@@ -180,7 +181,7 @@ func (f *TerminalFormatter) flushWord() {
 	}
 
 	wordStr := string(f.wordBuf)
-	wordVisualLen := len(f.wordBuf) // Visual character count
+	wordVisualLen := stringVisualWidth(f.wordBuf)
 	spaceLen := f.pendingSpaces
 
 	if f.width > 0 && f.currentCol+spaceLen+wordVisualLen > f.width && f.currentCol > len(f.wrapIndent) {
@@ -207,7 +208,7 @@ func (f *TerminalFormatter) appendToWord(r rune) {
 		if limit <= 0 {
 			limit = 1
 		}
-		if len(f.wordBuf) >= limit {
+		if stringVisualWidth(f.wordBuf) >= limit {
 			f.flushWord()
 		}
 	}
@@ -242,6 +243,37 @@ func (f *TerminalFormatter) writeNewline() {
 		f.wrapIndent = "  "
 	} else {
 		f.wrapIndent = ""
+	}
+}
+
+// printCodeBlockHeader prints the top border of a code block sized dynamically.
+func (f *TerminalFormatter) printCodeBlockHeader(lang string) {
+	w := f.width
+	if w <= 0 {
+		w = 80
+	}
+	// Visual box width is w - 4
+	dashes := w - len(lang) - 12
+	if dashes < 5 {
+		dashes = 5
+	}
+	f.writeFprintf("  \x1b[34m╭── %s ─%s\x1b[0m\n", lang, strings.Repeat("─", dashes))
+}
+
+// printCodeBlockFooter prints the bottom border of a code block matching header width.
+func (f *TerminalFormatter) printCodeBlockFooter() {
+	w := f.width
+	if w <= 0 {
+		w = 80
+	}
+	dashes := w - 6
+	if dashes < 10 {
+		dashes = 10
+	}
+	if f.isLineStart {
+		f.writeFprintf("  \x1b[34m╰%s\x1b[0m\n", strings.Repeat("─", dashes))
+	} else {
+		f.writeFprintf("\n  \x1b[34m╰%s\x1b[0m\n", strings.Repeat("─", dashes))
 	}
 }
 
@@ -317,11 +349,7 @@ func (f *TerminalFormatter) process() {
 				f.codeBlockLineStart = false
 				f.updateStyles()
 
-				if f.isLineStart {
-					f.writeString("  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
-				} else {
-					f.writeString("\n  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
-				}
+				f.printCodeBlockFooter()
 
 				f.buf = f.buf[consumeLen:]
 				f.isLineStart = true
@@ -361,7 +389,7 @@ func (f *TerminalFormatter) process() {
 			if !f.isLineStart {
 				f.writeString("\n")
 			}
-			f.writeFprintf("  \x1b[34m╭── %s ──────────────────────────────────────────────────────────\x1b[0m\n", lang)
+			f.printCodeBlockHeader(lang)
 			f.updateStyles()
 
 			f.buf = f.buf[consumeLen:]
@@ -480,6 +508,11 @@ func (f *TerminalFormatter) process() {
 
 // Flush outputs any remaining text, closes formatting states, and resets terminal color.
 func (f *TerminalFormatter) Flush() error {
+	if f.flushed {
+		return f.err
+	}
+	f.flushed = true
+
 	f.flushWord()
 
 	for len(f.buf) > 0 {
@@ -515,11 +548,7 @@ func (f *TerminalFormatter) Flush() error {
 	if f.inCodeBlock {
 		f.inCodeBlock = false
 		f.codeBlockLineStart = false
-		if f.isLineStart {
-			f.writeString("  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
-		} else {
-			f.writeString("\n  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
-		}
+		f.printCodeBlockFooter()
 	}
 
 	f.writeString("\x1b[0m")
@@ -531,4 +560,44 @@ func (f *TerminalFormatter) Flush() error {
 	f.wrapIndent = ""
 
 	return f.err
+}
+
+// runeVisualWidth returns the visual column width of a single rune.
+func runeVisualWidth(r rune) int {
+	if r < 0x20 {
+		return 0
+	}
+	if r == 0x200b || r == 0xfeff || (r >= 0x0300 && r <= 0x036f) {
+		return 0
+	}
+	// Hiragana, Katakana, CJK symbols & punctuation, CJK Unified Ideographs Extension A
+	if r >= 0x3000 && r <= 0x4dbf {
+		return 2
+	}
+	// CJK Unified Ideographs, CJK Compatibility Ideographs
+	if (r >= 0x4e00 && r <= 0x9fff) || (r >= 0xf900 && r <= 0xfaff) {
+		return 2
+	}
+	// CJK Compatibility Forms, Small Form Variants, Fullwidth forms
+	if (r >= 0xfe30 && r <= 0xfe6f) || (r >= 0xff00 && r <= 0xffef) {
+		return 2
+	}
+	// CJK Unified Ideographs Extension B etc. (Supplementary Ideographic Plane)
+	if r >= 0x20000 && r <= 0x3ffff {
+		return 2
+	}
+	// Emojis / Pictographs (covering most symbols, emoticons, transport, etc.)
+	if (r >= 0x1f000 && r <= 0x1faff) || (r >= 0x2600 && r <= 0x27bf) {
+		return 2
+	}
+	return 1
+}
+
+// stringVisualWidth returns the cumulative visual column width of a slice of runes.
+func stringVisualWidth(runes []rune) int {
+	w := 0
+	for _, r := range runes {
+		w += runeVisualWidth(r)
+	}
+	return w
 }
