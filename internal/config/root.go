@@ -8,9 +8,11 @@ import (
 )
 
 var (
-	cfgFile string
-	model   string
-	verbose bool
+	cfgFile      string
+	model        string
+	verbose      bool
+	sessionID    string
+	listSessions bool
 )
 
 // Active holds the successfully loaded application configuration.
@@ -30,8 +32,8 @@ using the Model Context Protocol (MCP).`,
 		Version: Version,
 		Args:    cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip config loading/validation if just running the root command without args (shows help).
-			if cmd.Name() == "powerword" && len(args) == 0 {
+			// Skip config loading/validation if just running the root command without args (shows help) unless listing sessions.
+			if cmd.Name() == "powerword" && len(args) == 0 && !listSessions {
 				return nil
 			}
 
@@ -47,24 +49,39 @@ using the Model Context Protocol (MCP).`,
 			if cmd.Flags().Changed("verbose") {
 				cfg.Verbose = verbose
 			}
+			if cmd.Flags().Changed("session") {
+				cfg.Session = sessionID
+			}
+			if cmd.Flags().Changed("list-sessions") {
+				cfg.ListSessions = listSessions
+			}
 
-			if err := cfg.Validate(); err != nil {
-				return err
+			if !cfg.ListSessions {
+				if err := cfg.Validate(); err != nil {
+					return err
+				}
 			}
 
 			Active = cfg
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
+			if len(args) == 0 && (Active == nil || !Active.ListSessions) {
 				return cmd.Help()
 			}
-			prompt := args[0]
+			prompt := ""
+			if len(args) > 0 {
+				prompt = args[0]
+			}
 			if Active.Verbose {
 				cmd.Printf("Verbose logging enabled. Model: %s\n", Active.Model)
-				cmd.Printf("Received prompt: %s\n", prompt)
+				if prompt != "" {
+					cmd.Printf("Received prompt: %s\n", prompt)
+				}
 			}
-			cmd.Printf("Processing prompt with model %s...\n", Active.Model)
+			if !Active.ListSessions {
+				cmd.Printf("Processing prompt with model %s...\n", Active.Model)
+			}
 			if Runner == nil {
 				return fmt.Errorf("no execution runner registered")
 			}
@@ -76,10 +93,14 @@ using the Model Context Protocol (MCP).`,
 	cfgFile = ""
 	model = ""
 	verbose = false
+	sessionID = ""
+	listSessions = false
 
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
+	cmd.PersistentFlags().StringVar(&sessionID, "session", "", "creates or resumes a conversation with the specified ID")
+	cmd.PersistentFlags().BoolVar(&listSessions, "list-sessions", false, "lists recent conversations")
 
 	return cmd
 }

@@ -3,6 +3,8 @@ package loop
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -127,5 +129,111 @@ func TestRunLoop_StreamChunkError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "chunk error") {
 		t.Errorf("expected error to mention 'chunk error', got: %v", err)
+	}
+}
+
+func TestRunLoop_ListSessions(t *testing.T) {
+	setupTestSessions(t)
+
+	// Create a dummy session to list
+	session := &Session{
+		ID:       "test-list-session",
+		Model:    "test",
+		Messages: []llm.Message{},
+	}
+	if err := SaveSession(session); err != nil {
+		t.Fatalf("failed to save dummy session: %v", err)
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		ListSessions: true,
+	}
+
+	err := RunLoop(ctx, cfg, "")
+	if err != nil {
+		t.Fatalf("expected no error for ListSessions, got: %v", err)
+	}
+}
+
+func TestRunLoop_ListSessionsEmpty(t *testing.T) {
+	setupTestSessions(t)
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		ListSessions: true,
+	}
+
+	err := RunLoop(ctx, cfg, "")
+	if err != nil {
+		t.Fatalf("expected no error for ListSessionsEmpty, got: %v", err)
+	}
+}
+
+func TestRunLoop_WithSession(t *testing.T) {
+	setupTestSessions(t)
+
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		chunks: []llm.StreamChunk{
+			{Content: "Assistant response"},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Session: "existing-session",
+		Model:   "test-model",
+	}
+
+	err := RunLoop(ctx, cfg, "test prompt")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Verify session was saved with the new messages
+	session, err := LoadSession("existing-session")
+	if err != nil {
+		t.Fatalf("expected no error loading session, got: %v", err)
+	}
+	if len(session.Messages) != 2 {
+		t.Fatalf("expected 2 messages, got: %d", len(session.Messages))
+	}
+	if session.Messages[0].Content != "test prompt" {
+		t.Errorf("expected user prompt, got: %s", session.Messages[0].Content)
+	}
+	if session.Messages[1].Content != "Assistant response" {
+		t.Errorf("expected assistant response, got: %s", session.Messages[1].Content)
+	}
+}
+
+func TestRunLoop_WithSessionLoadError(t *testing.T) {
+	dir := setupTestSessions(t)
+
+	// Need to manually create the invalid file
+	importOSDir := filepath.Join(dir, "sessions")
+	if err := os.MkdirAll(importOSDir, 0750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(importOSDir, "bad-session.json"), []byte("invalid json"), 0600); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Session: "bad-session",
+	}
+
+	err := RunLoop(ctx, cfg, "test prompt")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to unmarshal session") {
+		t.Errorf("expected error to contain 'failed to unmarshal session', got: %v", err)
 	}
 }
