@@ -85,6 +85,7 @@ powerword/
 
 ## Pull Request & Merging Workflow
 
+- **PR Required for Mainline Changes:** Direct pushes to `main` are blocked. AI agents and human contributors must **never** push changes directly to `main`. All updates, bug fixes, features, and documentation edits must go through a Pull Request.
 - **Pause Before Merging:** AI agents must **never** auto-merge pull requests. Always pause to request explicit user approval.
 - **Review Copilot Feedback:** Review and address all comments, suggestions, or issues flagged by the GitHub Copilot Code Review runner before finalizing a task.
 - **Review Loop with Timer:** After opening or updating a Pull Request, the agent should pause (e.g., schedule a 2-minute timer) to allow Copilot Code Review comments to generate, fetch those comments via the API/CLI, apply necessary refactors, and push the fixes before presenting the final result to the user.
