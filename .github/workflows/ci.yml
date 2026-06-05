@@ -36,6 +36,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       statuses: write
+      pull-requests: read
     steps:
       - name: Semantic PR Check
         uses: amannn/action-semantic-pull-request@v5
