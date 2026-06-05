@@ -177,6 +177,7 @@ func (o *OpenAIClient) ListModels(ctx context.Context) ([]string, error) {
 	}
 
 	var models []string
+	// Note: go-openai's ListModels response maps the JSON "data" field to the Models slice.
 	for _, m := range modelsList.Models {
 		models = append(models, m.ID)
 	}
