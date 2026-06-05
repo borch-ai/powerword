@@ -1,6 +1,6 @@
-# Task 5.3: Autonomous Review-Repair Orchestrator
+# Task 5.3: Autonomous Review-Repair & Issue Comment Orchestration
 
-Design a unified ReAct execution loop that pushes code, waits asynchronously for webhook alerts, parses incoming review comments, and resolves them automatically through local test and lint checks.
+Evolve the ReAct execution loop to read tasks directly from GitHub issues, run local checks, push changes, and publish progress updates and state reports back as issue comments.
 
 ## User Review Required
 
@@ -18,10 +18,11 @@ Design a unified ReAct execution loop that pushes code, waits asynchronously for
 
 #### [NEW] [repair.go](file:///Users/human/code/powerword/internal/review/repair.go)
 - Implement state manager to execute local test runners (`make test`), check code linting (`make lint`), and apply LLM patches.
-- Connect with MCP webhook event broker to pause execution state and block on remote events.
+- Add GitHub comment posting logic using `gh issue comment <id> --body "..."` or direct API client.
+- Automatically update issue progress checklists and change state status to "closed" on task completion.
 
 #### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
-- Evolve the reasoning loop to coordinate Git status, webhook callbacks, and local validation outputs.
+- Evolve the reasoning loop to coordinate Git status, webhook callbacks, local validation outputs, and issue comment updates.
 
 ---
 
@@ -31,9 +32,10 @@ Design a unified ReAct execution loop that pushes code, waits asynchronously for
 - Run command: `go test ./internal/loop/...`
 - Unit tests verifying:
   - Loop boundary limits (hard stop after 5 iterations).
-  - Git staging and commit runner mock checks.
+  - Issue comment payload generation (properly formatting task checklists).
   - Verification that local test failures trigger repair turns.
 
 ### Manual Verification
 - Cause a deliberate test failure on a branch.
-- Run `powerword run --autonomous` and verify that the agent identifies the failure, edits the files, checks that tests pass, and commits/pushes the fix.
+- Run `powerword run --autonomous` and verify that the agent identifies the failure, edits the files, checks that tests pass, logs a comment stating progress, and commits/pushes the fix.
+

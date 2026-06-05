@@ -1,6 +1,6 @@
-# Task 5.2: GitHub Webhook Listener & Event Broker
+# Task 5.2: GitHub Webhook Listener & Active Session Event Broker
 
-Build an MCP-enabled HTTP listener daemon that registers webhooks from GitHub (such as new PR comments or CI run completions) and surfaces these notifications as reactive agent events.
+Extend the HTTP listener daemon to handle webhook notifications for issue edits, state transitions, and PR comments, routing them dynamically as reactive MCP events.
 
 ## User Review Required
 
@@ -17,11 +17,15 @@ Build an MCP-enabled HTTP listener daemon that registers webhooks from GitHub (s
 ### Webhook Component
 
 #### [NEW] [listener.go](file:///Users/human/code/powerword/internal/review/listener.go)
-- Create HTTP handler to parse and validate GitHub webhook payloads (`pull_request_review_comment`, `workflow_run`).
+- Create HTTP handler to parse and validate GitHub webhook payloads for:
+  - `issues` (triggered when plans are edited or closed).
+  - `issue_comment` (triggered when users approve plans or comment on progress).
+  - `pull_request_review_comment` (triggered when reviewer bots leave reviews).
 - Trigger local event broker handlers upon validation.
 
 #### [NEW] [mcp.go](file:///Users/human/code/powerword/internal/review/mcp.go)
 - Integrate with MCP server interface to expose webhook events as standard MCP notifications.
+- Expose resource schemas representing the active issues and PR reviews to the model context.
 
 ### CLI Bindings
 
@@ -36,9 +40,10 @@ Build an MCP-enabled HTTP listener daemon that registers webhooks from GitHub (s
 - Run command: `go test ./internal/review/...`
 - Unit tests verifying:
   - HMAC SHA256 signature verification logic.
-  - Parsing of `pull_request_review_comment` payloads.
-  - Correct dispatch of events to the internal broker.
+  - Parsing of `issues` and `issue_comment` payloads.
+  - Correct dispatch of events to the active agent session context via MCP.
 
 ### Manual Verification
 - Launch the listener local server: `powerword review --listen --port 8080`.
-- Send a mock signed payload using `curl` and verify it is parsed and logs success.
+- Send a mock signed issue comment payload using `curl` and verify it logs event dispatching.
+
