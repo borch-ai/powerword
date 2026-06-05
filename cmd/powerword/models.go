@@ -12,15 +12,8 @@ func newModelsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "models",
 		Short: "List available models for the currently configured provider",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if config.Active == nil {
-				// Initialize config if not already done by persistent pre-run
-				// But root.go's PersistentPreRunE already sets config.Active.
-				// Wait, if no args are provided to root, PersistentPreRunE skips config loading.
-				// So we must ensure config is loaded. Actually, root.go skips if len(args) == 0, but for subcommands it might also skip if args are passed to the subcommand, not root.
-				// Let's check root.go's PersistentPreRunE.
-			}
-			
 			cfg := config.Active
 			if cfg == nil {
 				return fmt.Errorf("configuration not loaded")

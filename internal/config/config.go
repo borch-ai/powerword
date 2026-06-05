@@ -119,7 +119,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 			break
 		}
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(err) {
-			readErr = fmt.Errorf("failed to parse config file: %w", err)
+			readErr = fmt.Errorf("failed to parse config file %s: %w", file, err)
 			break
 		}
 		readErr = err
