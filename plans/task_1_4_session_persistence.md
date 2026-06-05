@@ -37,3 +37,13 @@ Implement local session management and persistence schemas to store chat transcr
 - Execute a prompt: `$ powerword --session="test-convo" "Hi, remember the code word 'xyz'"`
 - Run follow-up prompt: `$ powerword --session="test-convo" "What was the code word?"`
 - Confirm model successfully retrieves context.
+
+---
+
+## Final Implementation Details
+- **Final Configurations:** 
+  - Sessions are saved as JSON files in `~/.local/share/powerword/sessions/<id>.json`.
+  - Added CLI flags `--session <id>` (to resume or create a named session) and `--list-sessions` (to view all sessions).
+  - If `--session` is omitted, the session is ephemeral and not persisted to disk.
+- **Testing Updates:** Unit tests added in `session_test.go` and `loop_test.go` covering edge cases, directory creation errors, read-only file scenarios, and valid workflows. Overall coverage is >= 91%.
+- **Go Version:** Go 1.23+

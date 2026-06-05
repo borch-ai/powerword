@@ -12,9 +12,11 @@ import (
 
 // Config holds the application configuration.
 type Config struct {
-	Verbose bool    `mapstructure:"verbose"`
-	Model   string  `mapstructure:"model"`
-	APIKeys APIKeys `mapstructure:"api_keys"`
+	Verbose      bool    `mapstructure:"verbose"`
+	Model        string  `mapstructure:"model"`
+	APIKeys      APIKeys `mapstructure:"api_keys"`
+	Session      string  `mapstructure:"session"`
+	ListSessions bool    `mapstructure:"list-sessions"`
 }
 
 // APIKeys maps the model providers to their API keys.
