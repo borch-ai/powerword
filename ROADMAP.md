@@ -16,6 +16,9 @@ Focus: Bootstrapping the CLI application, establishing the LLM interface layer, 
 *   **Task 1.3: Core Loop & Streaming Output Engine**
     *   Implement the primary execution loop to pass user prompts to the abstraction layer, capture the stream, and render syntax-highlighted markdown back to the terminal.
     *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_1_3_core_loop.md)
+*   **Task 1.4: Session Persistence & Chat History Management**
+    *   Implement a local persistence engine (JSON files or SQLite database) in `~/.local/share/powerword/sessions` to store chat history, session state, and model parameters. Support resuming past sessions using a `--session` CLI flag.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_1_4_session_persistence.md)
 
 ---
 
@@ -31,6 +34,9 @@ Focus: Integrating the Model Context Protocol (MCP) and adapting the execution l
 *   **Task 2.3: Tool Calling Execution Loop**
     *   Evolve the execution loop from standard stream to a multi-turn ReAct reasoning loop. Convert LLM tool calls to MCP requests, run the tools, and return execution results back to the LLM.
     *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_2_3_tool_calling_loop.md)
+*   **Task 2.4: Interactive Permission & Consent Manager**
+    *   Build a CLI permission prompt engine to intercept tool executions (like filesystem edits, commands, or network hits). Prompt the user interactively in the terminal before running unsafe tools.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_2_4_permission_manager.md)
 
 ---
 
@@ -55,3 +61,6 @@ Focus: Enhancing coordination, scaling capability, and enabling headless environ
 *   **Task 4.2: Headless Pipelines & Automation**
     *   Support non-interactive pipeline execution modes. Allow Powerword to digest raw stdin stream arguments, output structured JSON format, and behave as a reliable utility in CI/CD environments.
     *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_4_2_headless_pipeline.md)
+*   **Task 4.3: Telemetry, Token Metrics & Cost Accounting**
+    *   Implement usage accounting to track input, output, and cached tokens consumed during loops. Calculate and display cost metrics on execution exit.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_4_3_telemetry_cost.md)
