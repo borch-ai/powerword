@@ -83,10 +83,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	if session != nil {
 		session.Model = cfg.Model
-		session.Messages = append(session.Messages, llm.Message{
+		messages = append(messages, llm.Message{
 			Role:    llm.RoleAssistant,
 			Content: fullResponse.String(),
 		})
+		session.Messages = messages
 		if saveErr := SaveSession(session); saveErr != nil {
 			return fmt.Errorf("failed to save session: %w", saveErr)
 		}
