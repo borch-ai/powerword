@@ -67,3 +67,19 @@ Focus: Enhancing coordination, scaling capability, and enabling headless environ
 *   **Task 4.3: Telemetry, Token Metrics & Cost Accounting**
     *   Implement usage accounting to track input, output, and cached tokens consumed during loops. Calculate and display cost metrics on execution exit.
     *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_4_3_telemetry_cost.md)
+
+---
+
+## Phase 5: Autonomous Review & Repair Loop
+Focus: Delivering a fully autonomous local-to-remote review feedback and code correction pipeline.
+
+*   **Task 5.1: Local Critic & Code-Review Simulator (Pre-Flight Checks)**
+    *   Implement a specialized sub-command or plugin that parses local Git diffs, applies project rules, and queries a local LLM critic to identify lints, bugs, or omissions before pushing.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_5_1_local_critic.md)
+*   **Task 5.2: GitHub Webhook Listener & Event Broker**
+    *   Build an MCP-enabled HTTP listener daemon that registers webhooks from GitHub (such as new PR comments or CI run completions) and surfaces these notifications as reactive agent events.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_5_2_github_webhook_listener.md)
+*   **Task 5.3: Autonomous Review-Repair Orchestrator**
+    *   Design a unified ReAct execution loop that pushes code, waits asynchronously for webhook alerts, parses incoming review comments, and resolves them automatically through local test and lint checks.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_5_3_autonomous_repair_loop.md)
+
