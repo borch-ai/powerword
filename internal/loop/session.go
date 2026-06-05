@@ -74,8 +74,13 @@ func SaveSession(session *Session) error {
 	}
 
 	filePath := filepath.Join(dir, session.ID+".json")
-	if err := os.WriteFile(filePath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write session file: %w", err)
+	tempPath := filePath + ".tmp"
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write session temp file: %w", err)
+	}
+	if err := os.Rename(tempPath, filePath); err != nil {
+		_ = os.Remove(tempPath) // Clean up temp file, ignore error
+		return fmt.Errorf("failed to save session file: %w", err)
 	}
 
 	return nil
@@ -111,6 +116,7 @@ func LoadSession(id string) (*Session, error) {
 	if err := json.Unmarshal(data, &session); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal session: %w", err)
 	}
+	session.ID = id
 
 	return &session, nil
 }
@@ -136,6 +142,8 @@ func ListSessions() ([]SessionSummary, error) {
 			continue
 		}
 
+		sessionID := strings.TrimSuffix(entry.Name(), ".json")
+
 		filePath := filepath.Join(dir, entry.Name())
 		//nolint:gosec // filePath is constructed from known dir
 		data, err := os.ReadFile(filePath)
@@ -151,7 +159,7 @@ func ListSessions() ([]SessionSummary, error) {
 		}
 
 		summaries = append(summaries, SessionSummary{
-			ID:           session.ID,
+			ID:           sessionID,
 			Timestamp:    session.Timestamp,
 			Model:        session.Model,
 			MessageCount: len(session.Messages),
