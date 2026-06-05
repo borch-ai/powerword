@@ -26,6 +26,15 @@ Define GitHub YAML Issue Forms to enforce structured planning schemas, and imple
 - Parse the fetched issue's structured fields (Goal, Proposed Changes, Verification steps) into a target plan struct.
 - Fetch staging or HEAD Git diffs and use LLM to check if changes match the plan constraints and codebase rules.
 
+### Git Hooks & Build System
+
+#### [NEW] [pre-push](file:///Users/human/code/powerword/scripts/git-hooks/pre-push)
+- Shell script running `make all` (executing markdown linting, plan validation, Go lints, vulnerability checks, unit tests, and coverage enforcement).
+- Aborts `git push` with non-zero exit status if any tool check fails.
+
+#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+- Add a new rule `make install-hooks` to copy `scripts/git-hooks/pre-push` to `.git/hooks/pre-push` and make it executable.
+
 ### Command Configuration
 
 #### [MODIFY] [config.go](file:///Users/human/code/powerword/internal/config/config.go)
