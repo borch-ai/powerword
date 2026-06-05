@@ -35,7 +35,8 @@ func init() {
 }
 
 // loadDotEnv reads the local .env file if it exists and pushes the keys into the process environment
-// so that BindEnv can pick them up.
+// so that BindEnv can pick them up. It only loads POWERWORD_ prefixed variables and does not overwrite
+// existing environment variables.
 func loadDotEnv() error {
 	v := viper.New()
 	v.SetConfigFile(".env")
@@ -52,8 +53,16 @@ func loadDotEnv() error {
 	}
 
 	for _, key := range v.AllKeys() {
-		val := v.GetString(key)
 		upperKey := strings.ToUpper(key)
+		if !strings.HasPrefix(upperKey, "POWERWORD_") {
+			continue
+		}
+		// Never overwrite already present environment variables
+		if os.Getenv(upperKey) != "" {
+			continue
+		}
+
+		val := v.GetString(key)
 		if err := os.Setenv(upperKey, val); err != nil {
 			return fmt.Errorf("failed to set environment variable %s: %w", upperKey, err)
 		}
@@ -62,9 +71,12 @@ func loadDotEnv() error {
 	return nil
 }
 
-// bindEnv is a helper to bind environment variables to Viper.
+// bindEnv is a helper to bind environment variables to Viper. It panics if the binding fails,
+// which is an unrecoverable setup error since the key and environment variable name are statically defined.
 func bindEnv(v *viper.Viper, input ...string) {
-	_ = v.BindEnv(input...)
+	if err := v.BindEnv(input...); err != nil {
+		panic(fmt.Errorf("failed to bind env variable: %w", err))
+	}
 }
 
 // LoadConfig loads the configuration using Viper.

@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/viper"
 )
 
 func TestLoadConfig_Success(t *testing.T) {
@@ -217,8 +219,14 @@ POWERWORD_MODEL=dotenv-model
 		t.Fatalf("failed to write .env: %v", errWrite)
 	}
 
-	t.Setenv("POWERWORD_GEMINI_API_KEY", "dotenv-gemini-key")
-	t.Setenv("POWERWORD_MODEL", "dotenv-model")
+	// Explicitly unset variables to verify they are loaded from the .env file
+	_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
+	_ = os.Unsetenv("POWERWORD_MODEL")
+
+	defer func() {
+		_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
+		_ = os.Unsetenv("POWERWORD_MODEL")
+	}()
 
 	cfg, err := LoadConfig("")
 	if err != nil {
@@ -277,4 +285,71 @@ verbose = "not-a-bool"
 	if err == nil {
 		t.Errorf("expected error for invalid TOML format in default path, got nil")
 	}
+}
+
+func TestLoadConfig_DotEnv_SafeOverride(t *testing.T) {
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+
+	if errChdir := os.Chdir(tmpDir); errChdir != nil {
+		t.Fatalf("failed to change directory: %v", errChdir)
+	}
+	defer func() {
+		_ = os.Chdir(origWd)
+	}()
+
+	envContent := `
+POWERWORD_GEMINI_API_KEY=dotenv-gemini-key
+POWERWORD_MODEL=dotenv-model
+SOME_OTHER_VAR=dotenv-other-key
+`
+	if errWrite := os.WriteFile(".env", []byte(envContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write .env: %v", errWrite)
+	}
+
+	// Preset POWERWORD_GEMINI_API_KEY to test that it doesn't get overridden
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "preset-gemini-key")
+	_ = os.Unsetenv("POWERWORD_MODEL")
+	_ = os.Unsetenv("SOME_OTHER_VAR")
+
+	defer func() {
+		_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
+		_ = os.Unsetenv("POWERWORD_MODEL")
+		_ = os.Unsetenv("SOME_OTHER_VAR")
+	}()
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig returned unexpected error: %v", err)
+	}
+
+	// Should keep the preset key instead of using the dotenv one
+	if cfg.APIKeys.Gemini != "preset-gemini-key" {
+		t.Errorf("expected Gemini API key to keep its preset value 'preset-gemini-key', got '%s'", cfg.APIKeys.Gemini)
+	}
+
+	// Should load the model key which wasn't preset
+	if cfg.Model != "dotenv-model" {
+		t.Errorf("expected Model to load from dotenv as 'dotenv-model', got '%s'", cfg.Model)
+	}
+
+	// Should NOT load SOME_OTHER_VAR (doesn't start with POWERWORD_)
+	if os.Getenv("SOME_OTHER_VAR") != "" {
+		t.Errorf("expected SOME_OTHER_VAR to not be loaded, got '%s'", os.Getenv("SOME_OTHER_VAR"))
+	}
+}
+
+func TestBindEnv_Error(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected bindEnv to panic with 0 arguments, but it did not")
+		}
+	}()
+
+	v := viper.New()
+	bindEnv(v) // 0 arguments triggers BindEnv error/panic
 }
