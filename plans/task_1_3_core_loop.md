@@ -14,6 +14,9 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 > - Toggles bold (`**`) and italic (`*`) text in real-time.
 > - Identifies and styles `<think>` ... `</think>` blocks (common in reasoning models) with dimmed, italicized text and a brainstorming icon.
 > - Word wrapping is handled dynamically. The formatter statefully buffers space tokens and wraps on word boundaries.
+> - Supports multi-byte Unicode display-width calculations for correct wrapping of double-width CJK characters and emojis.
+> - Integrates control character sanitization to prevent terminal control-sequence injection (escaping ESC `\x1b` to `^[` and converting other control characters/DEL `\x7f` to `\uFFFD`).
+> - Implements robust, idempotent flushing and captures deferred write errors safely.
 
 ## Proposed Changes
 
@@ -48,7 +51,7 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
   - Verified indentation preservation on lists and headers.
   - Verified multi-byte UTF-8 partial rune streaming buffers.
   - Verified mock LLM client streams and error chunk propagation.
-  - Verified 92.00% unit test coverage across `./internal/...`.
+  - Verified 91.60% unit test coverage across `./internal/...`.
 
 ### Manual Verification
 - Execute a query using Gemini/OpenAI (e.g. `powerword "write a python function to fetch status codes"`) and verify that formatting matches standard markdown styling in standard terminal setups.
