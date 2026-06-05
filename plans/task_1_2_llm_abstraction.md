@@ -1,6 +1,6 @@
 # Task 1.2: LLM Abstraction Layer
 
-Define a uniform abstraction interface to interact with multiple LLM providers (Gemini, OpenAI, and Anthropic). Implement provider wrappers using their official Go clients.
+Define a uniform abstraction interface to interact with multiple LLM providers (Gemini, OpenAI, and Anthropic). Implement provider wrappers using their Go SDKs (the official SDKs for Gemini and Anthropic, and the popular community SDK for OpenAI).
 
 ## Actual Choices & Configurations
 

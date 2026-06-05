@@ -33,7 +33,7 @@ func NewAnthropicClientWithOpts(modelName string, opts ...option.RequestOption) 
 	}, nil
 }
 
-func (g *AnthropicClient) prepareParams(messages []Message, tools []ToolDefinition) (anthropic.MessageNewParams, error) {
+func (a *AnthropicClient) prepareParams(messages []Message, tools []ToolDefinition) (anthropic.MessageNewParams, error) {
 	var anthropicMessages []anthropic.MessageParam
 	var systemPrompt string
 
@@ -90,7 +90,7 @@ func (g *AnthropicClient) prepareParams(messages []Message, tools []ToolDefiniti
 	}
 
 	params := anthropic.MessageNewParams{
-		Model:     anthropic.Model(g.modelName),
+		Model:     anthropic.Model(a.modelName),
 		MaxTokens: int64(4096),
 		Messages:  anthropicMessages,
 	}
@@ -124,13 +124,13 @@ func (g *AnthropicClient) prepareParams(messages []Message, tools []ToolDefiniti
 	return params, nil
 }
 
-func (g *AnthropicClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
-	params, err := g.prepareParams(messages, tools)
+func (a *AnthropicClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
+	params, err := a.prepareParams(messages, tools)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := g.client.Messages.New(ctx, params)
+	msg, err := a.client.Messages.New(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("anthropic messages error: %w", err)
 	}
@@ -156,13 +156,13 @@ func (g *AnthropicClient) Generate(ctx context.Context, messages []Message, tool
 	return assistantMsg, nil
 }
 
-func (g *AnthropicClient) Stream(ctx context.Context, messages []Message, tools []ToolDefinition) (<-chan StreamChunk, error) {
-	params, err := g.prepareParams(messages, tools)
+func (a *AnthropicClient) Stream(ctx context.Context, messages []Message, tools []ToolDefinition) (<-chan StreamChunk, error) {
+	params, err := a.prepareParams(messages, tools)
 	if err != nil {
 		return nil, err
 	}
 
-	stream := g.client.Messages.NewStreaming(ctx, params)
+	stream := a.client.Messages.NewStreaming(ctx, params)
 	out := make(chan StreamChunk, 10)
 
 	go func() {

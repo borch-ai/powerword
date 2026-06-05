@@ -213,7 +213,13 @@ func TestAnthropic_ConvertSchema(t *testing.T) {
 }
 
 func TestNewAnthropicClient_Direct(t *testing.T) {
-	_, _ = NewAnthropicClient("dummy-key", "claude-3-5-sonnet")
+	client, err := NewAnthropicClient("dummy-key", "claude-3-5-sonnet")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected client to not be nil")
+	}
 }
 
 func TestAnthropic_CoverageBonus(t *testing.T) {

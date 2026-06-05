@@ -255,9 +255,13 @@ func TestGemini_ConvertSchema(t *testing.T) {
 
 func TestNewGeminiClient_Direct(t *testing.T) {
 	// Call NewGeminiClient directly to cover that branch.
-	// Since it tries to initialize a real client, it might fail/error out if there's no auth,
-	// but we can pass a dummy key and check that it creates it or fails gracefully.
-	_, _ = NewGeminiClient("dummy-key", "gemini-1.5-pro")
+	client, err := NewGeminiClient("dummy-key", "gemini-1.5-pro")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected client to not be nil")
+	}
 }
 
 func TestGemini_CoverageBonus(t *testing.T) {

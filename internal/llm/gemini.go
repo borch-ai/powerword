@@ -49,7 +49,7 @@ func NewGeminiClientWithOpts(modelName string, opts ...option.ClientOption) (*Ge
 	}, nil
 }
 
-func (g *GeminiClient) prepareModel(ctx context.Context, messages []Message, tools []ToolDefinition) (*genai.GenerativeModel, []*genai.Content, []genai.Part, error) {
+func (g *GeminiClient) prepareModel(messages []Message, tools []ToolDefinition) (*genai.GenerativeModel, []*genai.Content, []genai.Part, error) {
 	model := g.client.GenerativeModel(g.modelName)
 
 	// Convert tools
@@ -121,7 +121,7 @@ func (g *GeminiClient) prepareModel(ctx context.Context, messages []Message, too
 }
 
 func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
-	model, history, lastParts, err := g.prepareModel(ctx, messages, tools)
+	model, history, lastParts, err := g.prepareModel(messages, tools)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 }
 
 func (g *GeminiClient) Stream(ctx context.Context, messages []Message, tools []ToolDefinition) (<-chan StreamChunk, error) {
-	model, history, lastParts, err := g.prepareModel(ctx, messages, tools)
+	model, history, lastParts, err := g.prepareModel(messages, tools)
 	if err != nil {
 		return nil, err
 	}

@@ -229,5 +229,11 @@ func TestOpenAIClient_InvalidRole(t *testing.T) {
 }
 
 func TestNewOpenAIClient_Direct(t *testing.T) {
-	_, _ = NewOpenAIClient("dummy-key", "gpt-4")
+	client, err := NewOpenAIClient("dummy-key", "gpt-4")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if client == nil {
+		t.Fatal("expected client to not be nil")
+	}
 }
