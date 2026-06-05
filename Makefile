@@ -17,11 +17,15 @@ FS_PLUGIN=pw-mcp-fs
 GIT_PLUGIN=pw-mcp-git
 SHELL_PLUGIN=pw-mcp-shell
 
+# Version parameter (can be overridden via: make build VERSION=v1.2.3)
+VERSION?=dev
+LDFLAGS=-ldflags "-X powerword/internal/config.Version=$(VERSION)"
+
 all: markdown-lint lint vuln check-coverage build
 
 build:
 	mkdir -p bin
-	$(GOBUILD) -o bin/$(BINARY_NAME) ./cmd/powerword
+	$(GOBUILD) $(LDFLAGS) -o bin/$(BINARY_NAME) ./cmd/powerword
 	# Compile plugins if folders exist
 	@if [ -d cmd/$(FS_PLUGIN) ]; then $(GOBUILD) -o bin/$(FS_PLUGIN) ./cmd/$(FS_PLUGIN); fi
 	@if [ -d cmd/$(GIT_PLUGIN) ]; then $(GOBUILD) -o bin/$(GIT_PLUGIN) ./cmd/$(GIT_PLUGIN); fi

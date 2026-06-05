@@ -21,7 +21,8 @@ func NewRootCmd() *cobra.Command {
 		Long: `Powerword is a lightweight, extensible command-line interface designed
 to bring vendor-agnostic, agentic AI capabilities directly to your terminal
 using the Model Context Protocol (MCP).`,
-		Args: cobra.MaximumNArgs(1),
+		Version: Version,
+		Args:    cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip config loading/validation if no arguments are provided (shows help).
 			if len(args) == 0 {
