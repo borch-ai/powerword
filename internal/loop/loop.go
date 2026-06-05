@@ -34,7 +34,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) error {
 
 	width := getTerminalWidth()
 	formatter := NewTerminalFormatter(os.Stdout, width)
-	defer formatter.Flush()
+	defer func() { _ = formatter.Flush() }()
 
 	for chunk := range chunks {
 		if chunk.Error != nil {
@@ -45,6 +45,10 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) error {
 				return fmt.Errorf("failed to write output: %w", err)
 			}
 		}
+	}
+
+	if err := formatter.Flush(); err != nil {
+		return fmt.Errorf("failed to flush output: %w", err)
 	}
 
 	return nil

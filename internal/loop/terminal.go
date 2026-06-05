@@ -13,6 +13,7 @@ import (
 type TerminalFormatter struct {
 	writer io.Writer
 	width  int
+	err    error // Stores the first encountered write error
 
 	// State variables
 	inCodeBlock        bool
@@ -43,10 +44,43 @@ func NewTerminalFormatter(w io.Writer, width int) *TerminalFormatter {
 	}
 }
 
+// writeBytes writes data to the underlying writer, capturing the first error.
+func (f *TerminalFormatter) writeBytes(p []byte) {
+	if f.err != nil {
+		return
+	}
+	_, err := f.writer.Write(p)
+	if err != nil {
+		f.err = err
+	}
+}
+
+// writeString writes a string to the underlying writer, capturing the first error.
+func (f *TerminalFormatter) writeString(s string) {
+	f.writeBytes([]byte(s))
+}
+
+// writeFprintf writes formatted data to the underlying writer, capturing the first error.
+func (f *TerminalFormatter) writeFprintf(format string, args ...any) {
+	if f.err != nil {
+		return
+	}
+	_, err := fmt.Fprintf(f.writer, format, args...)
+	if err != nil {
+		f.err = err
+	}
+}
+
 // Write appends streaming bytes, processes formatting, and outputs colored styled text.
 func (f *TerminalFormatter) Write(p []byte) (int, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
 	f.buf = append(f.buf, p...)
 	f.process()
+	if f.err != nil {
+		return 0, f.err
+	}
 	return len(p), nil
 }
 
@@ -81,7 +115,7 @@ func (f *TerminalFormatter) updateStyles() {
 		parts = append(parts, "3")
 	}
 
-	_, _ = f.writer.Write([]byte("\x1b[" + strings.Join(parts, ";") + "m"))
+	f.writeString("\x1b[" + strings.Join(parts, ";") + "m")
 }
 
 // hasIncompletePrefix checks if the current buffer starts with a prefix of a token
@@ -150,17 +184,17 @@ func (f *TerminalFormatter) flushWord() {
 	spaceLen := f.pendingSpaces
 
 	if f.width > 0 && f.currentCol+spaceLen+wordVisualLen > f.width && f.currentCol > len(f.wrapIndent) {
-		_, _ = f.writer.Write([]byte("\n"))
-		_, _ = f.writer.Write([]byte(f.wrapIndent))
+		f.writeString("\n")
+		f.writeString(f.wrapIndent)
 		f.currentCol = len(f.wrapIndent)
 		f.pendingSpaces = 0
 	} else if f.pendingSpaces > 0 {
-		_, _ = f.writer.Write([]byte(strings.Repeat(" ", f.pendingSpaces)))
+		f.writeString(strings.Repeat(" ", f.pendingSpaces))
 		f.currentCol += f.pendingSpaces
 		f.pendingSpaces = 0
 	}
 
-	_, _ = f.writer.Write([]byte(wordStr))
+	f.writeString(wordStr)
 	f.currentCol += wordVisualLen
 	f.wordBuf = f.wordBuf[:0]
 }
@@ -199,7 +233,7 @@ func (f *TerminalFormatter) writeNewline() {
 		f.updateStyles()
 	}
 
-	_, _ = f.writer.Write([]byte("\n"))
+	f.writeString("\n")
 	f.currentCol = 0
 	f.isLineStart = true
 	f.pendingSpaces = 0
@@ -219,9 +253,9 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 	}
 
 	r, size := utf8.DecodeRune(f.buf)
-	if r == utf8.RuneError {
+	if r == utf8.RuneError && size == 1 {
 		// Consume 1 byte as plain text to avoid blocking on genuinely invalid bytes
-		_, _ = f.writer.Write(f.buf[:1])
+		f.writeBytes(f.buf[:1])
 		f.buf = f.buf[1:]
 		f.isLineStart = false
 		return true
@@ -231,17 +265,17 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 
 	if f.inCodeBlock {
 		if f.codeBlockLineStart {
-			_, _ = f.writer.Write([]byte("\x1b[0m  \x1b[34m│\x1b[0m "))
+			f.writeString("\x1b[0m  \x1b[34m│\x1b[0m ")
 			f.updateStyles()
 			f.codeBlockLineStart = false
 		}
 
 		if r == '\n' {
-			_, _ = f.writer.Write(runeBytes)
+			f.writeBytes(runeBytes)
 			f.isLineStart = true
 			f.codeBlockLineStart = true
 		} else {
-			_, _ = f.writer.Write(runeBytes)
+			f.writeBytes(runeBytes)
 			f.isLineStart = false
 		}
 	} else {
@@ -264,6 +298,10 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 // process scans the internal buffer for formatting tokens and text.
 func (f *TerminalFormatter) process() {
 	for len(f.buf) > 0 {
+		if f.err != nil {
+			return
+		}
+
 		if f.hasIncompletePrefix() {
 			return
 		}
@@ -280,9 +318,9 @@ func (f *TerminalFormatter) process() {
 				f.updateStyles()
 
 				if f.isLineStart {
-					_, _ = f.writer.Write([]byte("  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n"))
+					f.writeString("  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
 				} else {
-					_, _ = f.writer.Write([]byte("\n  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n"))
+					f.writeString("\n  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
 				}
 
 				f.buf = f.buf[consumeLen:]
@@ -300,16 +338,20 @@ func (f *TerminalFormatter) process() {
 		// Check for opening code block "```"
 		if bytes.HasPrefix(f.buf, []byte("```")) {
 			idx := bytes.IndexByte(f.buf, '\n')
+			consumeLen := 0
+			lang := ""
 			if idx == -1 {
 				if len(f.buf) < 50 {
 					return // Wait for newline
 				}
-				idx = 3
-			}
-
-			lang := strings.TrimSpace(string(f.buf[3:idx]))
-			if lang == "" {
 				lang = "code"
+				consumeLen = 3
+			} else {
+				lang = strings.TrimSpace(string(f.buf[3:idx]))
+				if lang == "" {
+					lang = "code"
+				}
+				consumeLen = idx + 1
 			}
 
 			f.flushWord()
@@ -317,12 +359,12 @@ func (f *TerminalFormatter) process() {
 			f.codeBlockLineStart = true
 
 			if !f.isLineStart {
-				_, _ = f.writer.Write([]byte("\n"))
+				f.writeString("\n")
 			}
-			_, _ = fmt.Fprintf(f.writer, "  \x1b[34m╭── %s ──────────────────────────────────────────────────────────\x1b[0m\n", lang)
+			f.writeFprintf("  \x1b[34m╭── %s ──────────────────────────────────────────────────────────\x1b[0m\n", lang)
 			f.updateStyles()
 
-			f.buf = f.buf[idx+1:]
+			f.buf = f.buf[consumeLen:]
 			f.isLineStart = true
 			continue
 		}
@@ -332,9 +374,9 @@ func (f *TerminalFormatter) process() {
 			f.flushWord()
 			f.inThinking = true
 			if !f.isLineStart {
-				_, _ = f.writer.Write([]byte("\n"))
+				f.writeString("\n")
 			}
-			_, _ = f.writer.Write([]byte("  \x1b[1;35m🧠 Thinking...\x1b[0m\n"))
+			f.writeString("  \x1b[1;35m🧠 Thinking...\x1b[0m\n")
 			f.wrapIndent = "  "
 			f.currentCol = 0
 			f.updateStyles()
@@ -347,7 +389,7 @@ func (f *TerminalFormatter) process() {
 			f.flushWord()
 			f.inThinking = false
 			f.updateStyles()
-			_, _ = f.writer.Write([]byte("\n"))
+			f.writeString("\n")
 			f.wrapIndent = ""
 			f.currentCol = 0
 			f.buf = f.buf[8:]
@@ -360,7 +402,7 @@ func (f *TerminalFormatter) process() {
 			// Unordered list
 			if len(f.buf) >= 2 && (f.buf[0] == '*' || f.buf[0] == '-' || f.buf[0] == '+') && f.buf[1] == ' ' {
 				f.flushWord()
-				_, _ = f.writer.Write([]byte("\x1b[1;35m •\x1b[0m "))
+				f.writeString("\x1b[1;35m •\x1b[0m ")
 				f.wrapIndent = "   "
 				f.currentCol = 3
 				f.buf = f.buf[2:]
@@ -376,7 +418,7 @@ func (f *TerminalFormatter) process() {
 			if i > 0 && i < len(f.buf) && f.buf[i] == '.' && i+1 < len(f.buf) && f.buf[i+1] == ' ' {
 				f.flushWord()
 				num := string(f.buf[:i])
-				_, _ = fmt.Fprintf(f.writer, "\x1b[1;35m %s.\x1b[0m ", num)
+				f.writeFprintf("\x1b[1;35m %s.\x1b[0m ", num)
 				f.wrapIndent = strings.Repeat(" ", len(num)+3)
 				f.currentCol = len(num) + 3
 				f.buf = f.buf[i+2:]
@@ -395,13 +437,13 @@ func (f *TerminalFormatter) process() {
 				f.headerLevel = n
 				switch n {
 				case 1:
-					_, _ = f.writer.Write([]byte("\x1b[1;35m█ \x1b[0m"))
+					f.writeString("\x1b[1;35m█ \x1b[0m")
 				case 2:
-					_, _ = f.writer.Write([]byte("\x1b[1;34m▓ \x1b[0m"))
+					f.writeString("\x1b[1;34m▓ \x1b[0m")
 				case 3:
-					_, _ = f.writer.Write([]byte("\x1b[1;36m▒ \x1b[0m"))
+					f.writeString("\x1b[1;36m▒ \x1b[0m")
 				default:
-					_, _ = f.writer.Write([]byte("\x1b[1;32m░ \x1b[0m"))
+					f.writeString("\x1b[1;32m░ \x1b[0m")
 				}
 				f.wrapIndent = "  "
 				f.currentCol = 2
@@ -437,24 +479,28 @@ func (f *TerminalFormatter) process() {
 }
 
 // Flush outputs any remaining text, closes formatting states, and resets terminal color.
-func (f *TerminalFormatter) Flush() {
+func (f *TerminalFormatter) Flush() error {
 	f.flushWord()
 
 	for len(f.buf) > 0 {
+		if f.err != nil {
+			return f.err
+		}
+
 		r, size := utf8.DecodeRune(f.buf)
-		if r == utf8.RuneError {
-			_, _ = f.writer.Write(f.buf[:1])
+		if r == utf8.RuneError && size == 1 {
+			f.writeBytes(f.buf[:1])
 			f.buf = f.buf[1:]
 			continue
 		}
 
 		if f.inCodeBlock && f.codeBlockLineStart {
-			_, _ = f.writer.Write([]byte("\x1b[0m  \x1b[34m│\x1b[0m "))
+			f.writeString("\x1b[0m  \x1b[34m│\x1b[0m ")
 			f.updateStyles()
 			f.codeBlockLineStart = false
 		}
 
-		_, _ = f.writer.Write(f.buf[:size])
+		f.writeBytes(f.buf[:size])
 		if r == '\n' {
 			f.isLineStart = true
 			if f.inCodeBlock {
@@ -470,17 +516,19 @@ func (f *TerminalFormatter) Flush() {
 		f.inCodeBlock = false
 		f.codeBlockLineStart = false
 		if f.isLineStart {
-			_, _ = f.writer.Write([]byte("  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n"))
+			f.writeString("  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
 		} else {
-			_, _ = f.writer.Write([]byte("\n  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n"))
+			f.writeString("\n  \x1b[34m╰────────────────────────────────────────────────────────────────\x1b[0m\n")
 		}
 	}
 
-	_, _ = f.writer.Write([]byte("\x1b[0m"))
+	f.writeString("\x1b[0m")
 	f.boldActive = false
 	f.italicActive = false
 	f.inThinking = false
 	f.inHeader = false
 	f.headerLevel = 0
 	f.wrapIndent = ""
+
+	return f.err
 }

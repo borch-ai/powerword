@@ -2,6 +2,7 @@ package loop
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -67,7 +68,7 @@ func TestTerminalFormatter_WordWrap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Write failed: %v", err)
 			}
-			formatter.Flush()
+			_ = formatter.Flush()
 
 			actual := buf.String()
 			if actual != tc.expected {
@@ -153,7 +154,7 @@ func TestTerminalFormatter_MarkdownFormatting(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Write failed: %v", err)
 			}
-			formatter.Flush()
+			_ = formatter.Flush()
 
 			actual := buf.String()
 			for _, exp := range tc.expected {
@@ -173,7 +174,7 @@ func TestTerminalFormatter_CodeBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
-	formatter.Flush()
+	_ = formatter.Flush()
 
 	actual := buf.String()
 	if !strings.Contains(actual, "╭── go ──") {
@@ -197,7 +198,7 @@ func TestTerminalFormatter_ThinkBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
-	formatter.Flush()
+	_ = formatter.Flush()
 
 	actual := buf.String()
 	if !strings.Contains(actual, "🧠 Thinking...") {
@@ -229,7 +230,7 @@ func TestTerminalFormatter_UTF8RuneSplitting(t *testing.T) {
 	}
 
 	_, _ = formatter.Write([]byte{lastByte2})
-	formatter.Flush()
+	_ = formatter.Flush()
 
 	actual := buf.String()
 	plain := stripANSI(actual)
@@ -244,7 +245,7 @@ func TestTerminalFormatter_CoverageBonus(t *testing.T) {
 		var buf bytes.Buffer
 		formatter := NewTerminalFormatter(&buf, 80)
 		_, _ = formatter.Write([]byte("hello\tworld"))
-		formatter.Flush()
+		_ = formatter.Flush()
 		plain := stripANSI(buf.String())
 		if !strings.Contains(plain, "hello    world") {
 			t.Errorf("expected tab to print 4 spaces, got %q", plain)
@@ -258,7 +259,7 @@ func TestTerminalFormatter_CoverageBonus(t *testing.T) {
 		// Enter thinking and bold
 		_, _ = formatter.Write([]byte("<think>**thinking and bold"))
 		// Flush while active
-		formatter.Flush()
+		_ = formatter.Flush()
 		plain := stripANSI(buf.String())
 		if !strings.Contains(plain, "Thinking...") {
 			t.Errorf("expected thinking to be flushed, got %q", plain)
@@ -273,7 +274,7 @@ func TestTerminalFormatter_CoverageBonus(t *testing.T) {
 		var buf bytes.Buffer
 		formatter := NewTerminalFormatter(&buf, 80)
 		_, _ = formatter.Write([]byte("```go\ncode content"))
-		formatter.Flush()
+		_ = formatter.Flush()
 		plain := stripANSI(buf.String())
 		if !strings.Contains(plain, "code content") {
 			t.Errorf("expected code content to be flushed, got %q", plain)
@@ -303,7 +304,7 @@ func TestTerminalFormatter_CoverageBonus(t *testing.T) {
 			if buf.Len() > 0 && !strings.Contains(pref, "*") && !strings.Contains(pref, "`") {
 				t.Errorf("expected no output for incomplete prefix %q, got %q", pref, buf.String())
 			}
-			formatter.Flush()
+			_ = formatter.Flush()
 		}
 	}
 
@@ -312,7 +313,7 @@ func TestTerminalFormatter_CoverageBonus(t *testing.T) {
 		var buf bytes.Buffer
 		formatter := NewTerminalFormatter(&buf, 80)
 		formatter.buf = []byte{0x80} // Invalid starting byte
-		formatter.Flush()
+		_ = formatter.Flush()
 		if len(buf.Bytes()) == 0 || buf.Bytes()[0] != 0x80 {
 			t.Errorf("expected invalid byte 0x80 to be flushed first, got %v", buf.Bytes())
 		}
@@ -323,10 +324,35 @@ func TestTerminalFormatter_CoverageBonus(t *testing.T) {
 		var buf bytes.Buffer
 		formatter := NewTerminalFormatter(&buf, 80)
 		_, _ = formatter.Write([]byte{0x80})
-		formatter.Flush()
+		_ = formatter.Flush()
 		plain := stripANSI(buf.String())
 		if len(plain) == 0 {
 			t.Errorf("expected invalid byte to be written")
 		}
+	}
+}
+
+type errorWriter struct{}
+
+func (e errorWriter) Write(p []byte) (int, error) {
+	return 0, errors.New("underlying write error")
+}
+
+func TestTerminalFormatter_ErrorPropagation(t *testing.T) {
+	formatter := NewTerminalFormatter(errorWriter{}, 80)
+	_, err := formatter.Write([]byte("hello world"))
+	if err == nil {
+		t.Fatal("expected write error, got nil")
+	}
+	if !strings.Contains(err.Error(), "underlying write error") {
+		t.Errorf("expected underlying write error, got %v", err)
+	}
+
+	err = formatter.Flush()
+	if err == nil {
+		t.Fatal("expected flush error, got nil")
+	}
+	if !strings.Contains(err.Error(), "underlying write error") {
+		t.Errorf("expected underlying write error, got %v", err)
 	}
 }
