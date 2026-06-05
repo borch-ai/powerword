@@ -47,7 +47,7 @@ powerword/
 
 ## Coding Guidelines
 
-- **Go Version:** Go 1.22+
+- **Go Version:** Go 1.23+
 - **Format & Quality:** Ensure all Go code is formatted with `gofmt` and linted using `golangci-lint` (configured in [.golangci.yml](file:///Users/human/code/powerword/.golangci.yml)). The lint settings enforce `gosec` (AST security checks), `bodyclose` (prevent socket leaks), and `noctx` (ensure context propagation). Run with `make lint`.
 - **Vulnerabilities:** Ensure code remains free of known package vulnerabilities by running the Go Vulnerability Scanner via `make vuln`.
 - **Naming Conventions:**
