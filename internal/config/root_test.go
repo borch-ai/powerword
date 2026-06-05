@@ -212,7 +212,7 @@ gemini = "gemini-key"
 	Active = nil
 
 	cmd := NewRootCmd()
-	
+
 	// Create a mock subcommand
 	subCmd := &cobra.Command{
 		Use: "mocksub",
@@ -228,7 +228,7 @@ gemini = "gemini-key"
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
-	
+
 	// Execute subcommand without arguments
 	cmd.SetArgs([]string{"mocksub", "--config", cfgFilePath})
 

@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"powerword/internal/config"
 	"powerword/internal/llm"
+
+	"github.com/spf13/cobra"
 )
 
 func newModelsCmd() *cobra.Command {
