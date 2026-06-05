@@ -56,8 +56,10 @@ using the Model Context Protocol (MCP).`,
 				cfg.ListSessions = listSessions
 			}
 
-			if err := cfg.Validate(); err != nil {
-				return err
+			if !cfg.ListSessions {
+				if err := cfg.Validate(); err != nil {
+					return err
+				}
 			}
 
 			Active = cfg
