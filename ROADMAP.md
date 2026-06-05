@@ -19,6 +19,9 @@ Focus: Bootstrapping the CLI application, establishing the LLM interface layer, 
 *   **Task 1.4: Session Persistence & Chat History Management**
     *   Implement a local persistence engine (JSON files or SQLite database) in `~/.local/share/powerword/sessions` to store chat history, session state, and model parameters. Support resuming past sessions using a `--session` CLI flag.
     *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_1_4_session_persistence.md)
+*   **Task 1.5: Markdown Linting & Implementation Plan Validation**
+    *   Integrate Markdown linting tooling (`markdownlint-cli`) into the repository gates. Establish an automated structure check script to verify that all implementation plans conform to the core template standard.
+    *   [Implementation Plan](file:///Users/human/code/powerword/plans/task_1_5_markdown_linting.md)
 
 ---
 
