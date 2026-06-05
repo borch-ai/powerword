@@ -28,7 +28,7 @@ build:
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOBUILD) -o bin/$(SHELL_PLUGIN) ./cmd/$(SHELL_PLUGIN); fi
 
 test:
-	$(GOTEST) -v -race -coverprofile=coverage.out ./...
+	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/... ./internal/...
 
 check-coverage: test
 	@go tool cover -func=coverage.out | go run scripts/check_coverage.go $(MIN_COVERAGE)
