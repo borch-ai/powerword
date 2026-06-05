@@ -1,6 +1,9 @@
 package config
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -12,6 +15,9 @@ var (
 
 // Active holds the successfully loaded application configuration.
 var Active *Config
+
+// Runner executes the execution loop. It must be registered by the main package to avoid import cycles.
+var Runner func(ctx context.Context, cfg *Config, prompt string) error
 
 // NewRootCmd creates and returns a new root Cobra command.
 func NewRootCmd() *cobra.Command {
@@ -59,7 +65,10 @@ using the Model Context Protocol (MCP).`,
 				cmd.Printf("Received prompt: %s\n", prompt)
 			}
 			cmd.Printf("Processing prompt with model %s...\n", Active.Model)
-			return nil
+			if Runner == nil {
+				return fmt.Errorf("no execution runner registered")
+			}
+			return Runner(cmd.Context(), Active, prompt)
 		},
 	}
 

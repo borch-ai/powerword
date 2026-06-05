@@ -2,10 +2,18 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	Runner = func(ctx context.Context, cfg *Config, prompt string) error {
+		return nil
+	}
+	os.Exit(m.Run())
+}
 
 func TestRootCmd_Success(t *testing.T) {
 	tmpDir := t.TempDir()
