@@ -16,10 +16,11 @@
 # vendor/
 
 # Project-specific binaries
-powerword
-pw-mcp-fs
-pw-mcp-git
-pw-mcp-shell
+/powerword
+/pw-mcp-fs
+/pw-mcp-git
+/pw-mcp-shell
+/bin/
 
 # IDEs/Editors configuration
 .idea/
