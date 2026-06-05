@@ -34,7 +34,7 @@ var sessionsBaseDir string
 func getSessionsDir() (string, error) {
 	if sessionsBaseDir != "" {
 		dir := filepath.Join(sessionsBaseDir, "sessions")
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			return "", fmt.Errorf("failed to create sessions directory: %w", err)
 		}
 		return dir, nil
@@ -45,7 +45,7 @@ func getSessionsDir() (string, error) {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 	dir := filepath.Join(home, ".local", "share", "powerword", "sessions")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return "", fmt.Errorf("failed to create sessions directory: %w", err)
 	}
 	return dir, nil
@@ -71,7 +71,7 @@ func SaveSession(session *Session) error {
 	}
 
 	filePath := filepath.Join(dir, session.ID+".json")
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write session file: %w", err)
 	}
 
@@ -90,6 +90,7 @@ func LoadSession(id string) (*Session, error) {
 	}
 
 	filePath := filepath.Join(dir, id+".json")
+	//nolint:gosec // filePath is constructed from known dir
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -133,6 +134,7 @@ func ListSessions() ([]SessionSummary, error) {
 		}
 
 		filePath := filepath.Join(dir, entry.Name())
+		//nolint:gosec // filePath is constructed from known dir
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			// Skip files that can't be read

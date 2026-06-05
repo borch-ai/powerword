@@ -17,9 +17,9 @@ var newClient = llm.NewClient
 // RunLoop runs the core execution and reasoning loop.
 func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
 	if cfg.ListSessions {
-		summaries, err := ListSessions()
-		if err != nil {
-			return fmt.Errorf("failed to list sessions: %w", err)
+		summaries, listErr := ListSessions()
+		if listErr != nil {
+			return fmt.Errorf("failed to list sessions: %w", listErr)
 		}
 		if len(summaries) == 0 {
 			fmt.Println("No sessions found.")
@@ -83,12 +83,12 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	if session != nil {
 		session.Model = cfg.Model
-		session.Messages = append(messages, llm.Message{
+		session.Messages = append(session.Messages, llm.Message{
 			Role:    llm.RoleAssistant,
 			Content: fullResponse.String(),
 		})
-		if err := SaveSession(session); err != nil {
-			return fmt.Errorf("failed to save session: %w", err)
+		if saveErr := SaveSession(session); saveErr != nil {
+			return fmt.Errorf("failed to save session: %w", saveErr)
 		}
 	}
 

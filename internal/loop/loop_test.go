@@ -134,12 +134,12 @@ func TestRunLoop_StreamChunkError(t *testing.T) {
 
 func TestRunLoop_ListSessions(t *testing.T) {
 	setupTestSessions(t)
-	
+
 	// Create a dummy session to list
 	session := &Session{
-		ID:        "test-list-session",
-		Model:     "test",
-		Messages:  []llm.Message{},
+		ID:       "test-list-session",
+		Model:    "test",
+		Messages: []llm.Message{},
 	}
 	_ = SaveSession(session)
 
@@ -212,7 +212,7 @@ func TestRunLoop_WithSession(t *testing.T) {
 
 func TestRunLoop_WithSessionLoadError(t *testing.T) {
 	dir := setupTestSessions(t)
-	
+
 	importOSAndFilepath := func() {
 		// Just to ensure os and filepath are imported if not used elsewhere, but they are.
 	}
@@ -220,8 +220,12 @@ func TestRunLoop_WithSessionLoadError(t *testing.T) {
 
 	// Need to manually create the invalid file
 	importOSDir := filepath.Join(dir, "sessions")
-	os.MkdirAll(importOSDir, 0755)
-	os.WriteFile(filepath.Join(importOSDir, "bad-session.json"), []byte("invalid json"), 0644)
+	if err := os.MkdirAll(importOSDir, 0750); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(importOSDir, "bad-session.json"), []byte("invalid json"), 0600); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
 
 	ctx := context.Background()
 	cfg := &config.Config{

@@ -92,14 +92,14 @@ func TestListSessions(t *testing.T) {
 
 	for _, s := range sessions {
 		sCopy := s
-		if err := SaveSession(&sCopy); err != nil {
-			t.Fatalf("failed to save session: %v", err)
+		if saveErr := SaveSession(&sCopy); saveErr != nil {
+			t.Fatalf("failed to save session: %v", saveErr)
 		}
 	}
 
 	// Add an invalid file
-	if err := os.WriteFile(filepath.Join(dir, "invalid.json"), []byte("not-json"), 0644); err != nil {
-		t.Fatalf("failed to write invalid file: %v", err)
+	if writeErr := os.WriteFile(filepath.Join(dir, "invalid.json"), []byte("not-json"), 0600); writeErr != nil {
+		t.Fatalf("failed to write invalid file: %v", writeErr)
 	}
 
 	summaries, err = ListSessions()
@@ -141,11 +141,11 @@ func TestLoadEmptySessionID(t *testing.T) {
 
 func TestGetSessionsDir_RealHome(t *testing.T) {
 	sessionsBaseDir = ""
-	
+
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
 	t.Setenv("USERPROFILE", tempHome)
-	
+
 	dir, err := getSessionsDir()
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -158,29 +158,41 @@ func TestGetSessionsDir_RealHome(t *testing.T) {
 
 func TestSaveSession_WriteError(t *testing.T) {
 	dir := setupTestSessions(t)
-	
+
 	// Create the sessions directory explicitly so we can chmod it
 	sessionsDir := filepath.Join(dir, "sessions")
-	os.MkdirAll(sessionsDir, 0755)
-	
+	if err := os.MkdirAll(sessionsDir, 0750); err != nil {
+		t.Fatalf("failed to create sessions directory: %v", err)
+	}
+
 	// Make dir read-only
-	os.Chmod(sessionsDir, 0444)
-	
+	//nolint:gosec // testing permissions
+	if err := os.Chmod(sessionsDir, 0444); err != nil {
+		t.Fatalf("failed to chmod: %v", err)
+	}
+
 	err := SaveSession(&Session{ID: "test"})
 	if err == nil {
 		t.Error("expected error saving to read-only dir")
 	}
-	
+
 	// Restore
-	os.Chmod(sessionsDir, 0755)
+	//nolint:gosec // testing permissions
+	if err := os.Chmod(sessionsDir, 0750); err != nil {
+		t.Fatalf("failed to restore chmod: %v", err)
+	}
 }
 
 func TestLoadSession_InvalidJSON(t *testing.T) {
 	dir := setupTestSessions(t)
 	sessionsDir := filepath.Join(dir, "sessions")
-	os.MkdirAll(sessionsDir, 0755)
-	os.WriteFile(filepath.Join(sessionsDir, "bad.json"), []byte("invalid"), 0644)
-	
+	if err := os.MkdirAll(sessionsDir, 0750); err != nil {
+		t.Fatalf("failed to create sessions directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sessionsDir, "bad.json"), []byte("invalid"), 0600); err != nil {
+		t.Fatalf("failed to write bad.json: %v", err)
+	}
+
 	_, err := LoadSession("bad")
 	if err == nil {
 		t.Error("expected error loading invalid json")
@@ -189,11 +201,13 @@ func TestLoadSession_InvalidJSON(t *testing.T) {
 
 func TestListSessions_ReadDirError(t *testing.T) {
 	dir := setupTestSessions(t)
-	
+
 	// Create a FILE named "sessions" so os.ReadDir fails
 	sessionsPath := filepath.Join(dir, "sessions")
-	os.WriteFile(sessionsPath, []byte("i am a file"), 0644)
-	
+	if err := os.WriteFile(sessionsPath, []byte("i am a file"), 0600); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
 	_, err := ListSessions()
 	if err == nil {
 		t.Error("expected error listing sessions when dir is a file")
