@@ -27,7 +27,7 @@ make
 
 ## Branching & Merging Policy
 
-*   **No Direct Commits / PR Required**: Direct commits and pushes to the `main` branch are blocked and disabled. All changes must be proposed via a Pull Request.
+*   **No Direct Pushes / PR Required**: Direct pushes (including web UI commits) to the remote `main` branch are blocked. All changes must be proposed via a Pull Request.
 *   **Force Pushes Blocked**: Force pushing (`git push -f`) is blocked on the `main` branch.
 *   **Feature Branches**: Create a dedicated branch for your work matching standard patterns (e.g., `feature/*`, `docs/*`, `bugfix/*`, `chore/*`, `refactor/*`, `test/*`).
 *   **Squash Merging**: All pull requests must be **squash merged** into `main`. This keeps the git history linear, clean, and easy to parse. Individual intermediate commits will be consolidated into a single structured commit on merge.
