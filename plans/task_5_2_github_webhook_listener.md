@@ -33,7 +33,7 @@ Build an MCP-enabled HTTP listener daemon that registers webhooks from GitHub (s
 ## Verification Plan
 
 ### Automated Tests
-- Run command: `go test ./internal/review/webhook_test.go`
+- Run command: `go test ./internal/review/...`
 - Unit tests verifying:
   - HMAC SHA256 signature verification logic.
   - Parsing of `pull_request_review_comment` payloads.

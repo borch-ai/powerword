@@ -9,7 +9,7 @@ Design a unified ReAct execution loop that pushes code, waits asynchronously for
 > To prevent infinite loops and runaway API costs, we will enforce a strict execution limit of **5 iterations** per repair task before stopping and prompting for human intervention.
 
 > [!IMPORTANT]
-> **Human Interception Hatch**:
+> **Human Intervention Hatch**:
 > The user can press `Ctrl+C` at any time to abort the autonomous loop. We will gracefully restore the workspace state using git stash/reset on abort.
 
 ## Proposed Changes
