@@ -3,9 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"powerword/internal/config"
 )
 
 func main() {
-	fmt.Println("Powerword CLI")
-	os.Exit(0)
+	if err := config.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
