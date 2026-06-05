@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
+    types: [opened, edited, reopened, synchronize]
     branches: [ main ]
 
 permissions:
@@ -33,6 +34,8 @@ jobs:
     name: Validate PR Title
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    permissions:
+      statuses: write
     steps:
       - name: Semantic PR Check
         uses: amannn/action-semantic-pull-request@v5
