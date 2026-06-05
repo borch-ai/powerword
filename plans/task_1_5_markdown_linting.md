@@ -5,42 +5,53 @@ Establish continuous integration gates to ensure all documentation files (.md) f
 ## User Review Required
 
 > [!NOTE]
-> Markdown Tooling: We will use `markdownlint-cli` (an npm module) or a lightweight Go equivalent to perform local markdown style checks during build stages. We will check for the presence of node/npm on the system.
+> **Go-Native Solution**: We chose a Go-native markdown linter and plan validator rather than using external Node.js/NPM dependencies (like `markdownlint-cli`). This keeps the repository lightweight and self-contained for Go developers.
+
+## Actual Choices & Configurations
+
+- **Go Version Used**: Go 1.26.4
+- **Formatting and Linting Tools Configured**:
+  - A Go-native markdown linter implemented under [linter.go](file:///Users/human/code/powerword/internal/linter/linter.go) and unit-tested in [linter_test.go](file:///Users/human/code/powerword/internal/linter/linter_test.go).
+  - A plan template validator implemented under [linter.go](file:///Users/human/code/powerword/internal/linter/linter.go).
+  - Multi-file scripts runner organized under [scripts/lint_markdown/main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go) and [scripts/lint_plans/main.go](file:///Users/human/code/powerword/scripts/lint_plans/main.go).
+  - Makefile targets integrated into the default validation pipeline (`make all` and `make markdown-lint`).
+  - GitHub Actions CI workflow updated to run `make markdown-lint` as part of `ci.yml`.
 
 ## Proposed Changes
 
 ### Configuration & Scripters
 
-#### [NEW] [.markdownlint.json](file:///Users/human/code/powerword/.markdownlint.json)
-- Configures rules for `markdownlint-cli`:
-  - `MD013` (Line length): Disabled or customized to allow long lines (e.g. 120 chars or infinite for headings/paragraphs).
-  - `MD024` (Duplicate headers): Enabled to prevent duplicate header strings.
-  - `MD029` (Ordered list prefix): Standardized to use `1.` style prefixes.
+#### [NEW] [linter.go](file:///Users/human/code/powerword/internal/linter/linter.go)
+- Core Go-native logic for checking basic Markdown formatting:
+  - `MD024` (Duplicate headers): Enabled to prevent duplicate header strings within the same file.
+  - `MD029` (Ordered list prefix): Standardized to use `1.` style prefixes or sequential prefixes starting from 1.
+  - Skips text within code blocks to prevent false positives.
+- Core Go-native logic for checking plan files under `plans/` for required template headings.
 
-#### [NEW] [lint_plans.go](file:///Users/human/code/powerword/scripts/lint_plans.go)
-- A Go script that scans the `plans/` directory.
-- For each `.md` file (except `TEMPLATE.md`), checks if it contains the required template headings:
-  - `# [Goal Description]` (or similar top-level header)
-  - `## User Review Required`
-  - `## Proposed Changes`
-  - `## Verification Plan`
-- Fails with a descriptive error specifying which headings are missing if validation fails.
+#### [NEW] [linter_test.go](file:///Users/human/code/powerword/internal/linter/linter_test.go)
+- Comprehensive unit tests covering header duplicates, nested lists, list resets, style violations, and plan templates.
+- Enforces strict coverage threshold.
+
+#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
+- Walks the project directory and checks all markdown files with `linter.LintMarkdown`.
+
+#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_plans/main.go)
+- Scans `plans/*.md` (excluding `TEMPLATE.md`) and validates headings with `linter.LintPlan`.
 
 #### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
-- Adds a `markdown-lint` target:
-  - Checks if `markdownlint` is installed. If not, warns or installs locally.
-  - Runs `markdownlint **/*.md`.
-  - Runs `go run scripts/lint_plans.go`.
+- Adds a `markdown-lint` target which runs both script commands.
 - Integrates `markdown-lint` into the standard `make all` validation target pipeline.
+
+#### [MODIFY] [ci.yml](file:///Users/human/code/powerword/.github/workflows/ci.yml)
+- Adds a build step to run `make markdown-lint` to check PR validation.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- Test `lint_plans.go` against a mock directory containing:
-  - A correctly formatted mock plan.
-  - A plan missing the "Proposed Changes" heading (must fail validation).
+- Run `go test -v ./internal/linter/...` to execute the new linting logic tests.
+- Run `make check-coverage` to verify the coverage.
 
 ### Manual Verification
 - Run `make markdown-lint` on the current repository. Verify it checks all markdown files successfully and passes with no style issues.
