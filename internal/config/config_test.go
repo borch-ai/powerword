@@ -223,3 +223,82 @@ func TestLoadConfig_EmptyDefaultConfigPath(t *testing.T) {
 		t.Error("expected error when LoadConfig is called with empty cfgFile and empty DefaultConfigPath, got nil")
 	}
 }
+
+func TestLoadConfig_DotEnv(t *testing.T) {
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "pw-dotenv-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	if errChdir := os.Chdir(tmpDir); errChdir != nil {
+		t.Fatalf("failed to change directory: %v", errChdir)
+	}
+	defer func() {
+		_ = os.Chdir(origWd)
+	}()
+
+	envContent := `
+POWERWORD_GEMINI_API_KEY=dotenv-gemini-key
+POWERWORD_MODEL=dotenv-model
+`
+	if errWrite := os.WriteFile(".env", []byte(envContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write .env: %v", errWrite)
+	}
+
+	defer func() {
+		_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
+		_ = os.Unsetenv("POWERWORD_MODEL")
+	}()
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig returned unexpected error: %v", err)
+	}
+
+	if cfg.APIKeys.Gemini != "dotenv-gemini-key" {
+		t.Errorf("expected Gemini API key 'dotenv-gemini-key', got '%s'", cfg.APIKeys.Gemini)
+	}
+	if cfg.Model != "dotenv-model" {
+		t.Errorf("expected Model 'dotenv-model', got '%s'", cfg.Model)
+	}
+}
+
+func TestLoadConfig_DotEnvReadError(t *testing.T) {
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "pw-dotenv-err-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	if errChdir := os.Chdir(tmpDir); errChdir != nil {
+		t.Fatalf("failed to change directory: %v", errChdir)
+	}
+	defer func() {
+		_ = os.Chdir(origWd)
+	}()
+
+	// Create .env as a directory to trigger a read error
+	if errMkdir := os.Mkdir(".env", 0750); errMkdir != nil {
+		t.Fatalf("failed to create .env directory: %v", errMkdir)
+	}
+
+	_, err = LoadConfig("")
+	if err == nil {
+		t.Errorf("expected error when .env is a directory, got nil")
+	}
+}

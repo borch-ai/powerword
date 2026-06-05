@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -33,8 +34,40 @@ func init() {
 	}
 }
 
+// loadDotEnv reads the local .env file if it exists and pushes the keys into the process environment
+// so that BindEnv can pick them up.
+func loadDotEnv() error {
+	v := viper.New()
+	v.SetConfigFile(".env")
+	v.SetConfigType("env")
+
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return nil
+		}
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to read .env file: %w", err)
+	}
+
+	for _, key := range v.AllKeys() {
+		val := v.GetString(key)
+		upperKey := strings.ToUpper(key)
+		if err := os.Setenv(upperKey, val); err != nil {
+			return fmt.Errorf("failed to set environment variable %s: %w", upperKey, err)
+		}
+	}
+
+	return nil
+}
+
 // LoadConfig loads the configuration using Viper.
 func LoadConfig(cfgFile string) (*Config, error) {
+	if err := loadDotEnv(); err != nil {
+		return nil, err
+	}
+
 	v := viper.New()
 
 	if cfgFile != "" {

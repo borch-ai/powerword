@@ -183,3 +183,29 @@ gemini = "gemini-key"
 		t.Fatalf("RootCmd.Execute returned unexpected error: %v", err)
 	}
 }
+
+func TestExecute(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "pw-exec-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
+
+	cfgFilePath := filepath.Join(tmpDir, "config.toml")
+	tomlContent := `
+[api_keys]
+gemini = "gemini-key"
+`
+	if err := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); err != nil {
+		t.Fatalf("failed to write temp config: %v", err)
+	}
+
+	RootCmd.SetArgs([]string{"--config", cfgFilePath, "test prompt"})
+
+	errExec := Execute()
+	if errExec != nil {
+		t.Fatalf("Execute returned error: %v", errExec)
+	}
+}
