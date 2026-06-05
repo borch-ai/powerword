@@ -62,6 +62,11 @@ func loadDotEnv() error {
 	return nil
 }
 
+// bindEnv is a helper to bind environment variables to Viper.
+func bindEnv(v *viper.Viper, input ...string) {
+	_ = v.BindEnv(input...)
+}
+
 // LoadConfig loads the configuration using Viper.
 func LoadConfig(cfgFile string) (*Config, error) {
 	if err := loadDotEnv(); err != nil {
@@ -102,11 +107,11 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 	// Environment variable overrides
 	// Explicitly bind env vars to mapstructure path
-	_ = v.BindEnv("api_keys.gemini", "POWERWORD_GEMINI_API_KEY")
-	_ = v.BindEnv("api_keys.openai", "POWERWORD_OPENAI_API_KEY")
-	_ = v.BindEnv("api_keys.anthropic", "POWERWORD_ANTHROPIC_API_KEY")
-	_ = v.BindEnv("model", "POWERWORD_MODEL")
-	_ = v.BindEnv("verbose", "POWERWORD_VERBOSE")
+	bindEnv(v, "api_keys.gemini", "POWERWORD_GEMINI_API_KEY")
+	bindEnv(v, "api_keys.openai", "POWERWORD_OPENAI_API_KEY")
+	bindEnv(v, "api_keys.anthropic", "POWERWORD_ANTHROPIC_API_KEY")
+	bindEnv(v, "model", "POWERWORD_MODEL")
+	bindEnv(v, "verbose", "POWERWORD_VERBOSE")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

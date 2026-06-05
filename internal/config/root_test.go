@@ -8,14 +8,7 @@ import (
 )
 
 func TestRootCmd_Success(t *testing.T) {
-	// Create a temp directory and write config
-	tmpDir, err := os.MkdirTemp("", "pw-root-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
 	tomlContent := `
@@ -28,21 +21,18 @@ gemini = "gemini-key"
 		t.Fatalf("failed to write temp config: %v", errWrite)
 	}
 
-	// Reset Active and flag variables
+	// Reset Active
 	Active = nil
-	cfgFile = ""
-	model = ""
-	verbose = false
 
-	// Prepare buffers
+	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
-	RootCmd.SetOut(buf)
-	RootCmd.SetErr(buf)
-	RootCmd.SetArgs([]string{"--config", cfgFilePath, "test prompt"})
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--config", cfgFilePath, "test prompt"})
 
-	err = RootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
-		t.Fatalf("RootCmd.Execute returned unexpected error: %v", err)
+		t.Fatalf("cmd.Execute returned unexpected error: %v", err)
 	}
 
 	if Active == nil {
@@ -59,14 +49,7 @@ gemini = "gemini-key"
 }
 
 func TestRootCmd_FlagOverrides(t *testing.T) {
-	// Create a temp directory and write config
-	tmpDir, err := os.MkdirTemp("", "pw-root-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
 	tomlContent := `
@@ -81,19 +64,17 @@ gemini = "gemini-key"
 
 	// Reset Active
 	Active = nil
-	cfgFile = ""
-	model = ""
-	verbose = false
 
+	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
-	RootCmd.SetOut(buf)
-	RootCmd.SetErr(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	// Override model via flag
-	RootCmd.SetArgs([]string{"--config", cfgFilePath, "--model", "flag-model", "--verbose", "test prompt"})
+	cmd.SetArgs([]string{"--config", cfgFilePath, "--model", "flag-model", "--verbose", "test prompt"})
 
-	err = RootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
-		t.Fatalf("RootCmd.Execute returned unexpected error: %v", err)
+		t.Fatalf("cmd.Execute returned unexpected error: %v", err)
 	}
 
 	if Active == nil {
@@ -110,14 +91,7 @@ gemini = "gemini-key"
 }
 
 func TestRootCmd_ValidationError(t *testing.T) {
-	// Create config with no API keys
-	tmpDir, err := os.MkdirTemp("", "pw-root-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
 	tomlContent := `
@@ -130,30 +104,21 @@ model = "toml-model"
 
 	// Reset Active
 	Active = nil
-	cfgFile = ""
-	model = ""
-	verbose = false
 
+	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
-	RootCmd.SetOut(buf)
-	RootCmd.SetErr(buf)
-	RootCmd.SetArgs([]string{"--config", cfgFilePath, "test prompt"})
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"--config", cfgFilePath, "test prompt"})
 
-	err = RootCmd.Execute()
+	err := cmd.Execute()
 	if err == nil {
 		t.Fatalf("expected validation error, got nil")
 	}
 }
 
 func TestRootCmd_NoArgs(t *testing.T) {
-	// Create config with gemini key
-	tmpDir, err := os.MkdirTemp("", "pw-root-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
 	tomlContent := `
@@ -168,41 +133,29 @@ gemini = "gemini-key"
 
 	// Reset Active
 	Active = nil
-	cfgFile = ""
-	model = ""
-	verbose = false
 
+	cmd := NewRootCmd()
 	buf := new(bytes.Buffer)
-	RootCmd.SetOut(buf)
-	RootCmd.SetErr(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	// Run without prompt args, should call help
-	RootCmd.SetArgs([]string{"--config", cfgFilePath})
+	cmd.SetArgs([]string{"--config", cfgFilePath})
 
-	err = RootCmd.Execute()
+	err := cmd.Execute()
 	if err != nil {
-		t.Fatalf("RootCmd.Execute returned unexpected error: %v", err)
+		t.Fatalf("cmd.Execute returned unexpected error: %v", err)
 	}
 }
 
 func TestExecute(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "pw-exec-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	origArgs := os.Args
+	defer func() { os.Args = origArgs }()
 
-	cfgFilePath := filepath.Join(tmpDir, "config.toml")
-	tomlContent := `
-[api_keys]
-gemini = "gemini-key"
-`
-	if err := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); err != nil {
-		t.Fatalf("failed to write temp config: %v", err)
-	}
+	// Mock command arguments for executing the test
+	os.Args = []string{"powerword", "test prompt"}
 
-	RootCmd.SetArgs([]string{"--config", cfgFilePath, "test prompt"})
+	// Set API key via env so validation passes
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "env-gemini-key")
 
 	errExec := Execute()
 	if errExec != nil {

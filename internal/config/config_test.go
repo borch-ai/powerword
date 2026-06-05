@@ -7,14 +7,7 @@ import (
 )
 
 func TestLoadConfig_Success(t *testing.T) {
-	// Create a temporary directory for config
-	tmpDir, err := os.MkdirTemp("", "pw-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	tomlContent := `
 verbose = true
@@ -58,13 +51,7 @@ openai = "openai-key-456"
 }
 
 func TestLoadConfig_EnvOverrides(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "pw-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	tomlContent := `
 verbose = false
@@ -78,20 +65,12 @@ gemini = "gemini-key-toml"
 		t.Fatalf("failed to write temp config: %v", errWrite)
 	}
 
-	// Set env overrides
-	_ = os.Setenv("POWERWORD_GEMINI_API_KEY", "gemini-key-env")
-	_ = os.Setenv("POWERWORD_OPENAI_API_KEY", "openai-key-env")
-	_ = os.Setenv("POWERWORD_ANTHROPIC_API_KEY", "anthropic-key-env")
-	_ = os.Setenv("POWERWORD_MODEL", "openai-model-env")
-	_ = os.Setenv("POWERWORD_VERBOSE", "true")
-
-	defer func() {
-		_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
-		_ = os.Unsetenv("POWERWORD_OPENAI_API_KEY")
-		_ = os.Unsetenv("POWERWORD_ANTHROPIC_API_KEY")
-		_ = os.Unsetenv("POWERWORD_MODEL")
-		_ = os.Unsetenv("POWERWORD_VERBOSE")
-	}()
+	// Set env overrides using t.Setenv (which cleans up automatically)
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "gemini-key-env")
+	t.Setenv("POWERWORD_OPENAI_API_KEY", "openai-key-env")
+	t.Setenv("POWERWORD_ANTHROPIC_API_KEY", "anthropic-key-env")
+	t.Setenv("POWERWORD_MODEL", "openai-model-env")
+	t.Setenv("POWERWORD_VERBOSE", "true")
 
 	cfg, err := LoadConfig(cfgFilePath)
 	if err != nil {
@@ -123,13 +102,7 @@ func TestLoadConfig_MissingCustomConfig(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidTOML(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "pw-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	invalidContent := `
 verbose = "not-a-bool"
@@ -139,7 +112,7 @@ verbose = "not-a-bool"
 		t.Fatalf("failed to write temp config: %v", errWrite)
 	}
 
-	_, err = LoadConfig(cfgFilePath)
+	_, err := LoadConfig(cfgFilePath)
 	if err == nil {
 		t.Errorf("expected error for invalid TOML format, got nil")
 	}
@@ -198,10 +171,7 @@ func TestLoadConfig_DefaultConfigNotFound(t *testing.T) {
 	DefaultConfigPath = filepath.Join(t.TempDir(), "non-existent-dir", "config.toml")
 
 	// Set API key via env so validation passes
-	_ = os.Setenv("POWERWORD_GEMINI_API_KEY", "env-key")
-	defer func() {
-		_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
-	}()
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "env-key")
 
 	cfg, err := LoadConfig("")
 	if err != nil {
@@ -230,13 +200,7 @@ func TestLoadConfig_DotEnv(t *testing.T) {
 		t.Fatalf("failed to get working directory: %v", err)
 	}
 
-	tmpDir, err := os.MkdirTemp("", "pw-dotenv-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	if errChdir := os.Chdir(tmpDir); errChdir != nil {
 		t.Fatalf("failed to change directory: %v", errChdir)
@@ -253,10 +217,8 @@ POWERWORD_MODEL=dotenv-model
 		t.Fatalf("failed to write .env: %v", errWrite)
 	}
 
-	defer func() {
-		_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
-		_ = os.Unsetenv("POWERWORD_MODEL")
-	}()
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "dotenv-gemini-key")
+	t.Setenv("POWERWORD_MODEL", "dotenv-model")
 
 	cfg, err := LoadConfig("")
 	if err != nil {
@@ -277,13 +239,7 @@ func TestLoadConfig_DotEnvReadError(t *testing.T) {
 		t.Fatalf("failed to get working directory: %v", err)
 	}
 
-	tmpDir, err := os.MkdirTemp("", "pw-dotenv-err-test-*")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := t.TempDir()
 
 	if errChdir := os.Chdir(tmpDir); errChdir != nil {
 		t.Fatalf("failed to change directory: %v", errChdir)
@@ -300,5 +256,25 @@ func TestLoadConfig_DotEnvReadError(t *testing.T) {
 	_, err = LoadConfig("")
 	if err == nil {
 		t.Errorf("expected error when .env is a directory, got nil")
+	}
+}
+
+func TestLoadConfig_InvalidTOML_DefaultPath(t *testing.T) {
+	origPath := DefaultConfigPath
+	defer func() { DefaultConfigPath = origPath }()
+
+	tmpDir := t.TempDir()
+	invalidContent := `
+verbose = "not-a-bool"
+`
+	cfgFilePath := filepath.Join(tmpDir, "config.toml")
+	if errWrite := os.WriteFile(cfgFilePath, []byte(invalidContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write temp config: %v", errWrite)
+	}
+	DefaultConfigPath = cfgFilePath
+
+	_, err := LoadConfig("")
+	if err == nil {
+		t.Errorf("expected error for invalid TOML format in default path, got nil")
 	}
 }
