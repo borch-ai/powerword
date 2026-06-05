@@ -169,3 +169,16 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 
 	return out, nil
 }
+
+func (o *OpenAIClient) ListModels(ctx context.Context) ([]string, error) {
+	modelsList, err := o.client.ListModels(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("openai models list error: %w", err)
+	}
+
+	var models []string
+	for _, m := range modelsList.Models {
+		models = append(models, m.ID)
+	}
+	return models, nil
+}

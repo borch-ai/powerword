@@ -361,3 +361,19 @@ func parseMapToSchema(raw map[string]any) (*genai.Schema, error) {
 
 	return s, nil
 }
+
+func (g *GeminiClient) ListModels(ctx context.Context) ([]string, error) {
+	var models []string
+	iter := g.client.ListModels(ctx)
+	for {
+		m, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("gemini models list error: %w", err)
+		}
+		models = append(models, m.Name)
+	}
+	return models, nil
+}

@@ -194,6 +194,19 @@ func (a *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 	return out, nil
 }
 
+func (a *AnthropicClient) ListModels(ctx context.Context) ([]string, error) {
+	page, err := a.client.Models.List(ctx, anthropic.ModelListParams{})
+	if err != nil {
+		return nil, fmt.Errorf("anthropic models list error: %w", err)
+	}
+
+	var models []string
+	for _, m := range page.Data {
+		models = append(models, m.ID)
+	}
+	return models, nil
+}
+
 func convertAnthropicSchema(input any) (anthropic.ToolInputSchemaParam, error) {
 	var s anthropic.ToolInputSchemaParam
 	if input == nil {

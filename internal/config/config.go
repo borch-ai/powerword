@@ -87,11 +87,13 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 	v := viper.New()
 
+	var configFilesToTry []string
 	if cfgFile != "" {
-		v.SetConfigFile(cfgFile)
+		configFilesToTry = []string{cfgFile}
 	} else {
+		configFilesToTry = []string{"powerword.toml"}
 		if DefaultConfigPath != "" {
-			v.SetConfigFile(DefaultConfigPath)
+			configFilesToTry = append(configFilesToTry, DefaultConfigPath)
 		} else {
 			return nil, errors.New("could not determine home directory for default config path")
 		}
@@ -103,17 +105,32 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("verbose", false)
 	v.SetDefault("model", "gemini-1.5-pro")
 
-	// Read config file if it exists.
-	// If a custom config file is specified, error out if it doesn't exist.
-	// If default config file is specified but doesn't exist, we ignore the error (since keys might be set in environment variables).
-	if err := v.ReadInConfig(); err != nil {
-		if cfgFile != "" {
-			return nil, fmt.Errorf("failed to read config file %s: %w", cfgFile, err)
+	// Read config files in order
+	var readErr error
+	for _, file := range configFilesToTry {
+		v.SetConfigFile(file)
+		err := v.ReadInConfig()
+		if err == nil {
+			readErr = nil
+			break
 		}
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("failed to parse config file: %w", err)
-			}
+		if cfgFile != "" {
+			readErr = fmt.Errorf("failed to read config file %s: %w", cfgFile, err)
+			break
+		}
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(err) {
+			readErr = fmt.Errorf("failed to parse config file: %w", err)
+			break
+		}
+		readErr = err
+	}
+
+	if readErr != nil {
+		if cfgFile != "" {
+			return nil, readErr
+		}
+		if _, ok := readErr.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(readErr) {
+			return nil, readErr
 		}
 	}
 

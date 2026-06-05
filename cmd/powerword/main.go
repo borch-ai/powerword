@@ -10,7 +10,9 @@ import (
 
 func main() {
 	config.Runner = loop.RunLoop
-	if err := config.Execute(); err != nil {
+	rootCmd := config.NewRootCmd()
+	rootCmd.AddCommand(newModelsCmd())
+	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
