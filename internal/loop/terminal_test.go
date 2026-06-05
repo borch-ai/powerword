@@ -409,18 +409,64 @@ func TestTerminalFormatter_CJKAndEmojiWidth(t *testing.T) {
 }
 
 func TestTerminalFormatter_EdgeCases(t *testing.T) {
-	// 1. Control character (< 0x20), zero-width characters, combining marks, SIP CJK character
+	// 1. Control character (< 0x20), zero-width characters, combining marks, SIP CJK character, and ESC sanitization
 	{
-		var buf bytes.Buffer
-		formatter := NewTerminalFormatter(&buf, 80)
-		// \x01 is control char, \u200B is zero width, \u0301 is combining mark, \U00020000 is SIP CJK
-		input := "\x01a\u200Bb\u0301\U00020000"
-		_, _ = formatter.Write([]byte(input))
-		_ = formatter.Flush()
-		plain := stripANSI(buf.String())
-		// \x01 should be visual width 0, \u200B visual width 0, \u0301 visual width 0, \U00020000 visual width 2
-		if !strings.Contains(plain, "a") || !strings.Contains(plain, "b") {
-			t.Errorf("expected plain text to contain 'a' and 'b', got %q", plain)
+		// Test outside code block
+		var buf1 bytes.Buffer
+		f1 := NewTerminalFormatter(&buf1, 80)
+		// \x01 is control char, \u200B is zero width, \u0301 is combining mark, \U00020000 is SIP CJK, \x1b is ESC, \x7f is DEL
+		input1 := "\x01a\u200Bb\u0301\U00020000\x1b\x7f"
+		_, _ = f1.Write([]byte(input1))
+		_ = f1.Flush()
+		plain1 := stripANSI(buf1.String())
+		if !strings.Contains(plain1, "\uFFFD") {
+			t.Errorf("expected control character to be sanitized to replacement character, got %q", plain1)
+		}
+		if !strings.Contains(plain1, "^[") {
+			t.Errorf("expected ESC to be sanitized to '^[', got %q", plain1)
+		}
+
+		// Test inside code block
+		var buf2 bytes.Buffer
+		f2 := NewTerminalFormatter(&buf2, 80)
+		input2 := "```go\n\x01\x1b\x7f\n```"
+		_, _ = f2.Write([]byte(input2))
+		_ = f2.Flush()
+		plain2 := stripANSI(buf2.String())
+		if !strings.Contains(plain2, "\uFFFD") {
+			t.Errorf("expected control characters inside code block to be sanitized, got %q", plain2)
+		}
+		if !strings.Contains(plain2, "^[") {
+			t.Errorf("expected ESC inside code block to be sanitized, got %q", plain2)
+		}
+
+		// Test during Flush()
+		var buf3 bytes.Buffer
+		f3 := NewTerminalFormatter(&buf3, 80)
+		_, _ = f3.Write([]byte("some text"))
+		// Inject into f.buf directly to force Flush() to process them
+		f3.buf = []byte("\x01\x1b\x7f")
+		_ = f3.Flush()
+		plain3 := stripANSI(buf3.String())
+		if !strings.Contains(plain3, "\uFFFD") {
+			t.Errorf("expected control characters in Flush to be sanitized, got %q", plain3)
+		}
+		if !strings.Contains(plain3, "^[") {
+			t.Errorf("expected ESC in Flush to be sanitized, got %q", plain3)
+		}
+
+		// Test during Flush() inside code block
+		var buf4 bytes.Buffer
+		f4 := NewTerminalFormatter(&buf4, 80)
+		_, _ = f4.Write([]byte("```go\ncode"))
+		f4.buf = []byte("\x01\x1b\x7f")
+		_ = f4.Flush()
+		plain4 := stripANSI(buf4.String())
+		if !strings.Contains(plain4, "\uFFFD") {
+			t.Errorf("expected control characters in Flush inside code block to be sanitized, got %q", plain4)
+		}
+		if !strings.Contains(plain4, "^[") {
+			t.Errorf("expected ESC in Flush inside code block to be sanitized, got %q", plain4)
 		}
 	}
 

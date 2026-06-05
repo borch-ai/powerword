@@ -5,7 +5,7 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 ## User Review Required
 
 > [!NOTE]
-> **Completed Implementation Details (Go Version: 1.26.4)**:
+> **Completed Implementation Details (Go Version: Go 1.23+)**:
 > Rather than relying on static markdown rendering libraries (like Glamour), which require buffering the entire output before rendering, we implement a stateful, streaming-compatible token printer.
 > This printer:
 > - Highlights code blocks with beautiful Unicode box-drawing borders and color codes.

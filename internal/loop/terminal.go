@@ -287,13 +287,43 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 	r, size := utf8.DecodeRune(f.buf)
 	if r == utf8.RuneError && size == 1 {
 		// Consume 1 byte as plain text to avoid blocking on genuinely invalid bytes
-		f.writeBytes(f.buf[:1])
+		b := f.buf[0]
 		f.buf = f.buf[1:]
 		f.isLineStart = false
+		f.writeBytes([]byte{b})
 		return true
 	}
 
 	runeBytes := f.buf[:size]
+	f.buf = f.buf[size:]
+
+	// Sanitize control characters (notably ESC 0x1b and DEL 0x7f)
+	if r < 0x20 && r != '\n' && r != '\t' && r != '\r' {
+		if r == '\x1b' {
+			if f.inCodeBlock {
+				f.writeString("^[")
+			} else {
+				f.appendToWord('^')
+				f.appendToWord('[')
+			}
+		} else {
+			if f.inCodeBlock {
+				f.writeString("\uFFFD")
+			} else {
+				f.appendToWord('\uFFFD')
+			}
+		}
+		f.isLineStart = false
+		return true
+	} else if r == 0x7f {
+		if f.inCodeBlock {
+			f.writeString("\uFFFD")
+		} else {
+			f.appendToWord('\uFFFD')
+		}
+		f.isLineStart = false
+		return true
+	}
 
 	if f.inCodeBlock {
 		if f.codeBlockLineStart {
@@ -323,7 +353,6 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 		}
 	}
 
-	f.buf = f.buf[size:]
 	return true
 }
 
@@ -350,6 +379,8 @@ func (f *TerminalFormatter) process() {
 				f.updateStyles()
 
 				f.printCodeBlockFooter()
+				f.currentCol = 0
+				f.pendingSpaces = 0
 
 				f.buf = f.buf[consumeLen:]
 				f.isLineStart = true
@@ -388,6 +419,8 @@ func (f *TerminalFormatter) process() {
 
 			if !f.isLineStart {
 				f.writeString("\n")
+				f.currentCol = 0
+				f.pendingSpaces = 0
 			}
 			f.printCodeBlockHeader(lang)
 			f.updateStyles()
@@ -403,6 +436,7 @@ func (f *TerminalFormatter) process() {
 			f.inThinking = true
 			if !f.isLineStart {
 				f.writeString("\n")
+				f.pendingSpaces = 0
 			}
 			f.writeString("  \x1b[1;35m🧠 Thinking...\x1b[0m\n")
 			f.wrapIndent = "  "
@@ -420,6 +454,7 @@ func (f *TerminalFormatter) process() {
 			f.writeString("\n")
 			f.wrapIndent = ""
 			f.currentCol = 0
+			f.pendingSpaces = 0
 			f.buf = f.buf[8:]
 			f.isLineStart = true
 			continue
@@ -522,8 +557,9 @@ func (f *TerminalFormatter) Flush() error {
 
 		r, size := utf8.DecodeRune(f.buf)
 		if r == utf8.RuneError && size == 1 {
-			f.writeBytes(f.buf[:1])
+			b := f.buf[0]
 			f.buf = f.buf[1:]
+			f.writeBytes([]byte{b})
 			continue
 		}
 
@@ -533,7 +569,21 @@ func (f *TerminalFormatter) Flush() error {
 			f.codeBlockLineStart = false
 		}
 
-		f.writeBytes(f.buf[:size])
+		runeBytes := f.buf[:size]
+		f.buf = f.buf[size:]
+
+		// Sanitize control characters (notably ESC 0x1b and DEL 0x7f)
+		if r < 0x20 && r != '\n' && r != '\t' && r != '\r' {
+			if r == '\x1b' {
+				runeBytes = []byte("^[")
+			} else {
+				runeBytes = []byte("\uFFFD")
+			}
+		} else if r == 0x7f {
+			runeBytes = []byte("\uFFFD")
+		}
+
+		f.writeBytes(runeBytes)
 		if r == '\n' {
 			f.isLineStart = true
 			if f.inCodeBlock {
@@ -542,7 +592,6 @@ func (f *TerminalFormatter) Flush() error {
 		} else {
 			f.isLineStart = false
 		}
-		f.buf = f.buf[size:]
 	}
 
 	if f.inCodeBlock {
@@ -558,6 +607,8 @@ func (f *TerminalFormatter) Flush() error {
 	f.inHeader = false
 	f.headerLevel = 0
 	f.wrapIndent = ""
+	f.currentCol = 0
+	f.pendingSpaces = 0
 
 	return f.err
 }
