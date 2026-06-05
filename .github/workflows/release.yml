@@ -58,7 +58,7 @@ jobs:
           GOOS=linux GOARCH=arm64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-linux-arm64 ./cmd/powerword
           GOOS=windows GOARCH=amd64 go build -ldflags "-X powerword/internal/config.Version=${VERSION_TAG}" -o dist/powerword-windows-amd64.exe ./cmd/powerword
 
-      - name: Upload Binaries to Github Release
+      - name: Upload Binaries to GitHub Release
         if: steps.semrel.outputs.version != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,4 +66,5 @@ jobs:
         run: |
           VERSION_NUM="${VERSION#v}"
           VERSION_TAG="v${VERSION_NUM}"
-          gh release upload "$VERSION_TAG" dist/*
+          gh release upload "$VERSION_TAG" dist/* --clobber
+
