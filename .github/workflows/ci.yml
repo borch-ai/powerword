@@ -29,6 +29,29 @@ jobs:
         with:
           version: v2.12.2
 
+  pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Semantic PR Check
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+
   security-and-test:
     name: Security & Tests
     runs-on: ubuntu-latest
