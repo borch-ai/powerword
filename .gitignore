@@ -1,0 +1,38 @@
+# gitignore template for Go projects
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (suggested to use git status to check check-ins)
+# vendor/
+
+# Project-specific binaries
+powerword
+pw-mcp-fs
+pw-mcp-git
+pw-mcp-shell
+
+# IDEs/Editors configuration
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+.keys/
+
+# Local configurations / logs
+config.yaml
+var/log/
+*.log
