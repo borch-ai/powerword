@@ -298,3 +298,53 @@ func TestAnthropicClient_Stream_Cancel(t *testing.T) {
 		t.Error("expected stream to terminate with context.Canceled error")
 	}
 }
+
+func TestAnthropicClient_ListModels_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"data": []map[string]any{
+				{"id": "claude-3-5-sonnet", "type": "model"},
+				{"id": "claude-3-opus", "type": "model"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client, err := NewAnthropicClientWithOpts("claude",
+		option.WithBaseURL(server.URL),
+		option.WithAPIKey("dummy-key"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	models, err := client.ListModels(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(models) != 2 || models[0] != "claude-3-5-sonnet" || models[1] != "claude-3-opus" {
+		t.Errorf("unexpected models: %v", models)
+	}
+}
+
+func TestAnthropicClient_ListModels_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	client, err := NewAnthropicClientWithOpts("claude",
+		option.WithBaseURL(server.URL),
+		option.WithAPIKey("dummy-key"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.ListModels(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}

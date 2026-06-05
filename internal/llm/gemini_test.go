@@ -354,3 +354,57 @@ func TestGeminiClient_Stream_Cancel(t *testing.T) {
 		t.Error("expected stream to terminate with context.Canceled error")
 	}
 }
+
+func TestGeminiClient_ListModels_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"models": []map[string]any{
+				{"name": "models/gemini-pro"},
+				{"name": "models/gemini-1.5-pro"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	models, err := client.ListModels(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(models) != 2 || models[0] != "models/gemini-pro" || models[1] != "models/gemini-1.5-pro" {
+		t.Errorf("unexpected models: %v", models)
+	}
+}
+
+func TestGeminiClient_ListModels_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.ListModels(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}

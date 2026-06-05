@@ -237,3 +237,45 @@ func TestNewOpenAIClient_Direct(t *testing.T) {
 		t.Fatal("expected client to not be nil")
 	}
 }
+
+func TestOpenAIClient_ListModels_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"data": []map[string]any{
+				{"id": "gpt-4"},
+				{"id": "gpt-3.5-turbo"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+
+	models, err := client.ListModels(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(models) != 2 || models[0] != "gpt-4" || models[1] != "gpt-3.5-turbo" {
+		t.Errorf("unexpected models: %v", models)
+	}
+}
+
+func TestOpenAIClient_ListModels_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+
+	_, err := client.ListModels(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}

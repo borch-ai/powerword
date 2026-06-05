@@ -1,4 +1,4 @@
-.PHONY: all build test lint fmt clean tidy vuln check-coverage markdown-lint
+.PHONY: all build install test lint fmt clean tidy vuln check-coverage markdown-lint
 
 # Go parameters
 GOCMD=go
@@ -31,6 +31,12 @@ build:
 	@if [ -d cmd/$(GIT_PLUGIN) ]; then $(GOBUILD) -o bin/$(GIT_PLUGIN) ./cmd/$(GIT_PLUGIN); fi
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOBUILD) -o bin/$(SHELL_PLUGIN) ./cmd/$(SHELL_PLUGIN); fi
 
+install:
+	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
+	# Install plugins if folders exist
+	@if [ -d cmd/$(FS_PLUGIN) ]; then $(GOCMD) install ./cmd/$(FS_PLUGIN); fi
+	@if [ -d cmd/$(GIT_PLUGIN) ]; then $(GOCMD) install ./cmd/$(GIT_PLUGIN); fi
+	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SHELL_PLUGIN); fi
 test:
 	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/... ./internal/...
 

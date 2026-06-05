@@ -30,8 +30,8 @@ using the Model Context Protocol (MCP).`,
 		Version: Version,
 		Args:    cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip config loading/validation if no arguments are provided (shows help).
-			if len(args) == 0 {
+			// Skip config loading/validation if just running the root command without args (shows help).
+			if cmd.Name() == "powerword" && len(args) == 0 {
 				return nil
 			}
 
@@ -77,7 +77,7 @@ using the Model Context Protocol (MCP).`,
 	model = ""
 	verbose = false
 
-	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.config/powerword/config.toml)")
+	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 

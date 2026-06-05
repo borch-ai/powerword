@@ -37,3 +37,4 @@
 config.yaml
 var/log/
 *.log
+powerword.toml

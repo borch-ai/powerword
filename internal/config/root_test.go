@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestMain(m *testing.M) {
@@ -189,5 +191,53 @@ func TestRootCmd_VersionFlag(t *testing.T) {
 	expected := "powerword version v1.2.3\n"
 	if buf.String() != expected {
 		t.Errorf("expected version output %q, got %q", expected, buf.String())
+	}
+}
+
+func TestRootCmd_SubcommandConfigLoading(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfgFilePath := filepath.Join(tmpDir, "config.toml")
+	tomlContent := `
+verbose = true
+model = "toml-model"
+[api_keys]
+gemini = "gemini-key"
+`
+	if errWrite := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write temp config: %v", errWrite)
+	}
+
+	// Reset Active
+	Active = nil
+
+	cmd := NewRootCmd()
+
+	// Create a mock subcommand
+	subCmd := &cobra.Command{
+		Use: "mocksub",
+		RunE: func(c *cobra.Command, args []string) error {
+			if Active == nil {
+				t.Fatalf("expected Active config to be loaded in subcommand, got nil")
+			}
+			return nil
+		},
+	}
+	cmd.AddCommand(subCmd)
+
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+
+	// Execute subcommand without arguments
+	cmd.SetArgs([]string{"mocksub", "--config", cfgFilePath})
+
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("cmd.Execute returned unexpected error: %v", err)
+	}
+
+	if Active == nil {
+		t.Fatalf("expected Active config to be loaded, got nil")
 	}
 }
