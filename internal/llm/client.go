@@ -27,8 +27,8 @@ type ToolCall struct {
 
 // Message represents a single message in the chat history.
 type Message struct {
-	Role    Role     `json:"role"`
-	Content string   `json:"content"`
+	Role    Role   `json:"role"`
+	Content string `json:"content"`
 	// ToolCalls is set if the message is from the assistant and requests tool execution.
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 	// ToolCallID links this tool message back to the tool call request.

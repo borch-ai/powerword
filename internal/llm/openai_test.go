@@ -229,4 +229,3 @@ func TestOpenAIClient_InvalidRole(t *testing.T) {
 func TestNewOpenAIClient_Direct(t *testing.T) {
 	_, _ = NewOpenAIClient("dummy-key", "gpt-4")
 }
-

@@ -292,5 +292,3 @@ func TestAnthropicClient_Stream_Cancel(t *testing.T) {
 		t.Error("expected stream to terminate with context.Canceled error")
 	}
 }
-
-

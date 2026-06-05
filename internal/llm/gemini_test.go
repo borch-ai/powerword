@@ -221,12 +221,12 @@ func TestGemini_ConvertSchema(t *testing.T) {
 	input := map[string]any{
 		"type": "object",
 		"properties": map[string]any{
-			"str": map[string]any{"type": "string", "description": "a string"},
-			"num": map[string]any{"type": "number"},
-			"int": map[string]any{"type": "integer"},
+			"str":  map[string]any{"type": "string", "description": "a string"},
+			"num":  map[string]any{"type": "number"},
+			"int":  map[string]any{"type": "integer"},
 			"bool": map[string]any{"type": "boolean"},
 			"arr": map[string]any{
-				"type": "array",
+				"type":  "array",
 				"items": map[string]any{"type": "string"},
 			},
 			"enumVal": map[string]any{
@@ -350,5 +350,3 @@ func TestGeminiClient_Stream_Cancel(t *testing.T) {
 		t.Error("expected stream to terminate with context.Canceled error")
 	}
 }
-
-

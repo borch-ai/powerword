@@ -139,9 +139,10 @@ func (g *AnthropicClient) Generate(ctx context.Context, messages []Message, tool
 
 	var textBuilder strings.Builder
 	for _, block := range msg.Content {
-		if block.Type == "text" {
+		switch block.Type {
+		case "text":
 			textBuilder.WriteString(block.Text)
-		} else if block.Type == "tool_use" {
+		case "tool_use":
 			assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, ToolCall{
 				ID:        block.ID,
 				Name:      block.Name,
@@ -163,7 +164,9 @@ func (g *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 	out := make(chan StreamChunk, 10)
 
 	go func() {
-		defer stream.Close()
+		defer func() {
+			_ = stream.Close()
+		}()
 		defer close(out)
 
 		for stream.Next() {
@@ -173,10 +176,8 @@ func (g *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 				return
 			default:
 				event := stream.Current()
-				switch eventVariant := event.AsAny().(type) {
-				case anthropic.ContentBlockDeltaEvent:
-					switch deltaVariant := eventVariant.Delta.AsAny().(type) {
-					case anthropic.TextDelta:
+				if eventVariant, ok := event.AsAny().(anthropic.ContentBlockDeltaEvent); ok {
+					if deltaVariant, ok := eventVariant.Delta.AsAny().(anthropic.TextDelta); ok {
 						out <- StreamChunk{Content: deltaVariant.Text}
 					}
 				}

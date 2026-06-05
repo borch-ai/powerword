@@ -140,7 +140,9 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 	out := make(chan StreamChunk, 10)
 
 	go func() {
-		defer stream.Close()
+		defer func() {
+			_ = stream.Close()
+		}()
 		defer close(out)
 
 		for {
