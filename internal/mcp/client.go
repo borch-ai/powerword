@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"powerword/internal/config"
 )
 
 // MCPClient represents an active session with an MCP server.
@@ -17,7 +19,7 @@ type MCPClient struct {
 func NewClient(ctx context.Context, transport mcpsdk.Transport) (*MCPClient, error) {
 	client := mcpsdk.NewClient(&mcpsdk.Implementation{
 		Name:    "powerword",
-		Version: "v1.0.0",
+		Version: config.Version,
 	}, nil)
 
 	session, err := client.Connect(ctx, transport, nil)
