@@ -45,6 +45,17 @@ func TestRegistry_AddRemoveListCall(t *testing.T) {
 	c2, cleanup2 := createMockClient(t, "s2", "read")
 	defer cleanup2()
 
+	// Test AddClient validations
+	if err := registry.AddClient("", c1); err == nil {
+		t.Errorf("Expected error for empty client name")
+	}
+	if err := registry.AddClient("bad__name", c1); err == nil {
+		t.Errorf("Expected error for client name containing __")
+	}
+	if err := registry.AddClient("nilClient", nil); err == nil {
+		t.Errorf("Expected error for nil client")
+	}
+
 	// Add clients
 	if err := registry.AddClient("fs", c1); err != nil {
 		t.Fatalf("AddClient failed: %v", err)
