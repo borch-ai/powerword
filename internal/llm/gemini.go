@@ -194,19 +194,22 @@ func (g *GeminiClient) Stream(ctx context.Context, messages []Message, tools []T
 					out <- StreamChunk{Error: fmt.Errorf("gemini stream error: %w", err)}
 					return
 				}
-
-				if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
-					for _, part := range resp.Candidates[0].Content.Parts {
-						if t, ok := part.(genai.Text); ok {
-							out <- StreamChunk{Content: string(t)}
-						}
-					}
-				}
+				handleStreamChunk(resp, out)
 			}
 		}
 	}()
 
 	return out, nil
+}
+
+func handleStreamChunk(resp *genai.GenerateContentResponse, out chan<- StreamChunk) {
+	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+		for _, part := range resp.Candidates[0].Content.Parts {
+			if t, ok := part.(genai.Text); ok {
+				out <- StreamChunk{Content: string(t)}
+			}
+		}
+	}
 }
 
 func (g *GeminiClient) msgToContent(msg Message, allMsgs []Message) (*genai.Content, error) {
@@ -320,36 +323,11 @@ func parseMapToSchema(raw map[string]any) (*genai.Schema, error) {
 		s.Description = val
 	}
 
-	if val, ok := raw["properties"].(map[string]any); ok {
-		s.Properties = make(map[string]*genai.Schema)
-		for k, v := range val {
-			if propMap, ok := v.(map[string]any); ok {
-				propSchema, err := parseMapToSchema(propMap)
-				if err != nil {
-					return nil, err
-				}
-				s.Properties[k] = propSchema
-			}
-		}
+	if err := parseProperties(s, raw); err != nil {
+		return nil, err
 	}
-
-	if val, ok := raw["required"].([]any); ok {
-		s.Required = make([]string, 0, len(val))
-		for _, item := range val {
-			if str, ok := item.(string); ok {
-				s.Required = append(s.Required, str)
-			}
-		}
-	}
-
-	if val, ok := raw["enum"].([]any); ok {
-		s.Enum = make([]string, 0, len(val))
-		for _, item := range val {
-			if str, ok := item.(string); ok {
-				s.Enum = append(s.Enum, str)
-			}
-		}
-	}
+	parseRequired(s, raw)
+	parseEnum(s, raw)
 
 	if val, ok := raw["items"].(map[string]any); ok {
 		itemSchema, err := parseMapToSchema(val)
@@ -360,6 +338,44 @@ func parseMapToSchema(raw map[string]any) (*genai.Schema, error) {
 	}
 
 	return s, nil
+}
+
+func parseProperties(s *genai.Schema, raw map[string]any) error {
+	if val, ok := raw["properties"].(map[string]any); ok {
+		s.Properties = make(map[string]*genai.Schema)
+		for k, v := range val {
+			if propMap, ok := v.(map[string]any); ok {
+				propSchema, err := parseMapToSchema(propMap)
+				if err != nil {
+					return err
+				}
+				s.Properties[k] = propSchema
+			}
+		}
+	}
+	return nil
+}
+
+func parseRequired(s *genai.Schema, raw map[string]any) {
+	if val, ok := raw["required"].([]any); ok {
+		s.Required = make([]string, 0, len(val))
+		for _, item := range val {
+			if str, ok := item.(string); ok {
+				s.Required = append(s.Required, str)
+			}
+		}
+	}
+}
+
+func parseEnum(s *genai.Schema, raw map[string]any) {
+	if val, ok := raw["enum"].([]any); ok {
+		s.Enum = make([]string, 0, len(val))
+		for _, item := range val {
+			if str, ok := item.(string); ok {
+				s.Enum = append(s.Enum, str)
+			}
+		}
+	}
 }
 
 func (g *GeminiClient) ListModels(ctx context.Context) ([]string, error) {

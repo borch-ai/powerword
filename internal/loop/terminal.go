@@ -119,16 +119,43 @@ func (f *TerminalFormatter) updateStyles() {
 	f.writeString("\x1b[" + strings.Join(parts, ";") + "m")
 }
 
+func (f *TerminalFormatter) checkHeaderPrefix() bool {
+	if !f.isLineStart || len(f.buf) == 0 || len(f.buf) > 6 {
+		return false
+	}
+	for _, b := range f.buf {
+		if b != '#' {
+			return false
+		}
+	}
+	return true
+}
+
+func (f *TerminalFormatter) checkOrderedListPrefix() bool {
+	if !f.isLineStart || len(f.buf) == 0 {
+		return false
+	}
+	i := 0
+	for i < len(f.buf) && f.buf[i] >= '0' && f.buf[i] <= '9' {
+		i++
+	}
+	if i == len(f.buf) {
+		return true
+	}
+	if i < len(f.buf) && f.buf[i] == '.' && i+1 == len(f.buf) {
+		return true
+	}
+	return false
+}
+
 // hasIncompletePrefix checks if the current buffer starts with a prefix of a token
 // that is not yet fully readable, meaning we should wait for more bytes.
 func (f *TerminalFormatter) hasIncompletePrefix() bool {
 	if f.inCodeBlock {
-		// Inside code blocks, we only care about the closing fence "```"
 		tb := []byte("```")
 		return len(f.buf) < len(tb) && bytes.Equal(f.buf, tb[:len(f.buf)])
 	}
 
-	// Outside code blocks, check standard targets
 	targets := []string{"```", "<think>", "</think>", "**", "*"}
 	if f.isLineStart {
 		targets = append(targets, "* ", "- ", "+ ")
@@ -141,37 +168,11 @@ func (f *TerminalFormatter) hasIncompletePrefix() bool {
 		}
 	}
 
-	// Check for header prefix (up to 6 hashes at start of line)
-	if f.isLineStart && len(f.buf) > 0 && len(f.buf) <= 6 {
-		allHash := true
-		for _, b := range f.buf {
-			if b != '#' {
-				allHash = false
-				break
-			}
-		}
-		if allHash {
-			return true
-		}
+	if f.checkHeaderPrefix() {
+		return true
 	}
 
-	// Check for ordered list item prefix (digits followed by dot and optional space)
-	if f.isLineStart && len(f.buf) > 0 {
-		i := 0
-		for i < len(f.buf) && f.buf[i] >= '0' && f.buf[i] <= '9' {
-			i++
-		}
-		if i == len(f.buf) {
-			// Buffer consists entirely of digits, might be followed by ". "
-			return true
-		}
-		if i < len(f.buf) && f.buf[i] == '.' && i+1 == len(f.buf) {
-			// Buffer consists of "digits.", might be followed by " "
-			return true
-		}
-	}
-
-	return false
+	return f.checkOrderedListPrefix()
 }
 
 // flushWord writes the currently buffered word, applying wrapping if necessary.
@@ -252,7 +253,6 @@ func (f *TerminalFormatter) printCodeBlockHeader(lang string) {
 	if w <= 0 {
 		w = 80
 	}
-	// Visual box width is w - 4
 	dashes := w - len(lang) - 12
 	if dashes < 5 {
 		dashes = 5
@@ -277,6 +277,61 @@ func (f *TerminalFormatter) printCodeBlockFooter() {
 	}
 }
 
+func (f *TerminalFormatter) sanitizeControlRune(r rune) bool {
+	isControl := r < 0x20 && r != '\n' && r != '\t' && r != '\r'
+	if !isControl && r != 0x7f {
+		return false
+	}
+
+	f.isLineStart = false
+	if r == '\x1b' {
+		if f.inCodeBlock {
+			f.writeString("^[")
+		} else {
+			f.appendToWord('^')
+			f.appendToWord('[')
+		}
+		return true
+	}
+
+	if f.inCodeBlock {
+		f.writeString("\uFFFD")
+	} else {
+		f.appendToWord('\uFFFD')
+	}
+	return true
+}
+
+func (f *TerminalFormatter) consumeCodeBlockRune(r rune, runeBytes []byte) {
+	if f.codeBlockLineStart {
+		f.writeString("\x1b[0m  \x1b[34m│\x1b[0m ")
+		f.updateStyles()
+		f.codeBlockLineStart = false
+	}
+
+	if r == '\n' {
+		f.writeBytes(runeBytes)
+		f.isLineStart = true
+		f.codeBlockLineStart = true
+	} else {
+		f.writeBytes(runeBytes)
+		f.isLineStart = false
+	}
+}
+
+func (f *TerminalFormatter) consumeNormalRune(r rune) {
+	switch r {
+	case '\n':
+		f.writeNewline()
+	case ' ', '\t':
+		f.writeSpace(r)
+		f.isLineStart = false
+	default:
+		f.appendToWord(r)
+		f.isLineStart = false
+	}
+}
+
 // consumePlainRune reads a single rune from f.buf, processing it and adjusting column counters.
 // Returns false if it needs to wait for more bytes (partial UTF-8).
 func (f *TerminalFormatter) consumePlainRune() bool {
@@ -286,7 +341,6 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 
 	r, size := utf8.DecodeRune(f.buf)
 	if r == utf8.RuneError && size == 1 {
-		// Consume 1 byte as plain text to avoid blocking on genuinely invalid bytes
 		b := f.buf[0]
 		f.buf = f.buf[1:]
 		f.isLineStart = false
@@ -297,248 +351,260 @@ func (f *TerminalFormatter) consumePlainRune() bool {
 	runeBytes := f.buf[:size]
 	f.buf = f.buf[size:]
 
-	// Sanitize control characters (notably ESC 0x1b and DEL 0x7f)
-	if r < 0x20 && r != '\n' && r != '\t' && r != '\r' {
-		if r == '\x1b' {
-			if f.inCodeBlock {
-				f.writeString("^[")
-			} else {
-				f.appendToWord('^')
-				f.appendToWord('[')
-			}
-		} else {
-			if f.inCodeBlock {
-				f.writeString("\uFFFD")
-			} else {
-				f.appendToWord('\uFFFD')
-			}
-		}
-		f.isLineStart = false
-		return true
-	} else if r == 0x7f {
-		if f.inCodeBlock {
-			f.writeString("\uFFFD")
-		} else {
-			f.appendToWord('\uFFFD')
-		}
-		f.isLineStart = false
+	if f.sanitizeControlRune(r) {
 		return true
 	}
 
 	if f.inCodeBlock {
-		if f.codeBlockLineStart {
-			f.writeString("\x1b[0m  \x1b[34m│\x1b[0m ")
-			f.updateStyles()
-			f.codeBlockLineStart = false
-		}
-
-		if r == '\n' {
-			f.writeBytes(runeBytes)
-			f.isLineStart = true
-			f.codeBlockLineStart = true
-		} else {
-			f.writeBytes(runeBytes)
-			f.isLineStart = false
-		}
+		f.consumeCodeBlockRune(r, runeBytes)
 	} else {
-		switch r {
-		case '\n':
-			f.writeNewline()
-		case ' ', '\t':
-			f.writeSpace(r)
-			f.isLineStart = false
-		default:
-			f.appendToWord(r)
-			f.isLineStart = false
-		}
+		f.consumeNormalRune(r)
 	}
 
 	return true
 }
 
+func (f *TerminalFormatter) processClosingCodeFence() bool {
+	if !bytes.HasPrefix(f.buf, []byte("```")) {
+		return false
+	}
+	consumeLen := 3
+	if len(f.buf) > 3 && f.buf[3] == '\n' {
+		consumeLen = 4
+	}
+
+	f.inCodeBlock = false
+	f.codeBlockLineStart = false
+	f.updateStyles()
+
+	f.printCodeBlockFooter()
+	f.currentCol = 0
+	f.pendingSpaces = 0
+
+	f.buf = f.buf[consumeLen:]
+	f.isLineStart = true
+	return true
+}
+
+func (f *TerminalFormatter) processOpeningCodeFence() (handled bool, waitForMore bool) {
+	if !bytes.HasPrefix(f.buf, []byte("```")) {
+		return false, false
+	}
+	idx := bytes.IndexByte(f.buf, '\n')
+	consumeLen := 0
+	lang := ""
+	if idx == -1 {
+		if len(f.buf) < 50 {
+			return true, true // Wait for newline
+		}
+		lang = "code"
+		consumeLen = 3
+	} else {
+		lang = strings.TrimSpace(string(f.buf[3:idx]))
+		if lang == "" {
+			lang = "code"
+		}
+		consumeLen = idx + 1
+	}
+
+	f.flushWord()
+	f.inCodeBlock = true
+	f.codeBlockLineStart = true
+
+	if !f.isLineStart {
+		f.writeString("\n")
+		f.currentCol = 0
+		f.pendingSpaces = 0
+	}
+	f.printCodeBlockHeader(lang)
+	f.updateStyles()
+
+	f.buf = f.buf[consumeLen:]
+	f.isLineStart = true
+	return true, false
+}
+
+func (f *TerminalFormatter) processThinkBlock() bool {
+	if bytes.HasPrefix(f.buf, []byte("<think>")) {
+		f.flushWord()
+		f.inThinking = true
+		if !f.isLineStart {
+			f.writeString("\n")
+			f.pendingSpaces = 0
+		}
+		f.writeString("  \x1b[1;35m🧠 Thinking...\x1b[0m\n")
+		f.wrapIndent = "  "
+		f.currentCol = 0
+		f.updateStyles()
+		f.buf = f.buf[7:]
+		f.isLineStart = true
+		return true
+	}
+
+	if bytes.HasPrefix(f.buf, []byte("</think>")) {
+		f.flushWord()
+		f.inThinking = false
+		f.updateStyles()
+		f.writeString("\n")
+		f.wrapIndent = ""
+		f.currentCol = 0
+		f.pendingSpaces = 0
+		f.buf = f.buf[8:]
+		f.isLineStart = true
+		return true
+	}
+	return false
+}
+
+func (f *TerminalFormatter) processListItemsAndHeaders() bool {
+	if !f.isLineStart {
+		return false
+	}
+
+	// Unordered list
+	if len(f.buf) >= 2 && (f.buf[0] == '*' || f.buf[0] == '-' || f.buf[0] == '+') && f.buf[1] == ' ' {
+		f.flushWord()
+		f.writeString("\x1b[1;35m •\x1b[0m ")
+		f.wrapIndent = "   "
+		f.currentCol = 3
+		f.buf = f.buf[2:]
+		f.isLineStart = false
+		return true
+	}
+
+	// Ordered list
+	i := 0
+	for i < len(f.buf) && f.buf[i] >= '0' && f.buf[i] <= '9' {
+		i++
+	}
+	if i > 0 && i < len(f.buf) && f.buf[i] == '.' && i+1 < len(f.buf) && f.buf[i+1] == ' ' {
+		f.flushWord()
+		num := string(f.buf[:i])
+		f.writeFprintf("\x1b[1;35m %s.\x1b[0m ", num)
+		f.wrapIndent = strings.Repeat(" ", len(num)+3)
+		f.currentCol = len(num) + 3
+		f.buf = f.buf[i+2:]
+		f.isLineStart = false
+		return true
+	}
+
+	// Headers
+	n := 0
+	for n < len(f.buf) && f.buf[n] == '#' {
+		n++
+	}
+	if n > 0 && n < len(f.buf) && f.buf[n] == ' ' && n <= 6 {
+		f.flushWord()
+		f.inHeader = true
+		f.headerLevel = n
+		switch n {
+		case 1:
+			f.writeString("\x1b[1;35m█ \x1b[0m")
+		case 2:
+			f.writeString("\x1b[1;34m▓ \x1b[0m")
+		case 3:
+			f.writeString("\x1b[1;36m▒ \x1b[0m")
+		default:
+			f.writeString("\x1b[1;32m░ \x1b[0m")
+		}
+		f.wrapIndent = "  "
+		f.currentCol = 2
+		f.updateStyles()
+		f.buf = f.buf[n+1:]
+		f.isLineStart = false
+		return true
+	}
+
+	return false
+}
+
+func (f *TerminalFormatter) processTextFormatting() bool {
+	// Bold toggle
+	if bytes.HasPrefix(f.buf, []byte("**")) {
+		f.flushWord()
+		f.boldActive = !f.boldActive
+		f.updateStyles()
+		f.buf = f.buf[2:]
+		return true
+	}
+
+	// Italic toggle
+	if bytes.HasPrefix(f.buf, []byte("*")) {
+		f.flushWord()
+		f.italicActive = !f.italicActive
+		f.updateStyles()
+		f.buf = f.buf[1:]
+		return true
+	}
+
+	return false
+}
+
 // process scans the internal buffer for formatting tokens and text.
 func (f *TerminalFormatter) process() {
 	for len(f.buf) > 0 {
-		if f.err != nil {
+		if f.err != nil || f.hasIncompletePrefix() {
 			return
 		}
-
-		if f.hasIncompletePrefix() {
-			return
-		}
-
-		if f.inCodeBlock {
-			if bytes.HasPrefix(f.buf, []byte("```")) {
-				consumeLen := 3
-				if len(f.buf) > 3 && f.buf[3] == '\n' {
-					consumeLen = 4
-				}
-
-				f.inCodeBlock = false
-				f.codeBlockLineStart = false
-				f.updateStyles()
-
-				f.printCodeBlockFooter()
-				f.currentCol = 0
-				f.pendingSpaces = 0
-
-				f.buf = f.buf[consumeLen:]
-				f.isLineStart = true
-				continue
-			}
-
-			if !f.consumePlainRune() {
-				return
-			}
-			continue
-		}
-
-		// Outside code blocks:
-		// Check for opening code block "```"
-		if bytes.HasPrefix(f.buf, []byte("```")) {
-			idx := bytes.IndexByte(f.buf, '\n')
-			consumeLen := 0
-			lang := ""
-			if idx == -1 {
-				if len(f.buf) < 50 {
-					return // Wait for newline
-				}
-				lang = "code"
-				consumeLen = 3
-			} else {
-				lang = strings.TrimSpace(string(f.buf[3:idx]))
-				if lang == "" {
-					lang = "code"
-				}
-				consumeLen = idx + 1
-			}
-
-			f.flushWord()
-			f.inCodeBlock = true
-			f.codeBlockLineStart = true
-
-			if !f.isLineStart {
-				f.writeString("\n")
-				f.currentCol = 0
-				f.pendingSpaces = 0
-			}
-			f.printCodeBlockHeader(lang)
-			f.updateStyles()
-
-			f.buf = f.buf[consumeLen:]
-			f.isLineStart = true
-			continue
-		}
-
-		// Check for think block "<think>"
-		if bytes.HasPrefix(f.buf, []byte("<think>")) {
-			f.flushWord()
-			f.inThinking = true
-			if !f.isLineStart {
-				f.writeString("\n")
-				f.pendingSpaces = 0
-			}
-			f.writeString("  \x1b[1;35m🧠 Thinking...\x1b[0m\n")
-			f.wrapIndent = "  "
-			f.currentCol = 0
-			f.updateStyles()
-			f.buf = f.buf[7:]
-			f.isLineStart = true
-			continue
-		}
-
-		if bytes.HasPrefix(f.buf, []byte("</think>")) {
-			f.flushWord()
-			f.inThinking = false
-			f.updateStyles()
-			f.writeString("\n")
-			f.wrapIndent = ""
-			f.currentCol = 0
-			f.pendingSpaces = 0
-			f.buf = f.buf[8:]
-			f.isLineStart = true
-			continue
-		}
-
-		// Check list items and headers
-		if f.isLineStart {
-			// Unordered list
-			if len(f.buf) >= 2 && (f.buf[0] == '*' || f.buf[0] == '-' || f.buf[0] == '+') && f.buf[1] == ' ' {
-				f.flushWord()
-				f.writeString("\x1b[1;35m •\x1b[0m ")
-				f.wrapIndent = "   "
-				f.currentCol = 3
-				f.buf = f.buf[2:]
-				f.isLineStart = false
-				continue
-			}
-
-			// Ordered list
-			i := 0
-			for i < len(f.buf) && f.buf[i] >= '0' && f.buf[i] <= '9' {
-				i++
-			}
-			if i > 0 && i < len(f.buf) && f.buf[i] == '.' && i+1 < len(f.buf) && f.buf[i+1] == ' ' {
-				f.flushWord()
-				num := string(f.buf[:i])
-				f.writeFprintf("\x1b[1;35m %s.\x1b[0m ", num)
-				f.wrapIndent = strings.Repeat(" ", len(num)+3)
-				f.currentCol = len(num) + 3
-				f.buf = f.buf[i+2:]
-				f.isLineStart = false
-				continue
-			}
-
-			// Headers
-			n := 0
-			for n < len(f.buf) && f.buf[n] == '#' {
-				n++
-			}
-			if n > 0 && n < len(f.buf) && f.buf[n] == ' ' && n <= 6 {
-				f.flushWord()
-				f.inHeader = true
-				f.headerLevel = n
-				switch n {
-				case 1:
-					f.writeString("\x1b[1;35m█ \x1b[0m")
-				case 2:
-					f.writeString("\x1b[1;34m▓ \x1b[0m")
-				case 3:
-					f.writeString("\x1b[1;36m▒ \x1b[0m")
-				default:
-					f.writeString("\x1b[1;32m░ \x1b[0m")
-				}
-				f.wrapIndent = "  "
-				f.currentCol = 2
-				f.updateStyles()
-				f.buf = f.buf[n+1:]
-				f.isLineStart = false
-				continue
-			}
-		}
-
-		// Bold toggle
-		if bytes.HasPrefix(f.buf, []byte("**")) {
-			f.flushWord()
-			f.boldActive = !f.boldActive
-			f.updateStyles()
-			f.buf = f.buf[2:]
-			continue
-		}
-
-		// Italic toggle
-		if bytes.HasPrefix(f.buf, []byte("*")) {
-			f.flushWord()
-			f.italicActive = !f.italicActive
-			f.updateStyles()
-			f.buf = f.buf[1:]
-			continue
-		}
-
-		if !f.consumePlainRune() {
+		if !f.processNextToken() {
 			return
 		}
 	}
+}
+
+func (f *TerminalFormatter) processNextToken() bool {
+	if f.inCodeBlock {
+		if f.processClosingCodeFence() {
+			return true
+		}
+		return f.consumePlainRune()
+	}
+
+	// Outside code blocks:
+	handled, waitForMore := f.processOpeningCodeFence()
+	if handled {
+		return !waitForMore
+	}
+
+	if f.processThinkBlock() || f.processListItemsAndHeaders() || f.processTextFormatting() {
+		return true
+	}
+
+	return f.consumePlainRune()
+}
+
+func (f *TerminalFormatter) flushSanitizedRune(r rune, runeBytes []byte) {
+	isControl := r < 0x20 && r != '\n' && r != '\t' && r != '\r'
+	if isControl {
+		if r == '\x1b' {
+			runeBytes = []byte("^[")
+		} else {
+			runeBytes = []byte("\uFFFD")
+		}
+	} else if r == 0x7f {
+		runeBytes = []byte("\uFFFD")
+	}
+
+	f.writeBytes(runeBytes)
+	if r == '\n' {
+		f.isLineStart = true
+		if f.inCodeBlock {
+			f.codeBlockLineStart = true
+		}
+	} else {
+		f.isLineStart = false
+	}
+}
+
+func (f *TerminalFormatter) resetFormatting() {
+	f.boldActive = false
+	f.italicActive = false
+	f.inThinking = false
+	f.inHeader = false
+	f.headerLevel = 0
+	f.wrapIndent = ""
+	f.currentCol = 0
+	f.pendingSpaces = 0
 }
 
 // Flush outputs any remaining text, closes formatting states, and resets terminal color.
@@ -572,26 +638,7 @@ func (f *TerminalFormatter) Flush() error {
 		runeBytes := f.buf[:size]
 		f.buf = f.buf[size:]
 
-		// Sanitize control characters (notably ESC 0x1b and DEL 0x7f)
-		if r < 0x20 && r != '\n' && r != '\t' && r != '\r' {
-			if r == '\x1b' {
-				runeBytes = []byte("^[")
-			} else {
-				runeBytes = []byte("\uFFFD")
-			}
-		} else if r == 0x7f {
-			runeBytes = []byte("\uFFFD")
-		}
-
-		f.writeBytes(runeBytes)
-		if r == '\n' {
-			f.isLineStart = true
-			if f.inCodeBlock {
-				f.codeBlockLineStart = true
-			}
-		} else {
-			f.isLineStart = false
-		}
+		f.flushSanitizedRune(r, runeBytes)
 	}
 
 	if f.inCodeBlock {
@@ -601,14 +648,7 @@ func (f *TerminalFormatter) Flush() error {
 	}
 
 	f.writeString("\x1b[0m")
-	f.boldActive = false
-	f.italicActive = false
-	f.inThinking = false
-	f.inHeader = false
-	f.headerLevel = 0
-	f.wrapIndent = ""
-	f.currentCol = 0
-	f.pendingSpaces = 0
+	f.resetFormatting()
 
 	return f.err
 }

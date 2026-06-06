@@ -469,6 +469,9 @@ func TestTerminalFormatter_EdgeCases(t *testing.T) {
 			t.Errorf("expected ESC in Flush inside code block to be sanitized, got %q", plain4)
 		}
 	}
+}
+
+func TestTerminalFormatter_MoreEdgeCases(t *testing.T) {
 
 	// 2. Code block header and footer with width <= 0 (defaults to 80)
 	{

@@ -55,13 +55,39 @@ func TestLintMarkdown_DuplicateHeaders(t *testing.T) {
 	}
 }
 
+type orderedListTestCase struct {
+	name        string
+	content     string
+	expectError bool
+	errorMsg    string
+}
+
+func runOrderedListTest(t *testing.T, tc orderedListTestCase) {
+	errors := LintMarkdown("test.md", tc.content)
+	if !tc.expectError {
+		if len(errors) > 0 {
+			t.Errorf("expected no errors, got %v", errors)
+		}
+		return
+	}
+
+	if len(errors) == 0 {
+		t.Fatalf("expected error containing %q, got none", tc.errorMsg)
+	}
+	found := false
+	for _, err := range errors {
+		if strings.Contains(err, tc.errorMsg) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error containing %q, got errors: %v", tc.errorMsg, errors)
+	}
+}
+
 func TestLintMarkdown_OrderedListPrefix(t *testing.T) {
-	tests := []struct {
-		name        string
-		content     string
-		expectError bool
-		errorMsg    string
-	}{
+	tests := []orderedListTestCase{
 		{
 			name: "starts with 2",
 			content: `
@@ -153,24 +179,7 @@ Paragraph text at outer level
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			errors := LintMarkdown("test.md", tc.content)
-			if tc.expectError {
-				if len(errors) == 0 {
-					t.Fatalf("expected error containing %q, got none", tc.errorMsg)
-				}
-				found := false
-				for _, err := range errors {
-					if strings.Contains(err, tc.errorMsg) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("expected error containing %q, got errors: %v", tc.errorMsg, errors)
-				}
-			} else if len(errors) > 0 {
-				t.Errorf("expected no errors, got %v", errors)
-			}
+			runOrderedListTest(t, tc)
 		})
 	}
 }
