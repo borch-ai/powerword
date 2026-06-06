@@ -10,13 +10,21 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ServerConfig specifies how to launch an external MCP server.
+type ServerConfig struct {
+	Command string            `mapstructure:"command"`
+	Args    []string          `mapstructure:"args"`
+	Env     map[string]string `mapstructure:"env"`
+}
+
 // Config holds the application configuration.
 type Config struct {
-	Verbose      bool    `mapstructure:"verbose"`
-	Model        string  `mapstructure:"model"`
-	APIKeys      APIKeys `mapstructure:"api_keys"`
-	Session      string  `mapstructure:"session"`
-	ListSessions bool    `mapstructure:"list-sessions"`
+	Verbose      bool                    `mapstructure:"verbose"`
+	Model        string                  `mapstructure:"model"`
+	APIKeys      APIKeys                 `mapstructure:"api_keys"`
+	Session      string                  `mapstructure:"session"`
+	ListSessions bool                    `mapstructure:"list-sessions"`
+	Servers      map[string]ServerConfig `mapstructure:"servers"`
 }
 
 // APIKeys maps the model providers to their API keys.

@@ -73,3 +73,10 @@ func TestClient_ListAndCallTools(t *testing.T) {
 		t.Errorf("Expected 'hello', got %q", textContent.Text)
 	}
 }
+
+func TestClient_Close(t *testing.T) {
+	c := &MCPClient{}
+	if err := c.Close(); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}

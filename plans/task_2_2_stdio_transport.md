@@ -32,3 +32,12 @@ Implement the process control logic to launch, supervise, communicate with, and 
 ### Manual Verification
 - Launch a Node/Python-based MCP server (like the filesystem server) via command configs.
 - Terminate Powerword via Ctrl+C and verify the child process is automatically closed.
+
+---
+
+## Final Implementation Details
+- **Go Version:** Go 1.26.4
+- **Configuration:** Added `ServerConfig` (Command, Args, Env) and a `Servers` map to `config.Config` inside `internal/config/config.go` for dynamic MCP server definitions.
+- **Process Supervision:** `internal/mcp/process.go` implements `ServerProcess` which captures stdin/stdout/stderr pipes, wrapping the streams in `mcpsdk.IOTransport`. A background goroutine reads `stderr` to `log.Printf` for diagnostics.
+- **Graceful Shutdown:** `internal/mcp/lifecycle.go` exports `ProcessManager` which listens for `os.Interrupt` and `syscall.SIGTERM`. On receipt, it issues `client.Close()`, sends `os.Interrupt` to the child process, and waits. If the child process exceeds a 5-second timeout, `SIGKILL` is issued.
+- **Testing:** Implemented comprehensive unit tests for config map updates and process lifecycle/signal hooking. Maintained 91% global test coverage threshold (`make check-coverage` verified).

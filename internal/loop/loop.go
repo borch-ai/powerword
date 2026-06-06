@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"powerword/internal/config"
 	"powerword/internal/llm"
+	"powerword/internal/mcp"
 )
 
 // newClient is a package-level variable that defaults to llm.NewClient.
@@ -53,6 +55,26 @@ func consumeStream(chunks <-chan llm.StreamChunk, formatter *TerminalFormatter) 
 func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
 	if cfg.ListSessions {
 		return handleListSessions()
+	}
+
+	// Initialize MCP servers and registry
+	manager := mcp.NewProcessManager()
+	registry := mcp.NewRegistry()
+	
+	stopSignal := manager.StartSignalListener(5 * time.Second)
+	defer stopSignal()
+	defer manager.ShutdownAll(5 * time.Second)
+
+	for name, srvCfg := range cfg.Servers {
+		sp, err := mcp.NewServerProcess(ctx, name, srvCfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to start MCP server %s: %v\n", name, err)
+			continue
+		}
+		manager.Add(name, sp)
+		if err := registry.AddClient(name, sp.Client()); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to register MCP server %s: %v\n", name, err)
+		}
 	}
 
 	var session *Session

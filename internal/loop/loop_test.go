@@ -237,3 +237,32 @@ func TestRunLoop_WithSessionLoadError(t *testing.T) {
 		t.Errorf("expected error to contain 'failed to unmarshal session', got: %v", err)
 	}
 }
+
+func TestRunLoop_WithServers(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		chunks: []llm.StreamChunk{
+			{Content: "Hello "},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Servers: map[string]config.ServerConfig{
+			"dummy": {
+				Command: "echo",
+				Args:    []string{"not mcp"},
+			},
+		},
+	}
+
+	err := RunLoop(ctx, cfg, "test")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
