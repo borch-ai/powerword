@@ -30,8 +30,9 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 		return nil, fmt.Errorf("server command cannot be empty")
 	}
 
-	// We don't use CommandContext here because we manage the termination manually 
+	// We don't use CommandContext here because we manage the termination manually
 	// to allow for a graceful shutdown, instead of aggressive killing on context cancellation.
+	//nolint:gosec // Command execution is intentional and from config
 	cmd := exec.Command(cfg.Command, cfg.Args...)
 
 	if len(cfg.Env) > 0 {
@@ -56,8 +57,8 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 		return nil, fmt.Errorf("failed to get stderr pipe: %w", err)
 	}
 
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start process: %w", err)
+	if startErr := cmd.Start(); startErr != nil {
+		return nil, fmt.Errorf("failed to start process: %w", startErr)
 	}
 
 	sp := &ServerProcess{

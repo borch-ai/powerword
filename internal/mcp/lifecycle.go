@@ -44,7 +44,7 @@ func (m *ProcessManager) ShutdownAll(timeout time.Duration) {
 		}(sp)
 	}
 	wg.Wait()
-	
+
 	// Clear the processes map after shutting down
 	m.processes = make(map[string]*ServerProcess)
 }

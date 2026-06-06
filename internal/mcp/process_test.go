@@ -45,7 +45,7 @@ func TestNewServerProcess_FailsHandshake(t *testing.T) {
 
 func TestServerProcess_ClientAndShutdown(t *testing.T) {
 	// Create a long-running process
-	cmd := exec.Command("sleep", "10")
+	cmd := exec.CommandContext(context.Background(), "sleep", "10")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("failed to start sleep: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestServerProcess_GracefulShutdownNilCmd(t *testing.T) {
 
 func TestServerProcess_GracefulShutdownTimeout(t *testing.T) {
 	// A script that traps SIGINT and ignores it, so GracefulShutdown has to timeout and kill it
-	cmd := exec.Command("bash", "-c", `trap "" INT; sleep 10`)
+	cmd := exec.CommandContext(context.Background(), "bash", "-c", `trap "" INT; sleep 10`)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("failed to start bash: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestNewServerProcess_Env(t *testing.T) {
 }
 
 func TestServerProcess_GracefulShutdownClientClose(t *testing.T) {
-	cmd := exec.Command("sleep", "10")
+	cmd := exec.CommandContext(context.Background(), "sleep", "10")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("failed to start sleep: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestServerProcess_GracefulShutdownClientClose(t *testing.T) {
 }
 
 func TestServerProcess_GracefulShutdownSignalError(t *testing.T) {
-	cmd := exec.Command("echo", "test")
+	cmd := exec.CommandContext(context.Background(), "echo", "test")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("failed to start: %v", err)
 	}

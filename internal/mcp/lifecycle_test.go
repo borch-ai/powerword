@@ -23,11 +23,11 @@ func TestProcessManager_AddAndShutdown(t *testing.T) {
 
 func TestProcessManager_SignalListener(t *testing.T) {
 	manager := NewProcessManager()
-	
+
 	// Ensure that stop function successfully closes the channel
 	stopFunc := manager.StartSignalListener(1 * time.Second)
 	stopFunc() // Test that it doesn't block
-	
+
 	// Test idempotent stop (sync.Once)
 	stopFunc()
 }
