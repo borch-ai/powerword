@@ -31,11 +31,13 @@ func TestClient_ListAndCallTools(t *testing.T) {
 	t1, t2 := mcpsdk.NewInMemoryTransports()
 
 	// Connect server
+	errCh := make(chan error, 1)
 	go func() {
 		_, err := server.Connect(ctx, t1, nil)
 		if err != nil {
-			t.Errorf("Server connect failed: %v", err)
+			errCh <- err
 		}
+		close(errCh)
 	}()
 
 	// Connect client

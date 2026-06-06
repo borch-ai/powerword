@@ -9,6 +9,7 @@ import (
 )
 
 func createMockClient(t *testing.T, serverName string, toolName string) (*MCPClient, func()) {
+	t.Helper()
 	ctx := context.Background()
 	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: serverName, Version: "v1.0.0"}, nil)
 	server.AddTool(&mcpsdk.Tool{
