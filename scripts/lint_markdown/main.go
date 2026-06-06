@@ -10,8 +10,25 @@ import (
 )
 
 func main() {
+	files, err := walkMarkdownFiles(".")
+	if err != nil {
+		fmt.Printf("Error walking directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	failed := lintFiles(files)
+
+	if failed {
+		fmt.Println("Markdown lint check failed.")
+		os.Exit(1)
+	}
+
+	fmt.Println("Markdown lint check passed successfully.")
+}
+
+func walkMarkdownFiles(root string) ([]string, error) {
 	var files []string
-	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -28,12 +45,10 @@ func main() {
 		}
 		return nil
 	})
+	return files, err
+}
 
-	if err != nil {
-		fmt.Printf("Error walking directory: %v\n", err)
-		os.Exit(1)
-	}
-
+func lintFiles(files []string) bool {
 	failed := false
 	for _, file := range files {
 		// #nosec G304
@@ -52,11 +67,5 @@ func main() {
 			}
 		}
 	}
-
-	if failed {
-		fmt.Println("Markdown lint check failed.")
-		os.Exit(1)
-	}
-
-	fmt.Println("Markdown lint check passed successfully.")
+	return failed
 }

@@ -43,50 +43,11 @@ func (a *AnthropicClient) prepareParams(messages []Message, tools []ToolDefiniti
 			continue
 		}
 
-		var role anthropic.MessageParamRole
-		switch msg.Role {
-		case RoleUser, RoleTool:
-			role = anthropic.MessageParamRoleUser
-		case RoleAssistant:
-			role = anthropic.MessageParamRoleAssistant
-		default:
-			return anthropic.MessageNewParams{}, fmt.Errorf("invalid message role: %s", msg.Role)
+		param, err := convertMessageToParam(msg)
+		if err != nil {
+			return anthropic.MessageNewParams{}, err
 		}
-
-		var content []anthropic.ContentBlockParamUnion
-
-		if msg.Content != "" && msg.Role != RoleTool {
-			content = append(content, anthropic.NewTextBlock(msg.Content))
-		}
-
-		for _, tc := range msg.ToolCalls {
-			var input any
-			if tc.Arguments != "" {
-				if err := json.Unmarshal([]byte(tc.Arguments), &input); err != nil {
-					return anthropic.MessageNewParams{}, fmt.Errorf("failed to unmarshal arguments for tool call %s: %w", tc.Name, err)
-				}
-			}
-			content = append(content, anthropic.ContentBlockParamUnion{
-				OfToolUse: &anthropic.ToolUseBlockParam{
-					ID:    tc.ID,
-					Name:  tc.Name,
-					Input: input,
-				},
-			})
-		}
-
-		if msg.Role == RoleTool {
-			content = append(content, anthropic.NewToolResultBlock(
-				msg.ToolCallID,
-				msg.Content,
-				false,
-			))
-		}
-
-		anthropicMessages = append(anthropicMessages, anthropic.MessageParam{
-			Role:    role,
-			Content: content,
-		})
+		anthropicMessages = append(anthropicMessages, param)
 	}
 
 	params := anthropic.MessageNewParams{
@@ -223,4 +184,51 @@ func convertAnthropicSchema(input any) (anthropic.ToolInputSchemaParam, error) {
 		s.Type = "object"
 	}
 	return s, nil
+}
+
+func convertMessageToParam(msg Message) (anthropic.MessageParam, error) {
+	var role anthropic.MessageParamRole
+	switch msg.Role {
+	case RoleUser, RoleTool:
+		role = anthropic.MessageParamRoleUser
+	case RoleAssistant:
+		role = anthropic.MessageParamRoleAssistant
+	default:
+		return anthropic.MessageParam{}, fmt.Errorf("invalid message role: %s", msg.Role)
+	}
+
+	var content []anthropic.ContentBlockParamUnion
+
+	if msg.Content != "" && msg.Role != RoleTool {
+		content = append(content, anthropic.NewTextBlock(msg.Content))
+	}
+
+	for _, tc := range msg.ToolCalls {
+		var input any
+		if tc.Arguments != "" {
+			if err := json.Unmarshal([]byte(tc.Arguments), &input); err != nil {
+				return anthropic.MessageParam{}, fmt.Errorf("failed to unmarshal arguments for tool call %s: %w", tc.Name, err)
+			}
+		}
+		content = append(content, anthropic.ContentBlockParamUnion{
+			OfToolUse: &anthropic.ToolUseBlockParam{
+				ID:    tc.ID,
+				Name:  tc.Name,
+				Input: input,
+			},
+		})
+	}
+
+	if msg.Role == RoleTool {
+		content = append(content, anthropic.NewToolResultBlock(
+			msg.ToolCallID,
+			msg.Content,
+			false,
+		))
+	}
+
+	return anthropic.MessageParam{
+		Role:    role,
+		Content: content,
+	}, nil
 }
