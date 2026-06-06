@@ -8,7 +8,10 @@ Integrate the Model Context Protocol (MCP) Go SDK (`github.com/modelcontextproto
 > MCP client interactions are encapsulated under the [internal/mcp](../internal/mcp) package.
 > We are using `github.com/modelcontextprotocol/go-sdk` version `v1.6.1` with `go 1.26.4`.
 
-## Completed Changes
+## User Review Required
+None.
+
+## Proposed Changes
 
 ### MCP Client Core Integration
 
@@ -24,7 +27,7 @@ Integrate the Model Context Protocol (MCP) Go SDK (`github.com/modelcontextproto
 - Serves as the single repository of active plugins, providing tools aggregated across all spawned MCP servers to the core execution loop.
 - Aggregated tool names use the format `<client>__<tool>` to gracefully handle name collisions.
 
-## Verification
+## Verification Plan
 
 ### Automated Tests
 - Implemented `client_test.go` and `registry_test.go` utilizing `mcp.NewInMemoryTransports()`.
