@@ -25,6 +25,16 @@ func NewRegistry() *Registry {
 
 // AddClient registers a new MCP client under the given name.
 func (r *Registry) AddClient(name string, client *MCPClient) error {
+	if client == nil {
+		return fmt.Errorf("client cannot be nil")
+	}
+	if name == "" {
+		return fmt.Errorf("client name cannot be empty")
+	}
+	if strings.Contains(name, "__") {
+		return fmt.Errorf("client name cannot contain '__'")
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.clients[name]; exists {
