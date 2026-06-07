@@ -27,7 +27,7 @@ func TestProcessManager_SignalListener(t *testing.T) {
 	manager := NewProcessManager()
 
 	// Ensure that stop function successfully closes the channel
-	stopFunc := manager.StartSignalListener(nil, 1 * time.Second)
+	stopFunc := manager.StartSignalListener(nil, 1*time.Second)
 	stopFunc() // Test that it doesn't block
 
 	// Test idempotent stop (sync.Once)
@@ -37,7 +37,7 @@ func TestProcessManager_SignalListener(t *testing.T) {
 func TestProcessManager_SignalListener_Signal(t *testing.T) {
 	manager := NewProcessManager()
 	ctx, cancel := context.WithCancel(context.Background())
-	stopFunc := manager.StartSignalListener(cancel, 1 * time.Second)
+	stopFunc := manager.StartSignalListener(cancel, 1*time.Second)
 	defer stopFunc()
 
 	p, _ := os.FindProcess(os.Getpid())

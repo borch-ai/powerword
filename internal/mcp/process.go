@@ -73,8 +73,8 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 		for scanner.Scan() {
 			log.Printf("[MCP Server %s] stderr: %s", name, scanner.Text())
 		}
-		if err := scanner.Err(); err != nil {
-			log.Printf("[MCP Server %s] stderr read error: %v", name, err)
+		if scanErr := scanner.Err(); scanErr != nil {
+			log.Printf("[MCP Server %s] stderr read error: %v", name, scanErr)
 		}
 	}()
 
@@ -131,7 +131,7 @@ func (sp *ServerProcess) GracefulShutdown(timeout time.Duration) error {
 	case <-time.After(timeout):
 		// Timeout reached, force kill
 		sp.ForceKill()
-		
+
 		select {
 		case <-done:
 		case <-time.After(2 * time.Second):

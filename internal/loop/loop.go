@@ -62,7 +62,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	registry := mcp.NewRegistry()
 
 	loopCtx, cancel := context.WithCancel(ctx)
-	stopSignal := manager.StartSignalListener(cancel, 5 * time.Second)
+	stopSignal := manager.StartSignalListener(cancel, 5*time.Second)
 	defer stopSignal()
 	defer manager.ShutdownAll(5 * time.Second)
 
