@@ -6,6 +6,11 @@ This plan details the setup of a pure, sandboxed local toolchain (`.tools/`) to 
 
 Powerword frequently executes external MCP servers (often written in Node.js). Both DevContainers and Nix were rejected due to system environment constraints on macOS. To avoid global installations (`brew install node`), we will download the official Node binaries into a local `.tools` folder and temporarily add them to the `$PATH`.
 
+## User Review Required
+
+> [!NOTE]
+> None for this task.
+
 ## Proposed Changes
 
 ### [NEW] [scripts/setup_toolchain.sh](file:///Users/human/code/powerword/scripts/setup_toolchain.sh)

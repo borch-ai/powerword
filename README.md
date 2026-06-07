@@ -20,7 +20,7 @@ Written entirely in Go, Powerword prioritizes execution speed, straightforward s
 *(Note: Powerword is actively in development. See the Roadmap for current phase status).*
 
 ### Prerequisites
-- Go 1.23+
+- Go 1.26.4
 - Node.js (for testing standard MCP servers like `@modelcontextprotocol/server-everything`)
 
 *Tip: A local toolchain script is available in `scripts/setup_toolchain.sh` to fetch Node.js binaries directly into the project folder without system-wide installations.*
