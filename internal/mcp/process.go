@@ -32,7 +32,7 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 
 	// We don't use CommandContext here because we manage the termination manually
 	// to allow for a graceful shutdown, instead of aggressive killing on context cancellation.
-	//nolint:gosec // Command execution is intentional and from config
+	//nolint:gosec,noctx // Command execution is intentional and from config, noctx is intentional
 	cmd := exec.Command(cfg.Command, cfg.Args...)
 
 	if len(cfg.Env) > 0 {
