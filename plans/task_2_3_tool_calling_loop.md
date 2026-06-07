@@ -30,4 +30,26 @@ Evolve the single-turn core loop into an iterative reasoning loop (ReAct loop). 
 - Verify infinite loop protection is triggered if the model continues to request tool invocations past the maximum permitted limit.
 
 ### Manual Verification
-- Mount a dummy tool (e.g., `get_current_weather`), ask the model: `"What is the weather in Paris, and should I carry an umbrella?"`, and watch the model trigger the tool call, receive output, and synthesize the final answer.
+
+**1. Setup Environment**
+- If you don't have Node installed globally, add the local toolchain to your path: `export PATH=$PWD/.tools/node/bin:$PATH` (run `bash scripts/setup_toolchain.sh` first if the folder is missing).
+- Create a configuration `powerword.toml` that mounts an MCP server, such as the `@modelcontextprotocol/server-everything` npx package. 
+- Enable verbose logging using `POWERWORD_VERBOSE=true` to observe background tool invocations.
+
+**2. Basic Tool Execution**
+- Run `powerword "Echo 'hello world' using the echo tool"` (using the `echo` tool from the everything server).
+- Verify that the verbose logs show the tool being called with the correct arguments.
+- Verify that the final response contains the expected output synthesized by the LLM.
+
+**3. Tool Error Handling**
+- Ask the model to execute an action that will intentionally fail (e.g., trying to read a file that doesn't exist using the filesystem MCP server, or passing bad arguments).
+- Verify that the error returned by the MCP server is caught, sent back to the LLM, and the LLM gracefully handles the failure rather than crashing the loop.
+
+**4. Loop Limit Protection**
+- Temporarily lower the max ReAct loop iteration limit to `2` in the code or configuration.
+- Prompt the model with a complex task that requires multiple steps, such as exploring a directory tree structure.
+- Verify that the CLI stops execution when the loop limit is reached, emitting a clear warning or error about exceeding maximum loop iterations.
+
+**5. Parallel / Sequential Tool Calling**
+- Run a prompt requiring multiple disjoint facts: `"Fetch the weather for New York, Paris, and Tokyo."` (using a dummy weather tool).
+- Verify in the verbose logs that the tool calls are dispatched (either sequentially or in parallel depending on the API provider's capabilities), and that their aggregated results are passed back to the model correctly.

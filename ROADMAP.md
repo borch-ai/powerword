@@ -22,6 +22,9 @@ Focus: Bootstrapping the CLI application, establishing the LLM interface layer, 
 *   **Task 1.5: Markdown Linting & Implementation Plan Validation**
     *   Integrate Markdown linting tooling (`markdownlint-cli`) into the repository gates. Establish an automated structure check script to verify that all implementation plans conform to the core template standard.
     *   [Implementation Plan](plans/task_1_5_markdown_linting.md)
+*   **Task 1.8: Local Toolchain Sandbox**
+    *   Create a local, sandboxed script to fetch and run Node.js locally without any system-wide packages or containers.
+    *   [Implementation Plan](plans/task_1_8_local_toolchain.md)
 
 ---
 
