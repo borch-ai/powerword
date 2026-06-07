@@ -37,9 +37,7 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 
 	if len(cfg.Env) > 0 {
 		cmd.Env = os.Environ()
-		for k, v := range cfg.Env {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-		}
+		cmd.Env = append(cmd.Env, cfg.Env...)
 	}
 
 	stdin, err := cmd.StdinPipe()
@@ -58,6 +56,9 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 	}
 
 	if startErr := cmd.Start(); startErr != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stderr.Close()
 		return nil, fmt.Errorf("failed to start process: %w", startErr)
 	}
 
@@ -72,6 +73,9 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
 			log.Printf("[MCP Server %s] stderr: %s", name, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("[MCP Server %s] stderr read error: %v", name, err)
 		}
 	}()
 
@@ -125,7 +129,7 @@ func (sp *ServerProcess) GracefulShutdown(timeout time.Duration) error {
 		return err
 	case <-time.After(timeout):
 		// Timeout reached, force kill
-		sp.ForceKill()
+		_ = sp.cmd.Process.Signal(syscall.SIGKILL)
 		<-done // Wait for the kill to complete
 		sp.cleanupWg.Wait()
 		return fmt.Errorf("process did not exit gracefully within timeout, forcefully killed")
@@ -134,7 +138,7 @@ func (sp *ServerProcess) GracefulShutdown(timeout time.Duration) error {
 
 // ForceKill forcefully terminates the process.
 func (sp *ServerProcess) ForceKill() {
-	if sp.cmd.Process != nil {
+	if sp.cmd != nil && sp.cmd.Process != nil {
 		_ = sp.cmd.Process.Signal(syscall.SIGKILL)
 		_ = sp.cmd.Wait()
 	}

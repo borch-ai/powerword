@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"sync"
@@ -33,10 +34,12 @@ func (m *ProcessManager) Add(name string, sp *ServerProcess) {
 // ShutdownAll gracefully shuts down all registered processes.
 func (m *ProcessManager) ShutdownAll(timeout time.Duration) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	processes := m.processes
+	m.processes = make(map[string]*ServerProcess)
+	m.mu.Unlock()
 
 	var wg sync.WaitGroup
-	for _, sp := range m.processes {
+	for _, sp := range processes {
 		wg.Add(1)
 		go func(p *ServerProcess) {
 			defer wg.Done()
@@ -44,15 +47,12 @@ func (m *ProcessManager) ShutdownAll(timeout time.Duration) {
 		}(sp)
 	}
 	wg.Wait()
-
-	// Clear the processes map after shutting down
-	m.processes = make(map[string]*ServerProcess)
 }
 
 // StartSignalListener listens for interrupt signals in the background.
-// On receiving a signal, it shuts down all processes and exits the program.
+// On receiving a signal, it shuts down all processes and cancels the provided context.
 // It returns a function that can be called to stop listening.
-func (m *ProcessManager) StartSignalListener(timeout time.Duration) func() {
+func (m *ProcessManager) StartSignalListener(cancel context.CancelFunc, timeout time.Duration) func() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
@@ -60,7 +60,9 @@ func (m *ProcessManager) StartSignalListener(timeout time.Duration) func() {
 		select {
 		case <-sigCh:
 			m.ShutdownAll(timeout)
-			os.Exit(0)
+			if cancel != nil {
+				cancel()
+			}
 		case <-m.stopCh:
 			signal.Stop(sigCh)
 			return

@@ -95,7 +95,7 @@ func TestNewServerProcess_Env(t *testing.T) {
 
 	cfg := config.ServerConfig{
 		Command: "env",
-		Env:     map[string]string{"TEST_MCP_ENV": "1"},
+		Env:     []string{"TEST_MCP_ENV=1"},
 	}
 
 	sp, _ := NewServerProcess(ctx, "test_env", cfg)

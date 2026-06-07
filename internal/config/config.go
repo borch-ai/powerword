@@ -12,9 +12,9 @@ import (
 
 // ServerConfig specifies how to launch an external MCP server.
 type ServerConfig struct {
-	Command string            `mapstructure:"command"`
-	Args    []string          `mapstructure:"args"`
-	Env     map[string]string `mapstructure:"env"`
+	Command string   `mapstructure:"command"`
+	Args    []string `mapstructure:"args"`
+	Env     []string `mapstructure:"env"`
 }
 
 // Config holds the application configuration.

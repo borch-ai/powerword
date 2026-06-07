@@ -22,7 +22,7 @@ openai = "openai-key-456"
 [servers.filesystem]
 command = "node"
 args = ["/path/to/server.js"]
-env = { FOO = "BAR" }
+env = ["FOO=BAR"]
 `
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
 	if errWrite := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); errWrite != nil {
@@ -61,8 +61,8 @@ env = { FOO = "BAR" }
 	if len(srvCfg.Args) != 1 || srvCfg.Args[0] != "/path/to/server.js" {
 		t.Errorf("expected server args ['/path/to/server.js'], got %v", srvCfg.Args)
 	}
-	if srvCfg.Env["foo"] != "BAR" {
-		t.Errorf("expected server env foo='BAR', got %v", srvCfg.Env)
+	if len(srvCfg.Env) != 1 || srvCfg.Env[0] != "FOO=BAR" {
+		t.Errorf("expected server env ['FOO=BAR'], got %v", srvCfg.Env)
 	}
 
 	// Validate config

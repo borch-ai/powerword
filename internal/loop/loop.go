@@ -61,12 +61,13 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	manager := mcp.NewProcessManager()
 	registry := mcp.NewRegistry()
 
-	stopSignal := manager.StartSignalListener(5 * time.Second)
+	loopCtx, cancel := context.WithCancel(ctx)
+	stopSignal := manager.StartSignalListener(cancel, 5 * time.Second)
 	defer stopSignal()
 	defer manager.ShutdownAll(5 * time.Second)
 
 	for name, srvCfg := range cfg.Servers {
-		sp, srvErr := mcp.NewServerProcess(ctx, name, srvCfg)
+		sp, srvErr := mcp.NewServerProcess(loopCtx, name, srvCfg)
 		if srvErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to start MCP server %s: %v\n", name, srvErr)
 			continue
@@ -98,7 +99,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		Content: prompt,
 	})
 
-	chunks, err := client.Stream(ctx, messages, nil)
+	chunks, err := client.Stream(loopCtx, messages, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start model stream: %w", err)
 	}
