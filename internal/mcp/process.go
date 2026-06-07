@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -87,6 +86,8 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 	client, err := NewClient(ctx, transport)
 	if err != nil {
 		sp.ForceKill()
+		_ = sp.cmd.Wait()
+		sp.cleanupWg.Wait()
 		return nil, fmt.Errorf("failed to create MCP client: %w", err)
 	}
 	sp.client = client
@@ -129,8 +130,12 @@ func (sp *ServerProcess) GracefulShutdown(timeout time.Duration) error {
 		return err
 	case <-time.After(timeout):
 		// Timeout reached, force kill
-		_ = sp.cmd.Process.Signal(syscall.SIGKILL)
-		<-done // Wait for the kill to complete
+		sp.ForceKill()
+		
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+		}
 		sp.cleanupWg.Wait()
 		return fmt.Errorf("process did not exit gracefully within timeout, forcefully killed")
 	}
@@ -139,7 +144,6 @@ func (sp *ServerProcess) GracefulShutdown(timeout time.Duration) error {
 // ForceKill forcefully terminates the process.
 func (sp *ServerProcess) ForceKill() {
 	if sp.cmd != nil && sp.cmd.Process != nil {
-		_ = sp.cmd.Process.Signal(syscall.SIGKILL)
-		_ = sp.cmd.Wait()
+		_ = sp.cmd.Process.Kill()
 	}
 }

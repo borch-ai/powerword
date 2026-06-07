@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -54,7 +53,7 @@ func (m *ProcessManager) ShutdownAll(timeout time.Duration) {
 // It returns a function that can be called to stop listening.
 func (m *ProcessManager) StartSignalListener(cancel context.CancelFunc, timeout time.Duration) func() {
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(sigCh, shutdownSignals...)
 
 	go func() {
 		select {
