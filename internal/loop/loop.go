@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"powerword/internal/config"
 	"powerword/internal/llm"
+	"powerword/internal/mcp"
 )
 
 // newClient is a package-level variable that defaults to llm.NewClient.
@@ -55,6 +57,27 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		return handleListSessions()
 	}
 
+	// Initialize MCP servers and registry
+	manager := mcp.NewProcessManager()
+	registry := mcp.NewRegistry()
+
+	loopCtx, cancel := context.WithCancel(ctx)
+	stopSignal := manager.StartSignalListener(cancel, 5*time.Second)
+	defer stopSignal()
+	defer manager.ShutdownAll(5 * time.Second)
+
+	for name, srvCfg := range cfg.Servers {
+		sp, srvErr := mcp.NewServerProcess(loopCtx, name, srvCfg)
+		if srvErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to start MCP server %s: %v\n", name, srvErr)
+			continue
+		}
+		manager.Add(name, sp)
+		if registryErr := registry.AddClient(name, sp.Client()); registryErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to register MCP server %s: %v\n", name, registryErr)
+		}
+	}
+
 	var session *Session
 	var messages []llm.Message
 
@@ -76,7 +99,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		Content: prompt,
 	})
 
-	chunks, err := client.Stream(ctx, messages, nil)
+	chunks, err := client.Stream(loopCtx, messages, nil)
 	if err != nil {
 		return fmt.Errorf("failed to start model stream: %w", err)
 	}

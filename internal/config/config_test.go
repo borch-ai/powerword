@@ -18,6 +18,11 @@ model = "gemini-1.5-flash"
 [api_keys]
 gemini = "gemini-key-123"
 openai = "openai-key-456"
+
+[servers.filesystem]
+command = "node"
+args = ["/path/to/server.js"]
+env = ["FOO=BAR"]
 `
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
 	if errWrite := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); errWrite != nil {
@@ -44,6 +49,20 @@ openai = "openai-key-456"
 	}
 	if cfg.APIKeys.Anthropic != "" {
 		t.Errorf("expected Anthropic API key to be empty, got '%s'", cfg.APIKeys.Anthropic)
+	}
+
+	if len(cfg.Servers) != 1 {
+		t.Fatalf("expected 1 server config, got %d", len(cfg.Servers))
+	}
+	srvCfg := cfg.Servers["filesystem"]
+	if srvCfg.Command != "node" {
+		t.Errorf("expected server command 'node', got '%s'", srvCfg.Command)
+	}
+	if len(srvCfg.Args) != 1 || srvCfg.Args[0] != "/path/to/server.js" {
+		t.Errorf("expected server args ['/path/to/server.js'], got %v", srvCfg.Args)
+	}
+	if len(srvCfg.Env) != 1 || srvCfg.Env[0] != "FOO=BAR" {
+		t.Errorf("expected server env ['FOO=BAR'], got %v", srvCfg.Env)
 	}
 
 	// Validate config
