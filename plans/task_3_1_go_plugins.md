@@ -22,7 +22,7 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
 
 ### Native Go MCP Servers
 
-#### [NEW] [pw-mcp-fs](file:///Users/human/code/powerword/cmd/pw-mcp-fs/main.go)
+#### [NEW] [pw-mcp-fs](../cmd/pw-mcp-fs/main.go)
 - Separate executable (or internal command mode).
 - Implements MCP schema for:
   - `read_file(path)`
@@ -30,9 +30,9 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
   - `list_directory(path)`
   - `search_grep(pattern, path)`
 - Sandbox check: prevents reading/writing outside of configured workspace root.
-- Implementation: Uses `github.com/modelcontextprotocol/go-sdk/server`. `search_grep` uses `filepath.WalkDir` and `regexp`.
+- Implementation: Uses `github.com/modelcontextprotocol/go-sdk/mcp`. `search_grep` uses `filepath.WalkDir` and `regexp`.
 
-#### [NEW] [pw-mcp-git](file:///Users/human/code/powerword/cmd/pw-mcp-git/main.go)
+#### [NEW] [pw-mcp-git](../cmd/pw-mcp-git/main.go)
 - Implements MCP schema for git repository operations:
   - `git_status()`
   - `git_diff()`
@@ -40,7 +40,7 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
   - `git_commit(message)`
 - Interacts with git repositories using the pure Go library `github.com/go-git/go-git/v5`.
 
-#### [NEW] [pw-mcp-shell](file:///Users/human/code/powerword/cmd/pw-mcp-shell/main.go)
+#### [NEW] [pw-mcp-shell](../cmd/pw-mcp-shell/main.go)
 - Implements safe shell commands running:
   - `run_command(command, args[])`
 - Checks commands against a hardcoded deny-list (`rm, mkfs, dd, sudo, su, shutdown, reboot, poweroff, halt, format, chmod, chown`) and blocks them. Validates workspace directory matching.

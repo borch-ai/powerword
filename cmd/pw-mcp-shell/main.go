@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -51,8 +52,9 @@ func setupServer(workspaceRoot string) (*mcp.Server, error) {
 
 	isDenied := func(cmd string) bool {
 		baseCmd := strings.ToLower(strings.TrimSpace(cmd))
+		cmdName := filepath.Base(baseCmd)
 		for _, denied := range denyList {
-			if baseCmd == denied {
+			if cmdName == denied {
 				return true
 			}
 		}

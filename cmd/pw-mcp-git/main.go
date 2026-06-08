@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
@@ -93,7 +94,7 @@ func handleGitLog(workspaceRoot string) func(context.Context, *mcp.CallToolReque
 		count := 0
 		err = cIter.ForEach(func(c *object.Commit) error {
 			if args.Limit > 0 && count >= args.Limit {
-				return fmt.Errorf("limit reached")
+				return storer.ErrStop
 			}
 			fmt.Fprintf(&output, "commit %s\nAuthor: %s <%s>\nDate:   %s\n\n    %s\n",
 				c.Hash, c.Author.Name, c.Author.Email, c.Author.When.Format(time.RFC3339), strings.TrimSpace(c.Message))
@@ -101,7 +102,7 @@ func handleGitLog(workspaceRoot string) func(context.Context, *mcp.CallToolReque
 			return nil
 		})
 
-		if err != nil && err.Error() != "limit reached" {
+		if err != nil && err != storer.ErrStop {
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
 		}
 

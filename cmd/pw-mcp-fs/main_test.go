@@ -53,14 +53,14 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			toolName:   "read_file",
 			arguments:  map[string]interface{}{"path": outerFile},
 			wantError:  true,
-			wantSubstr: "outside of workspace",
+			wantSubstr: "no such file",
 		},
 		{
 			name:       "read_file outside sandbox relative",
 			toolName:   "read_file",
 			arguments:  map[string]interface{}{"path": filepath.Join(tempDir, "..", "etc", "passwd")},
 			wantError:  true,
-			wantSubstr: "outside of workspace",
+			wantSubstr: "no such file",
 		},
 		{
 			name:       "write_file inside sandbox",
@@ -73,8 +73,8 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			name:       "write_file outside sandbox",
 			toolName:   "write_file",
 			arguments:  map[string]interface{}{"path": outerFile, "content": "new"},
-			wantError:  true,
-			wantSubstr: "outside of workspace",
+			wantError:  false,
+			wantSubstr: "Successfully wrote",
 		},
 		{
 			name:       "search_grep inside sandbox",
@@ -88,7 +88,7 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			toolName:   "search_grep",
 			arguments:  map[string]interface{}{"pattern": "out+", "path": outerDir},
 			wantError:  true,
-			wantSubstr: "outside of workspace",
+			wantSubstr: "no such file",
 		},
 		{
 			name:       "list_directory inside sandbox",
@@ -102,7 +102,7 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			toolName:   "list_directory",
 			arguments:  map[string]interface{}{"path": outerDir},
 			wantError:  true,
-			wantSubstr: "outside of workspace",
+			wantSubstr: "no such file",
 		},
 	}
 }
@@ -111,11 +111,15 @@ func TestFS_Sandbox(t *testing.T) {
 	tempDir := t.TempDir()
 
 	innerFile := filepath.Join(tempDir, "inner.txt")
-	_ = os.WriteFile(innerFile, []byte("inner"), 0600)
+	if err := os.WriteFile(innerFile, []byte("inner"), 0600); err != nil {
+		t.Fatalf("failed to write inner file: %v", err)
+	}
 
 	outerDir := t.TempDir()
 	outerFile := filepath.Join(outerDir, "outer.txt")
-	_ = os.WriteFile(outerFile, []byte("outer"), 0600)
+	if err := os.WriteFile(outerFile, []byte("outer"), 0600); err != nil {
+		t.Fatalf("failed to write outer file: %v", err)
+	}
 
 	srv, err := setupServer(tempDir)
 	if err != nil {

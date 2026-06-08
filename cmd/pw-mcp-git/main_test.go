@@ -25,7 +25,9 @@ func setupTestRepo(t *testing.T, dir string) *git.Worktree {
 	}
 
 	testFile := filepath.Join(dir, "test.txt")
-	_ = os.WriteFile(testFile, []byte("hello world"), 0600)
+	if writeErr := os.WriteFile(testFile, []byte("hello world"), 0600); writeErr != nil {
+		t.Fatalf("failed to write test file: %v", writeErr)
+	}
 
 	if _, addErr := wt.Add("test.txt"); addErr != nil {
 		t.Fatalf("failed to add to worktree: %v", addErr)
@@ -42,7 +44,9 @@ func setupTestRepo(t *testing.T, dir string) *git.Worktree {
 		t.Fatalf("failed to commit: %v", err)
 	}
 
-	_ = os.WriteFile(testFile, []byte("hello universe"), 0600)
+	if writeErr := os.WriteFile(testFile, []byte("hello universe"), 0600); writeErr != nil {
+		t.Fatalf("failed to modify test file: %v", writeErr)
+	}
 	return wt
 }
 

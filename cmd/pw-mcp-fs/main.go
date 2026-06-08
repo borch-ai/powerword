@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -41,14 +42,7 @@ func run() error {
 }
 
 func checkSandbox(absRoot, target string) (string, error) {
-	absPath, err := filepath.Abs(target)
-	if err != nil {
-		return "", err
-	}
-	if !strings.HasPrefix(absPath, absRoot+string(filepath.Separator)) && absPath != absRoot {
-		return "", fmt.Errorf("path %s is outside of workspace root %s", absPath, absRoot)
-	}
-	return absPath, nil
+	return securejoin.SecureJoin(absRoot, target)
 }
 
 func setupServer(workspaceRoot string) (*mcp.Server, error) {
