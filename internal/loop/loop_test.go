@@ -53,13 +53,17 @@ func TestRunLoop_Success(t *testing.T) {
 
 	ctx := context.Background()
 	cfg := &config.Config{
-		Verbose: true,
-		Model:   "test",
+		Verbose:           true,
+		Model:             "test",
+		MaxLoopIterations: 3,
 	}
 
 	err := RunLoop(ctx, cfg, "test prompt")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
+	}
+	if mockClient.calls != 1 {
+		t.Fatalf("expected Generate to be called 1 time, got: %d", mockClient.calls)
 	}
 }
 
