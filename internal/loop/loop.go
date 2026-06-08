@@ -144,7 +144,7 @@ func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient,
 func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) []llm.Message {
 	for _, tc := range toolCalls {
 		if !cfg.AutoConfirm {
-			fmt.Printf("\nExecute tool '%s'? [y/N]: ", tc.Name)
+			fmt.Fprintf(os.Stderr, "\nExecute tool '%s'? [y/N]: ", tc.Name)
 			var resp string
 			_, _ = fmt.Scanln(&resp)
 			resp = strings.ToLower(strings.TrimSpace(resp))
@@ -171,7 +171,7 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 		}
 
 		if cfg.Verbose {
-			fmt.Printf("\n=> Executing tool: %s\n", tc.Name)
+			fmt.Fprintf(os.Stderr, "\n=> Executing tool: %s\n", tc.Name)
 		}
 		result, callErr := registry.CallTool(ctx, tc.Name, args)
 		if callErr != nil {
