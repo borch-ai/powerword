@@ -149,7 +149,7 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 	guard := NewGuard(profile, nil, nil)
 
 	for _, tc := range toolCalls {
-		var args map[string]interface{}
+		args := make(map[string]interface{})
 		if tc.Arguments != "" {
 			if unmarshalErr := json.Unmarshal([]byte(tc.Arguments), &args); unmarshalErr != nil {
 				messages = append(messages, llm.Message{
@@ -165,7 +165,7 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 		if err != nil {
 			messages = append(messages, llm.Message{
 				Role:       llm.RoleTool,
-				Content:    fmt.Sprintf("Error checking tool permission: %v", err),
+				Content:    err.Error(),
 				ToolCallID: tc.ID,
 			})
 			continue

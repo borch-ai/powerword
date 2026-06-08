@@ -12,71 +12,89 @@ func TestGuard_Authorize(t *testing.T) {
 		profile    SecurityProfile
 		toolName   string
 		input      string
-		wantResult bool
-		wantErr    bool
-		errMatch   string
+		wantResult   bool
+		wantErr      bool
+		errMatch     string
+		expectPrompt bool
 	}{
 		{
 			name:       "Bypass profile allows everything",
 			profile:    Bypass,
 			toolName:   "filesystem.delete_file",
-			wantResult: true,
-			wantErr:    false,
+			wantResult:   true,
+			wantErr:      false,
+			expectPrompt: false,
 		},
 		{
 			name:       "ReadOnly profile blocks mutating tool",
 			profile:    ReadOnly,
 			toolName:   "filesystem.delete_file",
-			wantResult: false,
-			wantErr:    true,
-			errMatch:   "blocked by ReadOnly",
+			wantResult:   false,
+			wantErr:      true,
+			errMatch:     "blocked by ReadOnly",
+			expectPrompt: false,
 		},
 		{
 			name:       "ReadOnly profile allows read tool",
 			profile:    ReadOnly,
 			toolName:   "filesystem.list_dir",
-			wantResult: true,
-			wantErr:    false,
+			wantResult:   true,
+			wantErr:      false,
+			expectPrompt: false,
+		},
+		{
+			name:       "Interactive profile allows read tool without prompt",
+			profile:    Interactive,
+			toolName:   "filesystem.list_dir",
+			input:      "", // EOF immediately
+			wantResult:   true,
+			wantErr:      false,
+			expectPrompt: false,
 		},
 		{
 			name:       "Interactive profile allows on yes",
 			profile:    Interactive,
 			toolName:   "filesystem.delete_file",
 			input:      "y\n",
-			wantResult: true,
-			wantErr:    false,
+			wantResult:   true,
+			wantErr:      false,
+			expectPrompt: true,
 		},
 		{
 			name:       "Interactive profile allows on Yes",
 			profile:    Interactive,
 			toolName:   "filesystem.delete_file",
 			input:      "Yes\n",
-			wantResult: true,
-			wantErr:    false,
+			wantResult:   true,
+			wantErr:      false,
+			expectPrompt: true,
 		},
 		{
 			name:       "Interactive profile denies on no",
 			profile:    Interactive,
 			toolName:   "filesystem.delete_file",
 			input:      "n\n",
-			wantResult: false,
-			wantErr:    false,
+			wantResult:   false,
+			wantErr:      false,
+			expectPrompt: true,
 		},
 		{
 			name:       "Interactive profile denies on empty",
 			profile:    Interactive,
 			toolName:   "filesystem.delete_file",
 			input:      "\n",
-			wantResult: false,
-			wantErr:    false,
+			wantResult:   false,
+			wantErr:      false,
+			expectPrompt: true,
 		},
 		{
 			name:       "Interactive profile fails closed on EOF",
 			profile:    Interactive,
 			toolName:   "filesystem.delete_file",
 			input:      "", // EOF immediately
-			wantResult: false,
-			wantErr:    false,
+			wantResult:   false,
+			wantErr:      false,
+			expectPrompt: true,
 		},
 	}
 
@@ -99,7 +117,7 @@ func TestGuard_Authorize(t *testing.T) {
 			}
 
 			// Verify output string formatting if interactive
-			if tt.profile == Interactive {
+			if tt.expectPrompt {
 				outStr := out.String()
 				if !strings.Contains(outStr, tt.toolName) {
 					t.Errorf("expected output to contain tool name %q, got: %q", tt.toolName, outStr)

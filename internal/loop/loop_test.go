@@ -303,7 +303,7 @@ func TestRunLoop_ToolCall_NoAutoConfirm(t *testing.T) {
 				ToolCalls: []llm.ToolCall{
 					{
 						ID:        "call_1",
-						Name:      "test_tool",
+						Name:      "write_tool",
 						Arguments: `{"arg":"val"}`,
 					},
 				},
