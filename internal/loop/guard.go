@@ -67,8 +67,8 @@ func (g *Guard) Authorize(toolName string, args map[string]interface{}) (bool, e
 	}
 
 	// Interactive Profile
-	fmt.Fprintf(g.Out, "\n\x1b[1;33m[?]\x1b[0m Allow tool \x1b[1;36m%s\x1b[0m? (y/N) ", toolName)
-	
+	_, _ = fmt.Fprintf(g.Out, "\n\x1b[1;33m[?]\x1b[0m Allow tool \x1b[1;36m%s\x1b[0m? (y/N) ", toolName)
+
 	reader := bufio.NewReader(g.In)
 	resp, err := reader.ReadString('\n')
 	if err != nil {

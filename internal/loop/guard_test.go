@@ -97,7 +97,7 @@ func TestGuard_Authorize(t *testing.T) {
 			if gotResult != tt.wantResult {
 				t.Errorf("Authorize() gotResult = %v, want %v", gotResult, tt.wantResult)
 			}
-			
+
 			// Verify output string formatting if interactive
 			if tt.profile == Interactive {
 				outStr := out.String()
