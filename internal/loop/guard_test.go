@@ -86,6 +86,15 @@ func TestGuard_Authorize_Interactive(t *testing.T) {
 			expectPrompt: false,
 		},
 		{
+			name:         "Interactive profile allows on yes without newline",
+			profile:      Interactive,
+			toolName:     "filesystem.delete_file",
+			input:        "y", // no newline, EOF immediately
+			wantResult:   true,
+			wantErr:      false,
+			expectPrompt: true,
+		},
+		{
 			name:         "Interactive profile allows on yes",
 			profile:      Interactive,
 			toolName:     "filesystem.delete_file",

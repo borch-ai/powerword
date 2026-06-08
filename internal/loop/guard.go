@@ -75,14 +75,14 @@ func (g *Guard) Authorize(toolName string, args map[string]interface{}) (bool, e
 
 	reader := bufio.NewReader(g.In)
 	resp, err := reader.ReadString('\n')
-	if err != nil {
-		if err == io.EOF {
-			return false, nil
-		}
+	if err != nil && err != io.EOF {
 		return false, fmt.Errorf("failed to read from terminal: %w", err)
 	}
 
-	resp = strings.ToLower(strings.TrimSpace(resp))
+	resp = strings.TrimSpace(strings.ToLower(resp))
+	if resp == "" && err == io.EOF {
+		return false, nil
+	}
 	if resp == "y" || resp == "yes" {
 		return true, nil
 	}
