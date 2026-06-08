@@ -1,5 +1,8 @@
 # Task 2.4: Interactive Permission & Consent Manager
 
+**Status:** Completed
+**Go Version:** 1.23+
+
 Implement an interactive security barrier in the CLI core routing loop. Intercept tool calling commands requested by the LLM and require manual yes/no terminal confirmations before executing unsafe commands (like write operations, git commits, or shell invocations).
 
 ## User Review Required

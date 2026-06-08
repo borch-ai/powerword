@@ -80,7 +80,7 @@ gemini = "gemini-key"
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	// Override model via flag
-	cmd.SetArgs([]string{"--config", cfgFilePath, "--model", "flag-model", "--verbose", "test prompt"})
+	cmd.SetArgs([]string{"--config", cfgFilePath, "--model", "flag-model", "--verbose", "--accept-all", "test prompt"})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -97,6 +97,10 @@ gemini = "gemini-key"
 
 	if !Active.Verbose {
 		t.Errorf("expected Active.Verbose to be overridden to true, got false")
+	}
+
+	if !Active.AutoConfirm {
+		t.Errorf("expected Active.AutoConfirm to be overridden to true, got false")
 	}
 }
 
