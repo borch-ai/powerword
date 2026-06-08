@@ -318,8 +318,8 @@ func TestRunLoop_ToolCall_NoAutoConfirm(t *testing.T) {
 	oldStdin := os.Stdin
 	os.Stdin = r
 	defer func() { os.Stdin = oldStdin }()
-	w.WriteString("n\n")
-	w.Close()
+	_, _ = w.WriteString("n\n")
+	_ = w.Close()
 
 	ctx := context.Background()
 	cfg := &config.Config{
