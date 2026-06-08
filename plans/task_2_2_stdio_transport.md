@@ -30,8 +30,18 @@ Implement the process control logic to launch, supervise, communicate with, and 
 - Test signal interception logic using controlled test sub-processes.
 
 ### Manual Verification
-- Launch a Node/Python-based MCP server (like the filesystem server) via command configs.
-- Terminate Powerword via Ctrl+C and verify the child process is automatically closed.
+1. Create a `powerword.toml` configuration file in the project root with the following content to register a sample MCP server (e.g., `server-everything`):
+   ```toml
+   [servers.everything]
+   command = "npx"
+   args = ["-y", "@modelcontextprotocol/server-everything"]
+   ```
+2. Run the powerword CLI with verbose logging so we can observe the background workers and stderr outputs:
+   ```bash
+   POWERWORD_VERBOSE=true go run ./cmd/powerword "Hello, world!"
+   ```
+3. Verify that the CLI output logs indicate the `everything` server has started and the background `stderr` monitoring goroutine is running (you should see MCP server initialization logs if any).
+4. Terminate Powerword via Ctrl+C while it is running, and verify the console outputs that the graceful shutdown sequence was triggered and the child process was closed correctly without leaving zombie processes.
 
 ---
 

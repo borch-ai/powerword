@@ -33,6 +33,8 @@ using the Model Context Protocol (MCP).`,
 		Args:              cobra.MaximumNArgs(1),
 		PersistentPreRunE: persistentPreRunE,
 		RunE:              runE,
+		SilenceUsage:      true,
+		SilenceErrors:     true,
 	}
 
 	setupPersistentFlags(cmd)
