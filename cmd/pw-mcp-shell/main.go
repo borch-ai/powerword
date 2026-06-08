@@ -44,14 +44,19 @@ func setupServer(workspaceRoot string) (*mcp.Server, error) {
 		Version: "1.0.0",
 	}, nil)
 
-	// Hardcoded deny-list for high-risk commands
+	// Hardcoded deny-list for high-risk commands and shell wrappers
 	denyList := []string{
 		"rm", "mkfs", "dd", "sudo", "su", "shutdown", "reboot",
 		"poweroff", "halt", "format", "chmod", "chown",
+		"sh", "bash", "zsh", "busybox",
 	}
 
 	isDenied := func(cmd string) bool {
-		baseCmd := strings.ToLower(strings.TrimSpace(cmd))
+		fields := strings.Fields(cmd)
+		if len(fields) == 0 {
+			return true // block empty commands
+		}
+		baseCmd := strings.ToLower(fields[0])
 		cmdName := filepath.Base(baseCmd)
 		for _, denied := range denyList {
 			if cmdName == denied {
@@ -74,12 +79,17 @@ func setupServer(workspaceRoot string) (*mcp.Server, error) {
 			return nil, err
 		}
 
+		fields := strings.Fields(input.Command)
+		if len(fields) == 0 {
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "Empty command."}}}, nil
+		}
+
 		if isDenied(input.Command) {
-			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Execution of '%s' is blocked by security policy.", input.Command)}}}, nil
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Execution of '%s' is blocked by security policy.", fields[0])}}}, nil
 		}
 
 		//nolint:gosec // command is checked by deny-list
-		cmd := exec.CommandContext(ctx, input.Command, input.Args...)
+		cmd := exec.CommandContext(ctx, fields[0], append(fields[1:], input.Args...)...)
 		cmd.Dir = workspaceRoot
 
 		output, err := cmd.CombinedOutput()

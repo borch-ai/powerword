@@ -52,7 +52,8 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
 ### Automated Tests
 - Test FS path resolution logic to verify sandbox escaping attempts (e.g. `../../etc/passwd`) are blocked and return standard errors.
 - Test shell command parser with injection sequences to ensure execution safety checks trigger correctly.
-- Added standard Go tests (`_test.go`) resolving linter rules cleanly (`errcheck`, `gosec`, `gocognit`, etc.) maintaining 91% code coverage dynamically.
+- Add thorough unit tests for the MCP handler logic using `mcp.NewInMemoryTransports()`.
+- Ensure tests maintain the required 91% code coverage threshold for `internal/...` core packages as enforced by CI.
 
 ### Manual Verification
 - Build the plugin binaries using `go build ./cmd/pw-mcp-fs`, `go build ./cmd/pw-mcp-git`, and `go build ./cmd/pw-mcp-shell`.

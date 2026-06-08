@@ -53,14 +53,14 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			toolName:   "read_file",
 			arguments:  map[string]interface{}{"path": outerFile},
 			wantError:  true,
-			wantSubstr: "no such file",
+			wantSubstr: "outside of workspace",
 		},
 		{
 			name:       "read_file outside sandbox relative",
 			toolName:   "read_file",
 			arguments:  map[string]interface{}{"path": filepath.Join(tempDir, "..", "etc", "passwd")},
 			wantError:  true,
-			wantSubstr: "no such file",
+			wantSubstr: "outside of workspace",
 		},
 		{
 			name:       "write_file inside sandbox",
@@ -73,8 +73,8 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			name:       "write_file outside sandbox",
 			toolName:   "write_file",
 			arguments:  map[string]interface{}{"path": outerFile, "content": "new"},
-			wantError:  false,
-			wantSubstr: "Successfully wrote",
+			wantError:  true,
+			wantSubstr: "outside of workspace",
 		},
 		{
 			name:       "search_grep inside sandbox",
@@ -88,7 +88,7 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			toolName:   "search_grep",
 			arguments:  map[string]interface{}{"pattern": "out+", "path": outerDir},
 			wantError:  true,
-			wantSubstr: "no such file",
+			wantSubstr: "outside of workspace",
 		},
 		{
 			name:       "list_directory inside sandbox",
@@ -102,7 +102,7 @@ func getTestCases(tempDir, innerFile, outerDir, outerFile string) []testCase {
 			toolName:   "list_directory",
 			arguments:  map[string]interface{}{"path": outerDir},
 			wantError:  true,
-			wantSubstr: "no such file",
+			wantSubstr: "outside of workspace",
 		},
 	}
 }

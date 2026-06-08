@@ -42,6 +42,19 @@ func run() error {
 }
 
 func checkSandbox(absRoot, target string) (string, error) {
+	if filepath.IsAbs(target) {
+		rel, err := filepath.Rel(absRoot, target)
+		if err != nil {
+			return "", err
+		}
+		target = rel
+	}
+
+	clean := filepath.Clean(target)
+	if strings.HasPrefix(clean, "..") {
+		return "", fmt.Errorf("path %s is outside of workspace", target)
+	}
+
 	return securejoin.SecureJoin(absRoot, target)
 }
 

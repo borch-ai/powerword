@@ -110,14 +110,45 @@ func handleGitLog(workspaceRoot string) func(context.Context, *mcp.CallToolReque
 	}
 }
 
+func getOriginalContent(tree *object.Tree, path string) string {
+	file, err := tree.File(path)
+	if err == nil {
+		content, _ := file.Contents()
+		return content
+	}
+	return ""
+}
+
+func getNewContent(wt *git.Worktree, path string) string {
+	fullPath := filepath.Join(wt.Filesystem.Root(), path)
+	//nolint:gosec // path is generated from git status
+	info, err := os.Lstat(fullPath)
+	if err != nil {
+		return ""
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		linkTarget, readErr := os.Readlink(fullPath)
+		if readErr == nil {
+			return fmt.Sprintf("symlink to %s", linkTarget)
+		}
+		return ""
+	}
+	//nolint:gosec // path is generated from git status
+	b, err := os.ReadFile(fullPath)
+	if err == nil {
+		return string(b)
+	}
+	return ""
+}
+
 func generateDiff(status git.Status, tree *object.Tree, wt *git.Worktree) string {
 	var output strings.Builder
 	dmp := diffmatchpatch.New()
 
 	for path, fileStatus := range status {
-		isModified := fileStatus.Worktree == git.Modified || fileStatus.Staging == git.Modified
-		isAdded := fileStatus.Worktree == git.Added || fileStatus.Staging == git.Added
-		isDeleted := fileStatus.Worktree == git.Deleted || fileStatus.Staging == git.Deleted
+		isModified := fileStatus.Worktree == git.Modified
+		isAdded := fileStatus.Worktree == git.Added
+		isDeleted := fileStatus.Worktree == git.Deleted
 
 		if !isModified && !isAdded && !isDeleted {
 			continue
@@ -125,19 +156,12 @@ func generateDiff(status git.Status, tree *object.Tree, wt *git.Worktree) string
 
 		var originalContent string
 		if !isAdded {
-			file, err := tree.File(path)
-			if err == nil {
-				originalContent, _ = file.Contents()
-			}
+			originalContent = getOriginalContent(tree, path)
 		}
 
 		var newContent string
 		if !isDeleted {
-			//nolint:gosec // path is generated from git status
-			b, err := os.ReadFile(filepath.Join(wt.Filesystem.Root(), path))
-			if err == nil {
-				newContent = string(b)
-			}
+			newContent = getNewContent(wt, path)
 		}
 
 		diffs := dmp.DiffMain(originalContent, newContent, false)
