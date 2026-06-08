@@ -55,5 +55,6 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
 - Added standard Go tests (`_test.go`) resolving linter rules cleanly (`errcheck`, `gosec`, `gocognit`, etc.) maintaining 91% code coverage dynamically.
 
 ### Manual Verification
-- Launch the `pw-mcp-fs` server independently via terminal stdio. Submit standardized JSON-RPC initialization and tool execution requests, verifying standard output response formatting.
-- Run Powerword and configure it to use the new MCP servers, then ask the LLM to read a file, check git status, and run a benign shell command.
+- Build the plugin binaries using `go build ./cmd/pw-mcp-fs`, `go build ./cmd/pw-mcp-git`, and `go build ./cmd/pw-mcp-shell`.
+- Launch the built binaries independently via terminal stdio or using an external testing tool like the `mcp-inspector`.
+- Run Powerword end-to-end using the updated `powerword.toml` (which configures the servers via `go run ./cmd/...`) and prompt the LLM to read a file, check the git status, and run a safe shell command to verify the full toolchain integration.
