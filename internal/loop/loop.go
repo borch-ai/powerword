@@ -142,23 +142,14 @@ func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient,
 }
 
 func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) []llm.Message {
-	for _, tc := range toolCalls {
-		if !cfg.AutoConfirm {
-			fmt.Fprintf(os.Stderr, "\nExecute tool '%s'? [y/N]: ", tc.Name)
-			var resp string
-			_, _ = fmt.Scanln(&resp)
-			resp = strings.ToLower(strings.TrimSpace(resp))
-			if resp != "y" && resp != "yes" {
-				messages = append(messages, llm.Message{
-					Role:       llm.RoleTool,
-					Content:    "Error: user denied tool execution",
-					ToolCallID: tc.ID,
-				})
-				continue
-			}
-		}
+	profile := Interactive
+	if cfg.AutoConfirm {
+		profile = Bypass
+	}
+	guard := NewGuard(profile, nil, nil)
 
-		var args map[string]interface{}
+	for _, tc := range toolCalls {
+		args := make(map[string]interface{})
 		if tc.Arguments != "" {
 			if unmarshalErr := json.Unmarshal([]byte(tc.Arguments), &args); unmarshalErr != nil {
 				messages = append(messages, llm.Message{
@@ -168,6 +159,25 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 				})
 				continue
 			}
+		}
+
+		allowed, err := guard.Authorize(tc.Name, args)
+		if err != nil {
+			messages = append(messages, llm.Message{
+				Role:       llm.RoleTool,
+				Content:    err.Error(),
+				ToolCallID: tc.ID,
+			})
+			continue
+		}
+
+		if !allowed {
+			messages = append(messages, llm.Message{
+				Role:       llm.RoleTool,
+				Content:    "Error: user denied tool execution",
+				ToolCallID: tc.ID,
+			})
+			continue
 		}
 
 		if cfg.Verbose {

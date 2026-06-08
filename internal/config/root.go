@@ -13,6 +13,7 @@ var (
 	verbose      bool
 	sessionID    string
 	listSessions bool
+	acceptAll    bool
 )
 
 // Active holds the successfully loaded application configuration.
@@ -100,6 +101,9 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	if cmd.Flags().Changed("list-sessions") {
 		cfg.ListSessions = listSessions
 	}
+	if cmd.Flags().Changed("accept-all") {
+		cfg.AutoConfirm = acceptAll
+	}
 }
 
 func setupPersistentFlags(cmd *cobra.Command) {
@@ -109,12 +113,14 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	verbose = false
 	sessionID = ""
 	listSessions = false
+	acceptAll = false
 
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 	cmd.PersistentFlags().StringVar(&sessionID, "session", "", "creates or resumes a conversation with the specified ID")
 	cmd.PersistentFlags().BoolVar(&listSessions, "list-sessions", false, "lists recent conversations")
+	cmd.PersistentFlags().BoolVar(&acceptAll, "accept-all", false, "bypass interactive confirmation prompts for tool executions")
 }
 
 // Execute executes the root command.

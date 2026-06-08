@@ -1,5 +1,8 @@
 # Task 2.4: Interactive Permission & Consent Manager
 
+**Status:** Completed
+**Go Version:** 1.26.4
+
 Implement an interactive security barrier in the CLI core routing loop. Intercept tool calling commands requested by the LLM and require manual yes/no terminal confirmations before executing unsafe commands (like write operations, git commits, or shell invocations).
 
 ## User Review Required
@@ -33,4 +36,7 @@ Implement an interactive security barrier in the CLI core routing loop. Intercep
 - Mock consent inputs (pressing `y` vs `n` in stdin reader) and check corresponding routing returns.
 
 ### Manual Verification
-- Ask the model: `"Delete the file ./temp.txt"`. Verify that the CLI intercepts the FS plugin `delete_file` call and prompts in the terminal: `[?] Allow tool filesystem.delete_file? (y/N)`. Declining should write a standard response to the model.
+- **Interactive Mode (Mutating Action):** Ask the model: `"Write 'hello world' to the file ./temp.txt"`. Verify that the CLI intercepts the FS plugin `write_file` call and prompts in the terminal: `[?] Allow tool filesystem_write_file? (y/N)`. Declining should write a standard error response to the model, allowing it to realize it couldn't write the file.
+- **Interactive Mode (Read-Only Action):** Ask the model to `"List the files in the current directory"`. Verify that the tool executes immediately without prompting the user.
+- **Bypass Mode:** Run the CLI with the `--accept-all` flag and ask it to `"Create a file named temp2.txt"`. Verify that the file is created automatically without any interactive prompt appearing.
+- **EOF/Headless Safety:** Run the CLI without `--accept-all` with a redirected empty standard input (e.g., `./powerword "Write 'hello world' to temp.txt" < /dev/null`). Verify that it fails-closed upon reaching EOF when attempting to prompt for a mutating action.
