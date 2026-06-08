@@ -19,12 +19,14 @@ type ServerConfig struct {
 
 // Config holds the application configuration.
 type Config struct {
-	Verbose      bool                    `mapstructure:"verbose"`
-	Model        string                  `mapstructure:"model"`
-	APIKeys      APIKeys                 `mapstructure:"api_keys"`
-	Session      string                  `mapstructure:"session"`
-	ListSessions bool                    `mapstructure:"list-sessions"`
-	Servers      map[string]ServerConfig `mapstructure:"servers"`
+	Verbose           bool                    `mapstructure:"verbose"`
+	Model             string                  `mapstructure:"model"`
+	APIKeys           APIKeys                 `mapstructure:"api_keys"`
+	Session           string                  `mapstructure:"session"`
+	ListSessions      bool                    `mapstructure:"list-sessions"`
+	MaxLoopIterations int                     `mapstructure:"max_loop_iterations"`
+	AutoConfirm       bool                    `mapstructure:"auto_confirm"`
+	Servers           map[string]ServerConfig `mapstructure:"servers"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -114,6 +116,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	// Set default values
 	v.SetDefault("verbose", false)
 	v.SetDefault("model", "gemini-1.5-pro")
+	v.SetDefault("max_loop_iterations", 10)
+	v.SetDefault("auto_confirm", false)
 
 	// Read config files in order
 	var readErr error
@@ -151,6 +155,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "api_keys.anthropic", "POWERWORD_ANTHROPIC_API_KEY")
 	bindEnv(v, "model", "POWERWORD_MODEL")
 	bindEnv(v, "verbose", "POWERWORD_VERBOSE")
+	bindEnv(v, "max_loop_iterations", "POWERWORD_MAX_LOOP_ITERATIONS")
+	bindEnv(v, "auto_confirm", "POWERWORD_AUTO_CONFIRM")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

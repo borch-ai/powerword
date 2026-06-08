@@ -53,3 +53,15 @@ Evolve the single-turn core loop into an iterative reasoning loop (ReAct loop). 
 **5. Parallel / Sequential Tool Calling**
 - Run a prompt requiring multiple disjoint facts: `"Fetch the weather for New York, Paris, and Tokyo."` (using a dummy weather tool).
 - Verify in the verbose logs that the tool calls are dispatched (either sequentially or in parallel depending on the API provider's capabilities), and that their aggregated results are passed back to the model correctly.
+
+---
+
+## Completion Status
+
+Task 2.3 is **COMPLETED**.
+
+### Final Design Decisions
+1. **Streaming vs Generate**: The `RunLoop` was updated to utilize blocking `Generate` requests instead of incremental `Stream` during the loop. This guarantees tools are reliably passed in and handled iteratively without requiring a complex parser for partial tool-call streams.
+2. **Loop Iterations Limits**: Added `MaxLoopIterations` (default: 10) to `config.Config` to protect against infinite loops.
+3. **Safety AutoConfirm**: Added `AutoConfirm` (default: `false`) to pause and prompt the user in terminal (`y/N`) before actually dispatching MCP tools.
+4. **Translation Layer**: Created `internal/mcp/translator.go` to adapt `mcpsdk.Tool` into unified generic `llm.ToolDefinition`s.

@@ -2,6 +2,7 @@ package loop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -34,24 +35,6 @@ func handleListSessions() error {
 	return nil
 }
 
-// consumeStream processes the LLM output stream chunk by chunk.
-func consumeStream(chunks <-chan llm.StreamChunk, formatter *TerminalFormatter) (string, error) {
-	var fullResponse strings.Builder
-	for chunk := range chunks {
-		if chunk.Error != nil {
-			return "", fmt.Errorf("error in stream chunk: %w", chunk.Error)
-		}
-		if chunk.Content != "" {
-			fullResponse.WriteString(chunk.Content)
-			if _, err := formatter.Write([]byte(chunk.Content)); err != nil {
-				return "", fmt.Errorf("failed to write output: %w", err)
-			}
-		}
-	}
-	return fullResponse.String(), nil
-}
-
-// RunLoop runs the core execution and reasoning loop.
 func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
 	if cfg.ListSessions {
 		return handleListSessions()
@@ -99,11 +82,6 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		Content: prompt,
 	})
 
-	chunks, err := client.Stream(loopCtx, messages, nil)
-	if err != nil {
-		return fmt.Errorf("failed to start model stream: %w", err)
-	}
-
 	formatter := NewTerminalFormatter(os.Stdout, getTerminalWidth())
 	defer func() {
 		flushErr := formatter.Flush()
@@ -112,22 +90,105 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		}
 	}()
 
-	fullResponse, streamErr := consumeStream(chunks, formatter)
-	if streamErr != nil {
-		return streamErr
+	updatedMessages, loopErr := runReActLoop(loopCtx, cfg, client, registry, formatter, messages)
+	if loopErr != nil {
+		return loopErr
 	}
 
 	if session != nil {
 		session.Model = cfg.Model
-		messages = append(messages, llm.Message{
-			Role:    llm.RoleAssistant,
-			Content: fullResponse,
-		})
-		session.Messages = messages
+		session.Messages = updatedMessages
 		if saveErr := SaveSession(session); saveErr != nil {
 			return fmt.Errorf("failed to save session: %w", saveErr)
 		}
 	}
 
 	return nil
+}
+
+func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message) ([]llm.Message, error) {
+	for i := 0; i < cfg.MaxLoopIterations; i++ {
+		mcpTools, listErr := registry.ListAllTools(ctx)
+		if listErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to list tools: %v\n", listErr)
+		}
+		tools, _ := mcp.TranslateTools(mcpTools)
+
+		assistantMsg, genErr := client.Generate(ctx, messages, tools)
+		if genErr != nil {
+			return nil, fmt.Errorf("failed to generate response: %w", genErr)
+		}
+
+		if assistantMsg.Content != "" {
+			if _, wErr := formatter.Write([]byte(assistantMsg.Content)); wErr != nil {
+				return nil, fmt.Errorf("failed to write output: %w", wErr)
+			}
+			_ = formatter.Flush()
+		}
+
+		messages = append(messages, *assistantMsg)
+
+		if len(assistantMsg.ToolCalls) == 0 {
+			break
+		}
+
+		messages = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
+
+		if i == cfg.MaxLoopIterations-1 && len(assistantMsg.ToolCalls) > 0 {
+			fmt.Fprintf(os.Stderr, "\nWarning: reached maximum loop iterations (%d)\n", cfg.MaxLoopIterations)
+		}
+	}
+	return messages, nil
+}
+
+func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) []llm.Message {
+	for _, tc := range toolCalls {
+		if !cfg.AutoConfirm {
+			fmt.Fprintf(os.Stderr, "\nExecute tool '%s'? [y/N]: ", tc.Name)
+			var resp string
+			_, _ = fmt.Scanln(&resp)
+			resp = strings.ToLower(strings.TrimSpace(resp))
+			if resp != "y" && resp != "yes" {
+				messages = append(messages, llm.Message{
+					Role:       llm.RoleTool,
+					Content:    "Error: user denied tool execution",
+					ToolCallID: tc.ID,
+				})
+				continue
+			}
+		}
+
+		var args map[string]interface{}
+		if tc.Arguments != "" {
+			if unmarshalErr := json.Unmarshal([]byte(tc.Arguments), &args); unmarshalErr != nil {
+				messages = append(messages, llm.Message{
+					Role:       llm.RoleTool,
+					Content:    fmt.Sprintf("Error parsing arguments: %v", unmarshalErr),
+					ToolCallID: tc.ID,
+				})
+				continue
+			}
+		}
+
+		if cfg.Verbose {
+			fmt.Fprintf(os.Stderr, "\n=> Executing tool: %s\n", tc.Name)
+		}
+		result, callErr := registry.CallTool(ctx, tc.Name, args)
+		if callErr != nil {
+			messages = append(messages, llm.Message{
+				Role:       llm.RoleTool,
+				Content:    fmt.Sprintf("Error calling tool: %v", callErr),
+				ToolCallID: tc.ID,
+			})
+			continue
+		}
+
+		formattedRes, _ := mcp.FormatToolResult(result)
+		messages = append(messages, llm.Message{
+			Role:       llm.RoleTool,
+			Content:    formattedRes,
+			ToolCallID: tc.ID,
+		})
+	}
+	return messages
 }

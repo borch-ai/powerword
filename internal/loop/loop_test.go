@@ -13,24 +13,25 @@ import (
 )
 
 type mockLLMClient struct {
-	chunks []llm.StreamChunk
-	err    error
+	genResps []*llm.Message
+	genErr   error
+	calls    int
 }
 
 func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, tools []llm.ToolDefinition) (*llm.Message, error) {
-	return nil, nil
+	if m.genErr != nil {
+		return nil, m.genErr
+	}
+	if m.calls < len(m.genResps) {
+		resp := m.genResps[m.calls]
+		m.calls++
+		return resp, nil
+	}
+	return &llm.Message{Content: "default fallback"}, nil
 }
 
 func (m *mockLLMClient) Stream(ctx context.Context, messages []llm.Message, tools []llm.ToolDefinition) (<-chan llm.StreamChunk, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	ch := make(chan llm.StreamChunk, len(m.chunks))
-	for _, chunk := range m.chunks {
-		ch <- chunk
-	}
-	close(ch)
-	return ch, nil
+	return nil, errors.New("not implemented")
 }
 
 func (m *mockLLMClient) ListModels(ctx context.Context) ([]string, error) {
@@ -42,9 +43,8 @@ func TestRunLoop_Success(t *testing.T) {
 	defer func() { newClient = oldNewClient }()
 
 	mockClient := &mockLLMClient{
-		chunks: []llm.StreamChunk{
-			{Content: "Hello "},
-			{Content: "world!"},
+		genResps: []*llm.Message{
+			{Content: "Hello world!"},
 		},
 	}
 	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
@@ -53,13 +53,17 @@ func TestRunLoop_Success(t *testing.T) {
 
 	ctx := context.Background()
 	cfg := &config.Config{
-		Verbose: true,
-		Model:   "test",
+		Verbose:           true,
+		Model:             "test",
+		MaxLoopIterations: 3,
 	}
 
 	err := RunLoop(ctx, cfg, "test prompt")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
+	}
+	if mockClient.calls != 1 {
+		t.Fatalf("expected Generate to be called 1 time, got: %d", mockClient.calls)
 	}
 }
 
@@ -83,52 +87,28 @@ func TestRunLoop_ClientCreationError(t *testing.T) {
 	}
 }
 
-func TestRunLoop_StreamStartError(t *testing.T) {
+func TestRunLoop_GenerateError(t *testing.T) {
 	oldNewClient := newClient
 	defer func() { newClient = oldNewClient }()
 
 	mockClient := &mockLLMClient{
-		err: errors.New("stream start error"),
+		genErr: errors.New("generate error"),
 	}
 	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
 		return mockClient, nil
 	}
 
 	ctx := context.Background()
-	cfg := &config.Config{}
+	cfg := &config.Config{
+		MaxLoopIterations: 5,
+	}
 
 	err := RunLoop(ctx, cfg, "test prompt")
 	if err == nil {
-		t.Fatal("expected stream start error, got nil")
+		t.Fatal("expected generate error, got nil")
 	}
-	if !strings.Contains(err.Error(), "stream start error") {
-		t.Errorf("expected error to mention 'stream start error', got: %v", err)
-	}
-}
-
-func TestRunLoop_StreamChunkError(t *testing.T) {
-	oldNewClient := newClient
-	defer func() { newClient = oldNewClient }()
-
-	mockClient := &mockLLMClient{
-		chunks: []llm.StreamChunk{
-			{Content: "Hello "},
-			{Error: errors.New("chunk error")},
-		},
-	}
-	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
-		return mockClient, nil
-	}
-
-	ctx := context.Background()
-	cfg := &config.Config{}
-
-	err := RunLoop(ctx, cfg, "test prompt")
-	if err == nil {
-		t.Fatal("expected stream chunk error, got nil")
-	}
-	if !strings.Contains(err.Error(), "chunk error") {
-		t.Errorf("expected error to mention 'chunk error', got: %v", err)
+	if !strings.Contains(err.Error(), "generate error") {
+		t.Errorf("expected error to mention 'generate error', got: %v", err)
 	}
 }
 
@@ -177,7 +157,7 @@ func TestRunLoop_WithSession(t *testing.T) {
 	defer func() { newClient = oldNewClient }()
 
 	mockClient := &mockLLMClient{
-		chunks: []llm.StreamChunk{
+		genResps: []*llm.Message{
 			{Content: "Assistant response"},
 		},
 	}
@@ -187,8 +167,9 @@ func TestRunLoop_WithSession(t *testing.T) {
 
 	ctx := context.Background()
 	cfg := &config.Config{
-		Session: "existing-session",
-		Model:   "test-model",
+		Session:           "existing-session",
+		Model:             "test-model",
+		MaxLoopIterations: 5,
 	}
 
 	err := RunLoop(ctx, cfg, "test prompt")
@@ -243,7 +224,7 @@ func TestRunLoop_WithServers(t *testing.T) {
 	defer func() { newClient = oldNewClient }()
 
 	mockClient := &mockLLMClient{
-		chunks: []llm.StreamChunk{
+		genResps: []*llm.Message{
 			{Content: "Hello "},
 		},
 	}
@@ -253,6 +234,7 @@ func TestRunLoop_WithServers(t *testing.T) {
 
 	ctx := context.Background()
 	cfg := &config.Config{
+		MaxLoopIterations: 5,
 		Servers: map[string]config.ServerConfig{
 			"dummy": {
 				Command: "echo",
@@ -262,6 +244,94 @@ func TestRunLoop_WithServers(t *testing.T) {
 	}
 
 	err := RunLoop(ctx, cfg, "test")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestRunLoop_ToolCall(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Content: "Wait, I will call a tool",
+				ToolCalls: []llm.ToolCall{
+					{
+						ID:        "call_1",
+						Name:      "unknown_tool",
+						Arguments: `{"arg":"val"}`,
+					},
+					{
+						ID:        "call_2",
+						Name:      "bad_json_tool",
+						Arguments: `{bad_json}`,
+					},
+				},
+			},
+			{
+				Content: "Okay, I got an error",
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		MaxLoopIterations: 3,
+		AutoConfirm:       true,
+		Verbose:           true,
+	}
+
+	err := RunLoop(ctx, cfg, "test prompt")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestRunLoop_ToolCall_NoAutoConfirm(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Content: "Wait, I will call a tool",
+				ToolCalls: []llm.ToolCall{
+					{
+						ID:        "call_1",
+						Name:      "test_tool",
+						Arguments: `{"arg":"val"}`,
+					},
+				},
+			},
+			{
+				Content: "Done",
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	// Mock stdin
+	r, w, _ := os.Pipe()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+	_, _ = w.WriteString("n\n")
+	_ = w.Close()
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		MaxLoopIterations: 3,
+		AutoConfirm:       false,
+	}
+
+	err := RunLoop(ctx, cfg, "test prompt")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
