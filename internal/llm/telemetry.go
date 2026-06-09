@@ -103,7 +103,7 @@ func (u *UsageTracker) FormatSummary(cfg *config.Config) string {
 
 	if cost > 0 {
 		sb.WriteString(fmt.Sprintf("- Estimated Cost: $%.5f\n", cost))
-	} else if len(cfg.Pricing) > 0 && total > 0 {
+	} else if cfg != nil && len(cfg.Pricing) > 0 && total > 0 {
 		sb.WriteString("- Estimated Cost: $0.00000 (Check pricing config)\n")
 	}
 	sb.WriteString(fmt.Sprintf("- Turns: %d\n", u.Turns))

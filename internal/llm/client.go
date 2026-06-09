@@ -58,7 +58,7 @@ type ToolDefinition struct {
 type StreamChunk struct {
 	Content string
 	Error   error
-	// Usage is populated on the final chunk if token usage is available.
+	// Usage may be populated if token usage is available from the provider.
 	Usage *TokenUsage
 }
 

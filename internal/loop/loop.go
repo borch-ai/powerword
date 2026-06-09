@@ -177,7 +177,9 @@ func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen i
 	}
 	payload.Response = responseBuilder.String()
 	payload.ToolsExecuted = executedTools
-	payload.Usage = tracker
+	if tracker != nil && tracker.Turns > 0 {
+		payload.Usage = tracker
+	}
 
 	b, _ := json.MarshalIndent(payload, "", "  ")
 	fmt.Println(string(b))
