@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +17,13 @@ import (
 // newClient is a package-level variable that defaults to llm.NewClient.
 // It can be overridden in unit tests to return a mock client.
 var newClient = llm.NewClient
+
+// JSONPayload represents the structured output for headless mode.
+type JSONPayload struct {
+	Response        string         `json:"response"`
+	ToolsExecuted   []llm.ToolCall `json:"tools_executed,omitempty"`
+	ExecutionStatus string         `json:"execution_status"`
+}
 
 // handleListSessions processes the session listing output.
 func handleListSessions() error {
@@ -40,6 +48,14 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		return handleListSessions()
 	}
 
+	if prompt == "" {
+		p, _ := readStdinPrompt()
+		prompt = p
+	}
+	if prompt == "" && !cfg.ListSessions {
+		return fmt.Errorf("no prompt provided and stdin is empty")
+	}
+
 	// Initialize MCP servers and registry
 	manager := mcp.NewProcessManager()
 	registry := mcp.NewRegistry()
@@ -49,17 +65,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	defer stopSignal()
 	defer manager.ShutdownAll(5 * time.Second)
 
-	for name, srvCfg := range cfg.Servers {
-		sp, srvErr := mcp.NewServerProcess(loopCtx, name, srvCfg)
-		if srvErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to start MCP server %s: %v\n", name, srvErr)
-			continue
-		}
-		manager.Add(name, sp)
-		if registryErr := registry.AddClient(name, sp.Client()); registryErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to register MCP server %s: %v\n", name, registryErr)
-		}
-	}
+	startServers(loopCtx, cfg, manager, registry)
 
 	var session *Session
 	var messages []llm.Message
@@ -78,7 +84,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	}
 
 	if cfg.Verbose && targetModel != cfg.Model {
-		fmt.Printf("Routed to model: %s\n", targetModel)
+		fmt.Fprintf(os.Stderr, "Routed to model: %s\n", targetModel)
 	}
 
 	messages = append(messages, llm.Message{
@@ -86,7 +92,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		Content: prompt,
 	})
 
-	formatter := NewTerminalFormatter(os.Stdout, getTerminalWidth())
+	var outWriter io.Writer = os.Stdout
+	if cfg.JSONOutput {
+		outWriter = io.Discard
+	}
+	formatter := NewTerminalFormatter(outWriter, getTerminalWidth())
 	defer func() {
 		flushErr := formatter.Flush()
 		if err == nil && flushErr != nil {
@@ -94,20 +104,77 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		}
 	}()
 
+	initialLen := len(messages)
 	updatedMessages, loopErr := runReActLoop(loopCtx, cfg, activeClient, registry, formatter, messages)
-	if loopErr != nil {
-		return loopErr
-	}
 
-	if session != nil {
+	if session != nil && loopErr == nil {
 		session.Model = targetModel
 		session.Messages = updatedMessages
 		if saveErr := SaveSession(session); saveErr != nil {
-			return fmt.Errorf("failed to save session: %w", saveErr)
+			loopErr = fmt.Errorf("failed to save session: %w", saveErr)
 		}
 	}
 
-	return nil
+	if cfg.JSONOutput {
+		printJSONPayload(loopErr, updatedMessages, initialLen)
+	}
+
+	return loopErr
+}
+
+func startServers(ctx context.Context, cfg *config.Config, manager *mcp.ProcessManager, registry *mcp.Registry) {
+	for name, srvCfg := range cfg.Servers {
+		sp, srvErr := mcp.NewServerProcess(ctx, name, srvCfg)
+		if srvErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to start MCP server %s: %v\n", name, srvErr)
+			continue
+		}
+		manager.Add(name, sp)
+		if registryErr := registry.AddClient(name, sp.Client()); registryErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to register MCP server %s: %v\n", name, registryErr)
+		}
+	}
+}
+
+func readStdinPrompt() (string, error) {
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return "", err
+	}
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		b, readErr := io.ReadAll(os.Stdin)
+		if readErr == nil {
+			return strings.TrimSpace(string(b)), nil
+		}
+		return "", readErr
+	}
+	return "", nil
+}
+
+func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen int) {
+	payload := JSONPayload{
+		ExecutionStatus: "success",
+	}
+	if loopErr != nil {
+		payload.ExecutionStatus = "error: " + loopErr.Error()
+	}
+
+	var responseBuilder strings.Builder
+	var executedTools []llm.ToolCall
+	for i := initialLen; i < len(updatedMessages); i++ {
+		msg := updatedMessages[i]
+		if msg.Role == llm.RoleAssistant && msg.Content != "" {
+			responseBuilder.WriteString(msg.Content)
+		}
+		if msg.Role == llm.RoleAssistant && len(msg.ToolCalls) > 0 {
+			executedTools = append(executedTools, msg.ToolCalls...)
+		}
+	}
+	payload.Response = responseBuilder.String()
+	payload.ToolsExecuted = executedTools
+
+	b, _ := json.MarshalIndent(payload, "", "  ")
+	fmt.Println(string(b))
 }
 
 func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt string) (llm.LLMClient, string, string, error) {
@@ -196,6 +263,8 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 	profile := Interactive
 	if cfg.AutoConfirm {
 		profile = Bypass
+	} else if cfg.Headless {
+		profile = ReadOnly
 	}
 	guard := NewGuard(profile, nil, nil)
 

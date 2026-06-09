@@ -14,6 +14,8 @@ var (
 	sessionID       string
 	listSessions    bool
 	acceptAll       bool
+	headless        bool
+	jsonOutput      bool
 	routeMap        map[string]string
 	classifierModel string
 )
@@ -106,6 +108,12 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	if cmd.Flags().Changed("accept-all") {
 		cfg.AutoConfirm = acceptAll
 	}
+	if cmd.Flags().Changed("headless") {
+		cfg.Headless = headless
+	}
+	if cmd.Flags().Changed("json") {
+		cfg.JSONOutput = jsonOutput
+	}
 	if cmd.Flags().Changed("route") {
 		cfg.Route = routeMap
 	}
@@ -131,6 +139,8 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&sessionID, "session", "", "creates or resumes a conversation with the specified ID")
 	cmd.PersistentFlags().BoolVar(&listSessions, "list-sessions", false, "lists recent conversations")
 	cmd.PersistentFlags().BoolVar(&acceptAll, "accept-all", false, "bypass interactive confirmation prompts for tool executions")
+	cmd.PersistentFlags().BoolVar(&headless, "headless", false, "run in headless mode, disabling interactive prompts and failing on unsafe commands")
+	cmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output structured JSON to stdout and route logs to stderr")
 	cmd.PersistentFlags().StringToStringVar(&routeMap, "route", nil, "comma-separated list of pattern=model rules for routing")
 	cmd.PersistentFlags().StringVar(&classifierModel, "classifier-model", "", "model to use for zero-shot prompt-based routing")
 }

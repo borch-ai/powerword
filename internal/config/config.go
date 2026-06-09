@@ -26,6 +26,8 @@ type Config struct {
 	ListSessions      bool                    `mapstructure:"list-sessions"`
 	MaxLoopIterations int                     `mapstructure:"max_loop_iterations"`
 	AutoConfirm       bool                    `mapstructure:"auto_confirm"`
+	Headless          bool                    `mapstructure:"headless"`
+	JSONOutput        bool                    `mapstructure:"json"`
 	Servers           map[string]ServerConfig `mapstructure:"servers"`
 	Route             map[string]string       `mapstructure:"route"`
 	ClassifierModel   string                  `mapstructure:"classifier_model"`
@@ -159,6 +161,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "verbose", "POWERWORD_VERBOSE")
 	bindEnv(v, "max_loop_iterations", "POWERWORD_MAX_LOOP_ITERATIONS")
 	bindEnv(v, "auto_confirm", "POWERWORD_AUTO_CONFIRM")
+	bindEnv(v, "headless", "POWERWORD_HEADLESS")
+	bindEnv(v, "json", "POWERWORD_JSON")
 	bindEnv(v, "route", "POWERWORD_ROUTE")
 	bindEnv(v, "classifier_model", "POWERWORD_CLASSIFIER_MODEL")
 
