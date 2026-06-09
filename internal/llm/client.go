@@ -110,6 +110,9 @@ func NewCriticClient(cfg *config.Config) (LLMClient, error) {
 	}
 
 	model := cfg.CriticModel
+	if model == "" {
+		model = cfg.Model
+	}
 	provider := strings.ToLower(cfg.CriticProvider)
 
 	if strings.Contains(provider, "openai") || strings.Contains(provider, "ollama") {

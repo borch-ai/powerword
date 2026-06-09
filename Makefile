@@ -21,7 +21,7 @@ SHELL_PLUGIN=pw-mcp-shell
 VERSION?=dev
 LDFLAGS=-ldflags "-X powerword/internal/config.Version=$(VERSION)"
 
-all: markdown-lint lint vuln test-review check-coverage build
+all: markdown-lint lint vuln check-coverage build
 
 build:
 	mkdir -p bin
@@ -44,8 +44,7 @@ install-hooks:
 	@cp scripts/git-hooks/pre-push .git/hooks/pre-push
 	@chmod +x .git/hooks/pre-push
 	@echo "Git hooks installed successfully."
-test-review:
-	$(GOTEST) ./internal/review/...
+
 
 test:
 	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/... ./internal/...

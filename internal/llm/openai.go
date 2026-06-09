@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -23,6 +24,9 @@ func NewOpenAIClient(apiKey string, modelName string) (*OpenAIClient, error) {
 func NewCustomOpenAIClient(apiKey string, modelName string, baseURL string) (*OpenAIClient, error) {
 	cfg := openai.DefaultConfig(apiKey)
 	if baseURL != "" {
+		if !strings.HasSuffix(baseURL, "/v1") {
+			baseURL = strings.TrimRight(baseURL, "/") + "/v1"
+		}
 		cfg.BaseURL = baseURL
 	}
 	client := openai.NewClientWithConfig(cfg)

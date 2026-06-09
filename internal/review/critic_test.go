@@ -241,8 +241,17 @@ func TestVerifyWorkspace_GitFails(t *testing.T) {
 }
 
 func TestExtractGitDiff_Fallback(t *testing.T) {
-	cfg := &config.Config{}
-	_, _ = ExtractGitDiff(context.Background(), cfg)
+	cfg := &config.Config{
+		Servers: map[string]config.ServerConfig{
+			"git": {
+				Command: "invalid-command-does-not-exist",
+			},
+		},
+	}
+	_, err := ExtractGitDiff(context.Background(), cfg)
+	if err == nil {
+		t.Errorf("expected error for invalid git server, got nil")
+	}
 }
 
 func TestLoadIssuePlan_InvalidJSON(t *testing.T) {
@@ -332,14 +341,4 @@ func TestVerifyWorkspace_Reject(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for reject, got nil")
 	}
-}
-
-func TestExtractGitDiff(t *testing.T) {
-	// Test ExtractGitDiff directly to satisfy coverage requirements
-	origExtract := ExtractGitDiff
-	defer func() { ExtractGitDiff = origExtract }()
-
-	// We expect an error without a real MCP server or git setup,
-	// but calling it provides the requested coverage.
-	_, _ = ExtractGitDiff(context.Background(), &config.Config{})
 }

@@ -141,6 +141,11 @@ func parseIssueBody(body string) (*Plan, error) {
 }
 
 func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error {
+	if plan == nil || cfg == nil {
+		return errors.New("VerifyWorkspace requires non-nil plan and cfg")
+	}
+
+	var validationOutput string
 	if checkMakefileExists() {
 		fmt.Println("Running local validation (make all)...")
 
@@ -153,6 +158,7 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 			_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Local Validation Failed\n\n```\n%s\n```\n", string(makeOut))), 0600)
 			return fmt.Errorf("local validation failed: %w", err)
 		}
+		validationOutput = string(makeOut)
 	} else {
 		fmt.Println("No Makefile found, skipping local validation")
 	}
@@ -186,13 +192,16 @@ Implementation Plan Proposed Changes:
 Implementation Plan Verification:
 %s
 
+Local Validation Output:
+%s
+
 Git Diff:
 %s
 
 Check if ALL proposed changes are implemented in the diff. Check for any omissions, bugs, or missing tests.
 If there are any missing changes or issues, clearly list them and end your response with exactly "VERDICT: REJECT".
 If the diff fully implements the plan correctly, end your response with exactly "VERDICT: ACCEPT".`,
-		plan.Goal, plan.Changes, plan.Verification, diffStr)
+		plan.Goal, plan.Changes, plan.Verification, validationOutput, diffStr)
 
 	messages := []llm.Message{
 		{Role: llm.RoleSystem, Content: "You are an automated pre-push code critic."},
@@ -210,7 +219,7 @@ If the diff fully implements the plan correctly, end your response with exactly 
 
 	_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Feedback\n\n%s\n", resp.Content)), 0600)
 
-	if !strings.Contains(resp.Content, "VERDICT: ACCEPT") {
+	if !strings.HasSuffix(strings.TrimSpace(resp.Content), "VERDICT: ACCEPT") {
 		return fmt.Errorf("critic rejected the workspace changes")
 	}
 
