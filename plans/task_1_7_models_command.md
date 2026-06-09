@@ -1,5 +1,7 @@
 # Task 1.7: Models Subcommand
 
+**Status:** Completed (Issue #42)
+
 ## Objective
 Implement a `powerword models` subcommand to act as a pre-flight check for users to verify their configured API key can access the intended models. 
 

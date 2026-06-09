@@ -1,5 +1,7 @@
 # Task [Task Number]: [Task Title]
 
+**Status:** Open (Issue #[TBD])
+
 Provide a brief description of the goal of this task, any background context, and what the changes accomplish.
 
 ## User Review Required

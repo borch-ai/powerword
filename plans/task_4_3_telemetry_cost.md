@@ -2,7 +2,7 @@
 
 Implement tracking and reporting of LLM token metrics (input tokens, output tokens, cached/context tokens) across execution loop turns. Calculate and render estimated cost calculations on CLI termination.
 
-## Status: Completed
+## Status: Completed (Issue #59)
 
 ## Final Implementation Details
 

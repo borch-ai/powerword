@@ -1,5 +1,7 @@
 # Task 1.5: Markdown Linting & Implementation Plan Validation
 
+**Status:** Completed (Issue #40)
+
 Establish continuous integration gates to ensure all documentation files (.md) follow strict Markdown styling rules, and verify that all files under `plans/` conform to the standard structure of the core template.
 
 ## User Review Required

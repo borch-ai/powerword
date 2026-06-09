@@ -18,6 +18,8 @@ var (
 	jsonOutput      bool
 	routeMap        map[string]string
 	classifierModel string
+	autonomous      bool
+	issueIDString   string
 )
 
 // Active holds the successfully loaded application configuration.
@@ -120,6 +122,12 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	if cmd.Flags().Changed("classifier-model") {
 		cfg.ClassifierModel = classifierModel
 	}
+	if cmd.Flags().Changed("autonomous") {
+		cfg.Autonomous = autonomous
+	}
+	if cmd.Flags().Changed("issue") {
+		cfg.Issue = issueIDString
+	}
 }
 
 func setupPersistentFlags(cmd *cobra.Command) {
@@ -143,6 +151,8 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output structured JSON to stdout and route logs to stderr")
 	cmd.PersistentFlags().StringToStringVar(&routeMap, "route", nil, "comma-separated list of pattern=model rules for routing")
 	cmd.PersistentFlags().StringVar(&classifierModel, "classifier-model", "", "model to use for zero-shot prompt-based routing")
+	cmd.PersistentFlags().BoolVar(&autonomous, "autonomous", false, "run an autonomous repair loop")
+	cmd.PersistentFlags().StringVar(&issueIDString, "issue", "", "GitHub issue ID for autonomous review/repair")
 }
 
 // Execute executes the root command.

@@ -1,5 +1,7 @@
 # Task 1.6: Automated Release Workflow
 
+**Status:** Completed (Issue #41)
+
 Add a post-merge "release" GitHub Action workflow to automate semantic versioning, create Git tags and GitHub releases, generate detailed release notes based on Conventional Commit messages, compile Powerword binaries for multiple platforms, and upload them as release assets.
 
 ## User Review Required

@@ -12,9 +12,9 @@ import (
 func setupTestSessions(t *testing.T) string {
 	t.Helper()
 	tempDir := t.TempDir()
-	sessionsBaseDir = tempDir
+	SessionsBaseDir = tempDir
 	t.Cleanup(func() {
-		sessionsBaseDir = ""
+		SessionsBaseDir = ""
 	})
 	return tempDir
 }
@@ -141,7 +141,7 @@ func TestLoadEmptySessionID(t *testing.T) {
 }
 
 func TestGetSessionsDir_RealHome(t *testing.T) {
-	sessionsBaseDir = ""
+	SessionsBaseDir = ""
 
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
@@ -216,7 +216,7 @@ func TestListSessions_ReadDirError(t *testing.T) {
 }
 
 func TestGetSessionsDir_NoHome(t *testing.T) {
-	sessionsBaseDir = ""
+	SessionsBaseDir = ""
 	t.Setenv("HOME", "")
 	t.Setenv("USERPROFILE", "")
 	_, err := getSessionsDir()

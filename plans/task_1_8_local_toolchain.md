@@ -1,5 +1,7 @@
 # Task 1.8: Local Toolchain Sandbox
 
+**Status:** Completed (Issue #43)
+
 This plan details the setup of a pure, sandboxed local toolchain (`.tools/`) to download and manage the Node.js binaries exclusively for this repository.
 
 ## Motivation
