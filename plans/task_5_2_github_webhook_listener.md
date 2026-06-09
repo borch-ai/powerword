@@ -46,7 +46,7 @@ Extend the HTTP listener daemon to handle webhook notifications for issue edits,
   - Parsing of `issues`, `issue_comment`, and `pull_request_review_comment` payloads.
   - Correct dispatch of events to the internal MCP Server (`WebhookMCPServer`).
   - Resource schema exposure under `github://issues`.
-- Final Go version used: Go 1.23+
+- Final Go version used: Go 1.26.4
 
 ### Manual Verification
 - Launch the listener local server: `powerword review --listen --port 8080`.

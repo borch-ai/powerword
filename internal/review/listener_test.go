@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"powerword/internal/config"
 )
@@ -18,7 +19,7 @@ func TestHandleWebhook_ValidSignature(t *testing.T) {
 	body := []byte(`{"issue": {"number": 123}}`)
 
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
+	_, _ = mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))
@@ -64,7 +65,7 @@ func TestHandleWebhook_IgnoreEvent(t *testing.T) {
 	body := []byte(`{"push": {}}`)
 
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
+	_, _ = mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))
@@ -91,14 +92,18 @@ func TestStartWebhookListener_Cancellation(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- StartWebhookListener(ctx, cfg, 0)
+		errCh <- StartWebhookListener(ctx, cfg)
 	}()
 
-	// Cancel immediately to trigger shutdown
 	cancel()
-	err := <-errCh
-	if err != nil {
-		t.Errorf("expected nil error on graceful shutdown, got %v", err)
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Errorf("expected nil error on graceful shutdown, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("StartWebhookListener did not return promptly after context cancellation")
 	}
 }
 
@@ -107,7 +112,7 @@ func TestHandleWebhook_IssueComment(t *testing.T) {
 	body := []byte(`{"comment": {"id": 123}}`)
 
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
+	_, _ = mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))
@@ -129,7 +134,7 @@ func TestHandleWebhook_PullRequestReviewComment(t *testing.T) {
 	body := []byte(`{"comment": {"id": 123}}`)
 
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
+	_, _ = mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))

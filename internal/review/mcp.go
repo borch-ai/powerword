@@ -41,6 +41,11 @@ func NewMCPServer() *WebhookMCPServer {
 	return ws
 }
 
+// Server returns the underlying MCP server so it can be connected to transports.
+func (ws *WebhookMCPServer) Server() *mcp.Server {
+	return ws.srv
+}
+
 func (ws *WebhookMCPServer) handleReadIssues(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 	ws.mu.RLock()
 	defer ws.mu.RUnlock()
@@ -61,7 +66,7 @@ func (ws *WebhookMCPServer) handleReadIssues(ctx context.Context, req *mcp.ReadR
 	}, nil
 }
 
-// HandleGitHubEvent stores the event data and triggers MCP notifications.
+// HandleGitHubEvent updates the in-memory MCP state with the event data.
 func (ws *WebhookMCPServer) HandleGitHubEvent(eventType string, payload map[string]interface{}) {
 	ws.mu.Lock()
 	defer ws.mu.Unlock()

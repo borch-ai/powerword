@@ -17,8 +17,12 @@ import (
 )
 
 // StartWebhookListener starts an HTTP server listening for GitHub webhooks.
-func StartWebhookListener(ctx context.Context, cfg *config.Config, port int) error {
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+func StartWebhookListener(ctx context.Context, cfg *config.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
+	addr := fmt.Sprintf(":%d", cfg.WebhookPort)
 	mux := http.NewServeMux()
 
 	// Initialize MCP Server and HTTP handlers
@@ -42,7 +46,11 @@ func StartWebhookListener(ctx context.Context, cfg *config.Config, port int) err
 	go func() { //nolint:gosec // intentional background context for shutdown
 		<-ctx.Done()
 		log.Println("Shutting down webhook listener...")
-		_ = server.Shutdown(context.Background())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("webhook listener shutdown error: %v", err)
+		}
 	}()
 
 	log.Printf("Starting webhook listener on %s\n", addr)
@@ -54,19 +62,20 @@ func StartWebhookListener(ctx context.Context, cfg *config.Config, port int) err
 }
 
 func handleWebhook(w http.ResponseWriter, r *http.Request, secret string, mcpSrv *WebhookMCPServer) {
+	defer func() {
+		_ = r.Body.Close()
+	}()
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(io.LimitReader(r.Body, 10*1024*1024)) // limit to 10MB
 	if err != nil {
 		http.Error(w, "Error reading body", http.StatusInternalServerError)
 		return
 	}
-	defer func() {
-		_ = r.Body.Close()
-	}()
 
 	if secret != "" {
 		signature := r.Header.Get("X-Hub-Signature-256")
@@ -106,7 +115,7 @@ func verifySignature(payloadBody []byte, signatureHeader string, secret string) 
 		return false
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(payloadBody)
+	_, _ = mac.Write(payloadBody)
 	expectedMAC := mac.Sum(nil)
 	return hmac.Equal(actualMAC, expectedMAC)
 }
