@@ -9,9 +9,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//nolint:gocognit // CLI command setup is inherently complex
 func newReviewCmd() *cobra.Command {
 	var issueID string
 	var localOnly bool
+	var listen bool
+	var port int
 
 	cmd := &cobra.Command{
 		Use:   "review",
@@ -21,6 +24,17 @@ func newReviewCmd() *cobra.Command {
 			cfg := config.Active
 			if cfg == nil {
 				return fmt.Errorf("configuration not loaded")
+			}
+
+			if listen {
+				listenPort := port
+				if listenPort == 0 {
+					listenPort = cfg.WebhookPort
+					if listenPort == 0 {
+						listenPort = 8080
+					}
+				}
+				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
 			}
 
 			if !localOnly && issueID == "" {
@@ -52,6 +66,8 @@ func newReviewCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&issueID, "issue", "", "GitHub issue ID containing the active plan")
 	cmd.Flags().BoolVar(&localOnly, "local", false, "Run local validation and ruleset verification only (without fetching a remote issue)")
+	cmd.Flags().BoolVar(&listen, "listen", false, "Start the webhook listener daemon")
+	cmd.Flags().IntVar(&port, "port", 0, "Port to bind the listener to (defaults to config webhook_port or 8080)")
 
 	return cmd
 }
