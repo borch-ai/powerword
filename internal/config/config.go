@@ -44,6 +44,8 @@ type Config struct {
 	CriticEndpoint    string                  `mapstructure:"critic_endpoint"`
 	Autonomous        bool                    `mapstructure:"autonomous"`
 	Issue             string                  `mapstructure:"issue"`
+	WebhookSecret     string                  `mapstructure:"webhook_secret"`
+	WebhookPort       int                     `mapstructure:"webhook_port"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -109,6 +111,8 @@ func bindEnv(v *viper.Viper, input ...string) {
 }
 
 // LoadConfig loads the configuration using Viper.
+//
+//nolint:funlen // Config loading is inherently lengthy
 func LoadConfig(cfgFile string) (*Config, error) {
 	if err := loadDotEnv(); err != nil {
 		return nil, err
@@ -135,6 +139,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("model", "gemini-1.5-pro")
 	v.SetDefault("max_loop_iterations", 10)
 	v.SetDefault("auto_confirm", false)
+	v.SetDefault("webhook_port", 8080)
 
 	// Read config files in order
 	var readErr error
@@ -183,6 +188,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "critic_endpoint", "POWERWORD_CRITIC_ENDPOINT")
 	bindEnv(v, "autonomous", "POWERWORD_AUTONOMOUS")
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
+	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")
+	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

@@ -87,7 +87,6 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
     *   [Implementation Plan](plans/task_5_3_autonomous_repair_loop.md)
 
 ---
-
 ## Phase 6: Remote Dashboard Integration
 Focus: Evolving the CLI into a persistent background daemon that coordinates with the AntigravityMobile dashboard over Firebase and WebRTC.
 
