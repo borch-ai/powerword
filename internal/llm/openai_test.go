@@ -23,6 +23,11 @@ func TestOpenAIClient_Generate_Success(t *testing.T) {
 					},
 				},
 			},
+			Usage: openai.Usage{
+				PromptTokens:     10,
+				CompletionTokens: 20,
+				TotalTokens:      30,
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -49,6 +54,10 @@ func TestOpenAIClient_Generate_Success(t *testing.T) {
 
 	if msg.Content != "Hello from OpenAI mock server!" {
 		t.Errorf("unexpected content: %s", msg.Content)
+	}
+
+	if msg.Usage == nil || msg.Usage.InputTokens != 10 || msg.Usage.OutputTokens != 20 {
+		t.Errorf("unexpected usage: %+v", msg.Usage)
 	}
 }
 
