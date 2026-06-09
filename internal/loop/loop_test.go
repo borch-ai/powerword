@@ -160,7 +160,7 @@ func TestRunLoop_WithSession(t *testing.T) {
 		genResps: []*llm.Message{
 			{
 				Content: "Assistant response",
-				Usage: &llm.TokenUsage{InputTokens: 10, OutputTokens: 20},
+				Usage:   &llm.TokenUsage{InputTokens: 10, OutputTokens: 20},
 			},
 		},
 	}
