@@ -49,25 +49,7 @@ func (u *UsageTracker) EstimatedCost(cfg *config.Config) float64 {
 
 	var totalCost float64
 	for model, usage := range u.ModelUsages {
-		var pricing *config.ModelPricing
-		if p, ok := cfg.Pricing[model]; ok {
-			pricing = &p
-		} else {
-			// Find the best prefix match
-			var bestPrefix string
-			for prefix := range cfg.Pricing {
-				if strings.HasPrefix(model, prefix) {
-					if len(prefix) > len(bestPrefix) {
-						bestPrefix = prefix
-					}
-				}
-			}
-			if bestPrefix != "" {
-				p := cfg.Pricing[bestPrefix]
-				pricing = &p
-			}
-		}
-
+		pricing := getPricingForModel(model, cfg)
 		if pricing == nil {
 			continue
 		}
@@ -79,6 +61,23 @@ func (u *UsageTracker) EstimatedCost(cfg *config.Config) float64 {
 	}
 
 	return totalCost
+}
+
+func getPricingForModel(model string, cfg *config.Config) *config.ModelPricing {
+	if p, ok := cfg.Pricing[model]; ok {
+		return &p
+	}
+	var bestPrefix string
+	for prefix := range cfg.Pricing {
+		if strings.HasPrefix(model, prefix) && len(prefix) > len(bestPrefix) {
+			bestPrefix = prefix
+		}
+	}
+	if bestPrefix != "" {
+		p := cfg.Pricing[bestPrefix]
+		return &p
+	}
+	return nil
 }
 
 // FormatSummary returns a formatted string detailing token usage and estimated cost.
@@ -95,18 +94,18 @@ func (u *UsageTracker) FormatSummary(cfg *config.Config) string {
 
 	var sb strings.Builder
 	sb.WriteString("Session Metrics:\n")
-	sb.WriteString(fmt.Sprintf("- Total Tokens: %d (%d In, %d Out", total, totalInput, totalOutput))
+	fmt.Fprintf(&sb, "- Total Tokens: %d (%d In, %d Out", total, totalInput, totalOutput)
 	if totalCached > 0 {
-		sb.WriteString(fmt.Sprintf(", %d Cached", totalCached))
+		fmt.Fprintf(&sb, ", %d Cached", totalCached)
 	}
 	sb.WriteString(")\n")
 
 	if cost > 0 {
-		sb.WriteString(fmt.Sprintf("- Estimated Cost: $%.5f\n", cost))
+		fmt.Fprintf(&sb, "- Estimated Cost: $%.5f\n", cost)
 	} else if cfg != nil && len(cfg.Pricing) > 0 && total > 0 {
 		sb.WriteString("- Estimated Cost: $0.00000 (Check pricing config)\n")
 	}
-	sb.WriteString(fmt.Sprintf("- Turns: %d\n", u.Turns))
+	fmt.Fprintf(&sb, "- Turns: %d\n", u.Turns)
 
 	return sb.String()
 }

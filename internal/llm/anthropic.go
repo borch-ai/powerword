@@ -143,30 +143,7 @@ func (a *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 				out <- StreamChunk{Error: ctx.Err()}
 				return
 			default:
-				event := stream.Current()
-
-				if messageStart, ok := event.AsAny().(anthropic.MessageStartEvent); ok {
-					out <- StreamChunk{
-						Usage: &TokenUsage{
-							InputTokens:  int(messageStart.Message.Usage.InputTokens),
-							CachedTokens: int(messageStart.Message.Usage.CacheReadInputTokens),
-						},
-					}
-				}
-				
-				if messageDelta, ok := event.AsAny().(anthropic.MessageDeltaEvent); ok {
-					out <- StreamChunk{
-						Usage: &TokenUsage{
-							OutputTokens: int(messageDelta.Usage.OutputTokens),
-						},
-					}
-				}
-
-				if eventVariant, ok := event.AsAny().(anthropic.ContentBlockDeltaEvent); ok {
-					if deltaVariant, ok := eventVariant.Delta.AsAny().(anthropic.TextDelta); ok {
-						out <- StreamChunk{Content: deltaVariant.Text}
-					}
-				}
+				handleAnthropicStreamEvent(stream.Current(), out)
 			}
 		}
 
@@ -178,6 +155,30 @@ func (a *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 	return out, nil
 }
 
+func handleAnthropicStreamEvent(event anthropic.MessageStreamEventUnion, out chan<- StreamChunk) {
+	if messageStart, ok := event.AsAny().(anthropic.MessageStartEvent); ok {
+		out <- StreamChunk{
+			Usage: &TokenUsage{
+				InputTokens:  int(messageStart.Message.Usage.InputTokens),
+				CachedTokens: int(messageStart.Message.Usage.CacheReadInputTokens),
+			},
+		}
+	}
+
+	if messageDelta, ok := event.AsAny().(anthropic.MessageDeltaEvent); ok {
+		out <- StreamChunk{
+			Usage: &TokenUsage{
+				OutputTokens: int(messageDelta.Usage.OutputTokens),
+			},
+		}
+	}
+
+	if eventVariant, ok := event.AsAny().(anthropic.ContentBlockDeltaEvent); ok {
+		if deltaVariant, ok := eventVariant.Delta.AsAny().(anthropic.TextDelta); ok {
+			out <- StreamChunk{Content: deltaVariant.Text}
+		}
+	}
+}
 func (a *AnthropicClient) ListModels(ctx context.Context) ([]string, error) {
 	page, err := a.client.Models.List(ctx, anthropic.ModelListParams{})
 	if err != nil {
