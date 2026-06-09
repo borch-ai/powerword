@@ -357,7 +357,7 @@ func TestReadStdinPrompt(t *testing.T) {
 
 func TestPrintJSONPayload(t *testing.T) {
 	oldStdout := os.Stdout
-	_, w, _ := os.Pipe()
+	r, w, _ := os.Pipe()
 	os.Stdout = w
 	defer func() { os.Stdout = oldStdout }()
 
@@ -367,7 +367,19 @@ func TestPrintJSONPayload(t *testing.T) {
 	}, 0)
 
 	_ = w.Close()
-	// Just need it to execute without panic for coverage
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	_ = r.Close()
+	output := string(buf[:n])
+
+	if !strings.Contains(output, "Hello") {
+		t.Errorf("expected payload to contain 'Hello', got: %s", output)
+	}
+	if !strings.Contains(output, "success") {
+		t.Errorf("expected payload to contain 'success', got: %s", output)
+	}
 }
 
 func TestRunLoop_JSONOutput(t *testing.T) {
@@ -376,7 +388,7 @@ func TestRunLoop_JSONOutput(t *testing.T) {
 
 	mockClient := &mockLLMClient{
 		genResps: []*llm.Message{
-			{Content: "JSON response"},
+			{Role: llm.RoleAssistant, Content: "JSON response"},
 		},
 	}
 	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
@@ -390,7 +402,7 @@ func TestRunLoop_JSONOutput(t *testing.T) {
 	}
 
 	oldStdout := os.Stdout
-	_, w, _ := os.Pipe()
+	r, w, _ := os.Pipe()
 	os.Stdout = w
 	defer func() { os.Stdout = oldStdout }()
 
@@ -399,6 +411,16 @@ func TestRunLoop_JSONOutput(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 	_ = w.Close()
+	os.Stdout = oldStdout
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	_ = r.Close()
+	output := string(buf[:n])
+
+	if !strings.Contains(output, "JSON response") {
+		t.Errorf("expected JSON payload to contain generated response, got: %s", output)
+	}
 }
 
 func TestRunLoop_Headless(t *testing.T) {
