@@ -8,12 +8,14 @@ import (
 )
 
 var (
-	cfgFile      string
-	model        string
-	verbose      bool
-	sessionID    string
-	listSessions bool
-	acceptAll    bool
+	cfgFile         string
+	model           string
+	verbose         bool
+	sessionID       string
+	listSessions    bool
+	acceptAll       bool
+	routeMap        map[string]string
+	classifierModel string
 )
 
 // Active holds the successfully loaded application configuration.
@@ -104,6 +106,12 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	if cmd.Flags().Changed("accept-all") {
 		cfg.AutoConfirm = acceptAll
 	}
+	if cmd.Flags().Changed("route") {
+		cfg.Route = routeMap
+	}
+	if cmd.Flags().Changed("classifier-model") {
+		cfg.ClassifierModel = classifierModel
+	}
 }
 
 func setupPersistentFlags(cmd *cobra.Command) {
@@ -114,6 +122,8 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	sessionID = ""
 	listSessions = false
 	acceptAll = false
+	routeMap = nil
+	classifierModel = ""
 
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
@@ -121,6 +131,8 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&sessionID, "session", "", "creates or resumes a conversation with the specified ID")
 	cmd.PersistentFlags().BoolVar(&listSessions, "list-sessions", false, "lists recent conversations")
 	cmd.PersistentFlags().BoolVar(&acceptAll, "accept-all", false, "bypass interactive confirmation prompts for tool executions")
+	cmd.PersistentFlags().StringToStringVar(&routeMap, "route", nil, "comma-separated list of pattern=model rules for routing")
+	cmd.PersistentFlags().StringVar(&classifierModel, "classifier-model", "", "model to use for zero-shot prompt-based routing")
 }
 
 // Execute executes the root command.

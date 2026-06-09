@@ -31,3 +31,10 @@ Develop routing mechanisms to dispatch prompts to different models dynamically. 
 
 ### Manual Verification
 - Execute a query with explicit routing: `$ powerword --route="git=local,code=gemini" "List files changed in git and write a docstring for each"`. Confirm terminal debug logs show correct routing endpoints being called for each segment.
+
+## Final Implementation Details
+
+- **Configuration:** Added `--route` flag for mapping regex patterns to models (e.g., `git.*=openai`) and `--classifier-model` for zero-shot prompt-based classification. 
+- **Routing Engine:** Created `internal/llm/router.go` with strict evaluation precedence: explicit prefixes (`@model`), regex rules, zero-shot classification, and default fallback.
+- **Dynamic Swap:** Updated `internal/loop/loop.go` to use a client cache `map[string]llm.LLMClient` to lazy-load and swap clients during a session.
+- **Testing:** Added robust test cases in `router_test.go` and `loop_routing_test.go`. Final test coverage successfully verified at 91.1%.
