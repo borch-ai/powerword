@@ -55,31 +55,39 @@ var ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, erro
 		_ = srv.GracefulShutdown(time.Second * 5)
 	}()
 
-	res, err := srv.Client().CallTool(ctx, "git_diff", map[string]interface{}{})
-	if err != nil {
-		return "", fmt.Errorf("git_diff tool call failed: %w", err)
-	}
+	var diffBuilder strings.Builder
 
-	if res.IsError {
-		if len(res.Content) > 0 {
-			if tc, ok := res.Content[0].(*mcpsdk.TextContent); ok {
-				return "", fmt.Errorf("git_diff returned error: %s", tc.Text)
+	// 1. Get committed changes against main
+	resCommits, err := srv.Client().CallTool(ctx, "git_diff_commits", map[string]interface{}{"base": "main", "head": "HEAD"})
+	if err == nil && !resCommits.IsError && len(resCommits.Content) > 0 {
+		if tc, ok := resCommits.Content[0].(*mcpsdk.TextContent); ok {
+			text := strings.TrimSpace(tc.Text)
+			if text != "No changes" && text != "" {
+				diffBuilder.WriteString("Committed changes (main -> HEAD):\n")
+				diffBuilder.WriteString(text)
+				diffBuilder.WriteString("\n\n")
 			}
 		}
-		return "", errors.New("git_diff returned an unknown error")
 	}
 
-	if len(res.Content) > 0 {
-		if tc, ok := res.Content[0].(*mcpsdk.TextContent); ok {
-			diffStr := strings.TrimSpace(tc.Text)
-			if diffStr == "No changes" {
-				return "", nil
+	// 2. Get uncommitted working tree changes
+	resWorking, err := srv.Client().CallTool(ctx, "git_diff", map[string]interface{}{})
+	if err == nil && !resWorking.IsError && len(resWorking.Content) > 0 {
+		if tc, ok := resWorking.Content[0].(*mcpsdk.TextContent); ok {
+			text := strings.TrimSpace(tc.Text)
+			if text != "No changes" && text != "" {
+				diffBuilder.WriteString("Uncommitted changes (Working Tree):\n")
+				diffBuilder.WriteString(text)
+				diffBuilder.WriteString("\n\n")
 			}
-			return diffStr, nil
 		}
 	}
 
-	return "", nil
+	if diffBuilder.Len() == 0 {
+		return "", nil
+	}
+
+	return strings.TrimSpace(diffBuilder.String()), nil
 }
 
 func LoadIssuePlan(ctx context.Context, issueID string) (*Plan, error) {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -260,6 +261,64 @@ func handleGitCommit(workspaceRoot string) func(context.Context, *mcp.CallToolRe
 	}
 }
 
+func getTreeFromRevision(repo *git.Repository, rev string) (*object.Tree, error) {
+	hash, err := repo.ResolveRevision(plumbing.Revision(rev))
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve %s: %w", rev, err)
+	}
+	commit, err := repo.CommitObject(*hash)
+	if err != nil {
+		return nil, err
+	}
+	return commit.Tree()
+}
+
+func handleGitDiffCommits(workspaceRoot string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Base string `json:"base"`
+			Head string `json:"head"`
+		}
+		if req.Params.Arguments != nil {
+			if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+				return nil, err
+			}
+		}
+		if args.Base == "" {
+			args.Base = "main"
+		}
+		if args.Head == "" {
+			args.Head = "HEAD"
+		}
+
+		repo, err := getRepo(workspaceRoot)
+		if err != nil {
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
+		}
+
+		baseTree, err := getTreeFromRevision(repo, args.Base)
+		if err != nil {
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
+		}
+		headTree, err := getTreeFromRevision(repo, args.Head)
+		if err != nil {
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
+		}
+
+		patch, err := baseTree.Patch(headTree)
+		if err != nil {
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
+		}
+
+		diffText := patch.String()
+		if diffText == "" {
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "No changes"}}}, nil
+		}
+
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: diffText}}}, nil
+	}
+}
+
 func setupServer(workspaceRoot string) (*mcp.Server, error) {
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "pw-mcp-git",
@@ -283,6 +342,12 @@ func setupServer(workspaceRoot string) (*mcp.Server, error) {
 		Description: "Returns the diff of the working tree",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
 	}, handleGitDiff(workspaceRoot))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "git_diff_commits",
+		Description: "Returns the diff between two commits or branches. Defaults to main...HEAD.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"base":{"type":"string","description":"Base ref (e.g. main)"},"head":{"type":"string","description":"Head ref (e.g. HEAD)"}}}`),
+	}, handleGitDiffCommits(workspaceRoot))
 
 	srv.AddTool(&mcp.Tool{
 		Name:        "git_commit",

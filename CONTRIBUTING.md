@@ -18,8 +18,8 @@ Before submitting a pull request, your changes must pass our automated quality c
     *   **We enforce a minimum 91% unit test coverage gate.**
     *   Run tests and verify coverage: `make check-coverage` (runs unit tests and evaluates output via [scripts/check_coverage.go](file:///Users/human/code/powerword/scripts/check_coverage.go)).
 4.  **AI Local Critic (Pre-Push)**:
-    *   Powerword enforces a `pre-push` hook that evaluates your local uncommitted and unpushed changes against the implementation plan in the GitHub issue.
-    *   It first runs `make all` locally. If it passes, it extracts the git diff and sends it to the configured Critic LLM for strict verification.
+    *   Powerword enforces a `pre-push` hook that evaluates both your unpushed committed changes (relative to `main`) and your local uncommitted working-tree changes against the implementation plan in the GitHub issue.
+    *   It first runs `make all` locally. If it passes, it extracts the combined git diff and sends it to the configured Critic LLM for strict verification.
     *   If validation fails or the critic rejects the changes, the push aborts and detailed feedback is written locally to `.powerword-critic.md`.
 
 Run the entire verification pipeline before pushing:
