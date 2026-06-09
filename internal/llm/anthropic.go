@@ -99,6 +99,11 @@ func (a *AnthropicClient) Generate(ctx context.Context, messages []Message, tool
 	assistantMsg := &Message{
 		Role: RoleAssistant,
 	}
+	assistantMsg.Usage = TokenUsage{
+		InputTokens:  int(msg.Usage.InputTokens),
+		OutputTokens: int(msg.Usage.OutputTokens),
+		CachedTokens: int(msg.Usage.CacheReadInputTokens),
+	}
 
 	var textBuilder strings.Builder
 	for _, block := range msg.Content {
@@ -139,6 +144,24 @@ func (a *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 				return
 			default:
 				event := stream.Current()
+
+				if messageStart, ok := event.AsAny().(anthropic.MessageStartEvent); ok {
+					out <- StreamChunk{
+						Usage: &TokenUsage{
+							InputTokens:  int(messageStart.Message.Usage.InputTokens),
+							CachedTokens: int(messageStart.Message.Usage.CacheReadInputTokens),
+						},
+					}
+				}
+				
+				if messageDelta, ok := event.AsAny().(anthropic.MessageDeltaEvent); ok {
+					out <- StreamChunk{
+						Usage: &TokenUsage{
+							OutputTokens: int(messageDelta.Usage.OutputTokens),
+						},
+					}
+				}
+
 				if eventVariant, ok := event.AsAny().(anthropic.ContentBlockDeltaEvent); ok {
 					if deltaVariant, ok := eventVariant.Delta.AsAny().(anthropic.TextDelta); ok {
 						out <- StreamChunk{Content: deltaVariant.Text}

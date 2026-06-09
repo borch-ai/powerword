@@ -115,6 +115,13 @@ func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools [
 		Content: choice.Message.Content,
 	}
 
+	if resp.Usage.TotalTokens > 0 {
+		assistantMsg.Usage = TokenUsage{
+			InputTokens:  resp.Usage.PromptTokens,
+			OutputTokens: resp.Usage.CompletionTokens,
+		}
+	}
+
 	for _, tc := range choice.Message.ToolCalls {
 		assistantMsg.ToolCalls = append(assistantMsg.ToolCalls, ToolCall{
 			ID:        tc.ID,
@@ -130,6 +137,9 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 	req, err := o.prepareRequest(messages, tools)
 	if err != nil {
 		return nil, err
+	}
+	req.StreamOptions = &openai.StreamOptions{
+		IncludeUsage: true,
 	}
 
 	stream, err := o.client.CreateChatCompletionStream(ctx, req)
@@ -158,6 +168,15 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 				if err != nil {
 					out <- StreamChunk{Error: fmt.Errorf("openai stream error: %w", err)}
 					return
+				}
+
+				if response.Usage != nil {
+					out <- StreamChunk{
+						Usage: &TokenUsage{
+							InputTokens:  response.Usage.PromptTokens,
+							OutputTokens: response.Usage.CompletionTokens,
+						},
+					}
 				}
 
 				if len(response.Choices) > 0 {

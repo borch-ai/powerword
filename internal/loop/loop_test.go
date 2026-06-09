@@ -364,7 +364,7 @@ func TestPrintJSONPayload(t *testing.T) {
 	printJSONPayload(nil, []llm.Message{
 		{Role: llm.RoleAssistant, Content: "Hello"},
 		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{Name: "test"}}},
-	}, 0)
+	}, 0, llm.NewUsageTracker())
 
 	_ = w.Close()
 	os.Stdout = oldStdout
