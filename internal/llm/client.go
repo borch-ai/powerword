@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"powerword/internal/config"
@@ -95,4 +96,45 @@ func NewClient(cfg *config.Config) (LLMClient, error) {
 		return nil, errors.New("openai API key is not configured")
 	}
 	return NewOpenAIClient(cfg.APIKeys.OpenAI, cfg.Model)
+}
+
+// NewCriticClient returns an LLMClient tailored for the critic, using critic-specific configs if provided.
+func NewCriticClient(cfg *config.Config) (LLMClient, error) {
+	if cfg == nil {
+		return nil, errors.New("config is nil")
+	}
+
+	if cfg.CriticProvider == "" {
+		// Fallback to the main client if no critic-specific provider is set.
+		return NewClient(cfg)
+	}
+
+	model := cfg.CriticModel
+	provider := strings.ToLower(cfg.CriticProvider)
+
+	if strings.Contains(provider, "openai") || strings.Contains(provider, "ollama") {
+		// OpenAI compatible provider
+		apiKey := cfg.APIKeys.OpenAI
+		if apiKey == "" {
+			apiKey = "dummy" // local models like Ollama might not require a real key
+		}
+
+		return NewCustomOpenAIClient(apiKey, model, cfg.CriticEndpoint)
+	}
+
+	if strings.Contains(provider, "gemini") {
+		if cfg.APIKeys.Gemini == "" {
+			return nil, errors.New("gemini API key is not configured for critic")
+		}
+		return NewGeminiClient(cfg.APIKeys.Gemini, model)
+	}
+
+	if strings.Contains(provider, "claude") || strings.Contains(provider, "anthropic") {
+		if cfg.APIKeys.Anthropic == "" {
+			return nil, errors.New("anthropic API key is not configured for critic")
+		}
+		return NewAnthropicClient(cfg.APIKeys.Anthropic, model)
+	}
+
+	return nil, fmt.Errorf("unsupported critic provider: %s", provider)
 }

@@ -16,7 +16,15 @@ type OpenAIClient struct {
 
 // NewOpenAIClient creates a new OpenAI client.
 func NewOpenAIClient(apiKey string, modelName string) (*OpenAIClient, error) {
+	return NewCustomOpenAIClient(apiKey, modelName, "")
+}
+
+// NewCustomOpenAIClient creates a new OpenAI client with a custom base URL.
+func NewCustomOpenAIClient(apiKey string, modelName string, baseURL string) (*OpenAIClient, error) {
 	cfg := openai.DefaultConfig(apiKey)
+	if baseURL != "" {
+		cfg.BaseURL = baseURL
+	}
 	client := openai.NewClientWithConfig(cfg)
 	return &OpenAIClient{
 		client:    client,

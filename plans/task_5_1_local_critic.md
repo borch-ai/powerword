@@ -67,6 +67,13 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
   - `--issue`: GitHub issue ID containing the active plan.
   - `--local`: Run local validation and ruleset verification only (without fetching a remote issue).
 
+### Final Implementation Details (Post-Critic Review)
+- **Timeouts**: Added a 3-minute `context.WithTimeout` to the `VerifyWorkspace` step so a hung local build doesn't indefinitely block pushing code.
+- **Payload Sanitization**: Cleaned up the `parseIssueBody` function to strip out generic empty form placeholders (`_No response_`) provided by GitHub Issue Forms.
+- **Robust Branch Regex**: Tightened up the ID extraction logic in `.git/hooks/pre-push` to accurately isolate branch IDs.
+- **Issue Form Locking**: Added `.github/ISSUE_TEMPLATE/config.yml` to disable blank issues and enforce structured templates for all new issues.
+- **Coverage Mock Logic**: Expanded `internal/review/critic_test.go` and refactored file existence check strategies for `Makefile` and `pw-mcp-git` to allow them to be tested safely across diverse `go test` environments without relying on the actual repo structure.
+
 ---
 
 ## Verification Plan

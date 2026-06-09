@@ -86,6 +86,7 @@ powerword/
 ## Pull Request & Merging Workflow
 
 - **PR Required for Mainline Changes:** Direct pushes to the remote `main` branch are blocked. AI agents and human contributors must **never** push changes directly to `main`. All updates, bug fixes, features, and documentation edits must go through a Pull Request.
+- **Local Critic Review (Pre-Push):** Before pushing, the `powerword review --local` command runs automatically via a Git `pre-push` hook. It triggers a local build (`make all`), extracts the git diff using `pw-mcp-git`, and strictly evaluates the changes against the assigned implementation plan. All output and feedback is written to `.powerword-critic.md`. Configure the critic in `config.toml` with `critic_provider`, `critic_model`, and `critic_endpoint`.
 - **Pause Before Merging:** AI agents must **never** auto-merge pull requests. Always pause to request explicit user approval.
 - **Review Copilot Feedback:** Review and address all comments, suggestions, or issues flagged by the GitHub Copilot Code Review runner before finalizing a task.
 - **Review Loop with Timer:** After opening or updating a Pull Request, the agent should pause (e.g., schedule a 30-second timer) to check for Copilot Code Review comments. If no comments are found and the total wait time has not exceeded a 7-minute timeout, the agent should repeat the 30-second check loop. Once comments are found, or the timeout is reached with no comments, the agent applies necessary refactors, pushes the fixes, and restarts the check loop for the new commit.

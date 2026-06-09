@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# pre-push git hook
+# Runs powerword review --local before pushing to ensure quality.
+
+echo "Running powerword local review..."
+
+if ! command -v powerword &> /dev/null; then
+    echo "ERROR: powerword is not installed or not in PATH."
+    echo "Run 'make install' to install powerword."
+    exit 1
+fi
+
+branch_name=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
+issue_id=$(echo "$branch_name" | grep -o -E '(^|/)[0-9]+(-|$)' | tr -d '/' | tr -d '-' | head -n 1)
+
+if [ -n "$issue_id" ]; then
+    echo "Found issue ID $issue_id from branch name."
+    if ! powerword review --issue "$issue_id"; then
+        echo "ERROR: powerword review failed. Please fix the issues and try again, or use git push --no-verify to bypass."
+        exit 1
+    fi
+else
+    echo "No issue ID found in branch name, running local review."
+    if ! powerword review --local; then
+        echo "ERROR: powerword review failed. Please fix the issues and try again, or use git push --no-verify to bypass."
+        exit 1
+    fi
+fi
+
+exit 0

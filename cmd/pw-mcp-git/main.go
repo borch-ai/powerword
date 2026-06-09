@@ -148,14 +148,15 @@ func generateDiff(status git.Status, tree *object.Tree, wt *git.Worktree) string
 	for path, fileStatus := range status {
 		isModified := fileStatus.Worktree == git.Modified
 		isAdded := fileStatus.Worktree == git.Added
+		isUntracked := fileStatus.Worktree == git.Untracked
 		isDeleted := fileStatus.Worktree == git.Deleted
 
-		if !isModified && !isAdded && !isDeleted {
+		if !isModified && !isAdded && !isDeleted && !isUntracked {
 			continue
 		}
 
 		var originalContent string
-		if !isAdded {
+		if !isAdded && !isUntracked {
 			originalContent = getOriginalContent(tree, path)
 		}
 

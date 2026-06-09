@@ -1,4 +1,4 @@
-.PHONY: all build install test lint fmt clean tidy vuln check-coverage markdown-lint
+.PHONY: all build install test test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks
 
 # Go parameters
 GOCMD=go
@@ -21,7 +21,7 @@ SHELL_PLUGIN=pw-mcp-shell
 VERSION?=dev
 LDFLAGS=-ldflags "-X powerword/internal/config.Version=$(VERSION)"
 
-all: markdown-lint lint vuln check-coverage build
+all: markdown-lint lint vuln test-review check-coverage build
 
 build:
 	mkdir -p bin
@@ -37,6 +37,16 @@ install:
 	@if [ -d cmd/$(FS_PLUGIN) ]; then $(GOCMD) install ./cmd/$(FS_PLUGIN); fi
 	@if [ -d cmd/$(GIT_PLUGIN) ]; then $(GOCMD) install ./cmd/$(GIT_PLUGIN); fi
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SHELL_PLUGIN); fi
+
+install-hooks:
+	@echo "Installing git hooks..."
+	@mkdir -p .git/hooks
+	@cp scripts/git-hooks/pre-push .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-push
+	@echo "Git hooks installed successfully."
+test-review:
+	$(GOTEST) ./internal/review/...
+
 test:
 	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/... ./internal/...
 
