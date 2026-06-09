@@ -18,6 +18,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestRootCmd_Success(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
@@ -59,6 +60,7 @@ gemini = "gemini-key"
 }
 
 func TestRootCmd_FlagOverrides(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
@@ -113,6 +115,7 @@ gemini = "gemini-key"
 }
 
 func TestRootCmd_ValidationError(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
@@ -140,6 +143,7 @@ model = "toml-model"
 }
 
 func TestRootCmd_NoArgs(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")
@@ -170,6 +174,7 @@ gemini = "gemini-key"
 }
 
 func TestExecute(t *testing.T) {
+	defer clearEnv()()
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
@@ -207,6 +212,7 @@ func TestRootCmd_VersionFlag(t *testing.T) {
 }
 
 func TestRootCmd_SubcommandConfigLoading(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	cfgFilePath := filepath.Join(tmpDir, "config.toml")

@@ -3,12 +3,33 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
 )
 
+func clearEnv() func() {
+	orig := os.Environ()
+	for _, env := range orig {
+		if strings.HasPrefix(env, "POWERWORD_") {
+			_ = os.Unsetenv(strings.SplitN(env, "=", 2)[0])
+		}
+	}
+	return func() {
+		for _, env := range orig {
+			if strings.HasPrefix(env, "POWERWORD_") {
+				kv := strings.SplitN(env, "=", 2)
+				if len(kv) == 2 {
+					_ = os.Setenv(kv[0], kv[1])
+				}
+			}
+		}
+	}
+}
+
 func TestLoadConfig_Success(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	tomlContent := `
@@ -72,6 +93,7 @@ env = ["FOO=BAR"]
 }
 
 func TestLoadConfig_EnvOverrides(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	tomlContent := `
@@ -92,6 +114,9 @@ gemini = "gemini-key-toml"
 	t.Setenv("POWERWORD_ANTHROPIC_API_KEY", "anthropic-key-env")
 	t.Setenv("POWERWORD_MODEL", "openai-model-env")
 	t.Setenv("POWERWORD_VERBOSE", "true")
+	t.Setenv("POWERWORD_CRITIC_PROVIDER", "ollama")
+	t.Setenv("POWERWORD_CRITIC_MODEL", "llama3")
+	t.Setenv("POWERWORD_CRITIC_ENDPOINT", "http://localhost:11434")
 
 	cfg, err := LoadConfig(cfgFilePath)
 	if err != nil {
@@ -113,9 +138,19 @@ gemini = "gemini-key-toml"
 	if cfg.APIKeys.Anthropic != "anthropic-key-env" {
 		t.Errorf("expected Anthropic API key overridden to 'anthropic-key-env', got '%s'", cfg.APIKeys.Anthropic)
 	}
+	if cfg.CriticProvider != "ollama" {
+		t.Errorf("expected CriticProvider overridden to 'ollama', got '%s'", cfg.CriticProvider)
+	}
+	if cfg.CriticModel != "llama3" {
+		t.Errorf("expected CriticModel overridden to 'llama3', got '%s'", cfg.CriticModel)
+	}
+	if cfg.CriticEndpoint != "http://localhost:11434" {
+		t.Errorf("expected CriticEndpoint overridden to 'http://localhost:11434', got '%s'", cfg.CriticEndpoint)
+	}
 }
 
 func TestLoadConfig_MissingCustomConfig(t *testing.T) {
+	defer clearEnv()()
 	_, err := LoadConfig("non-existent-file.toml")
 	if err == nil {
 		t.Errorf("expected error for missing custom config file, got nil")
@@ -123,6 +158,7 @@ func TestLoadConfig_MissingCustomConfig(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidTOML(t *testing.T) {
+	defer clearEnv()()
 	tmpDir := t.TempDir()
 
 	invalidContent := `
@@ -186,6 +222,7 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestLoadConfig_DefaultConfigNotFound(t *testing.T) {
+	defer clearEnv()()
 	// Temporarily redirect DefaultConfigPath to a non-existent file
 	origPath := DefaultConfigPath
 	defer func() { DefaultConfigPath = origPath }()
@@ -205,6 +242,7 @@ func TestLoadConfig_DefaultConfigNotFound(t *testing.T) {
 }
 
 func TestLoadConfig_EmptyDefaultConfigPath(t *testing.T) {
+	defer clearEnv()()
 	origPath := DefaultConfigPath
 	defer func() { DefaultConfigPath = origPath }()
 	DefaultConfigPath = ""
@@ -216,6 +254,7 @@ func TestLoadConfig_EmptyDefaultConfigPath(t *testing.T) {
 }
 
 func TestLoadConfig_DotEnv(t *testing.T) {
+	defer clearEnv()()
 	origWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)
@@ -261,6 +300,7 @@ POWERWORD_MODEL=dotenv-model
 }
 
 func TestLoadConfig_DotEnvReadError(t *testing.T) {
+	defer clearEnv()()
 	origWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)
@@ -287,6 +327,7 @@ func TestLoadConfig_DotEnvReadError(t *testing.T) {
 }
 
 func TestLoadConfig_InvalidTOML_DefaultPath(t *testing.T) {
+	defer clearEnv()()
 	origPath := DefaultConfigPath
 	defer func() { DefaultConfigPath = origPath }()
 
@@ -307,6 +348,7 @@ verbose = "not-a-bool"
 }
 
 func TestLoadConfig_DotEnv_SafeOverride(t *testing.T) {
+	defer clearEnv()()
 	origWd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("failed to get working directory: %v", err)

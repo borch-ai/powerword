@@ -38,6 +38,10 @@ config.yaml
 var/log/
 *.log
 powerword.toml
+.powerword-critic.md
+review_out.txt
 
 # Local toolchain
 .tools/
+coverage.html
+coverage.out

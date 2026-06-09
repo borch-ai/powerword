@@ -39,6 +39,9 @@ type Config struct {
 	Route             map[string]string       `mapstructure:"route"`
 	ClassifierModel   string                  `mapstructure:"classifier_model"`
 	Pricing           map[string]ModelPricing `mapstructure:"pricing"`
+	CriticProvider    string                  `mapstructure:"critic_provider"`
+	CriticModel       string                  `mapstructure:"critic_model"`
+	CriticEndpoint    string                  `mapstructure:"critic_endpoint"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -173,6 +176,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "json", "POWERWORD_JSON")
 	bindEnv(v, "route", "POWERWORD_ROUTE")
 	bindEnv(v, "classifier_model", "POWERWORD_CLASSIFIER_MODEL")
+	bindEnv(v, "critic_provider", "POWERWORD_CRITIC_PROVIDER")
+	bindEnv(v, "critic_model", "POWERWORD_CRITIC_MODEL")
+	bindEnv(v, "critic_endpoint", "POWERWORD_CRITIC_ENDPOINT")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

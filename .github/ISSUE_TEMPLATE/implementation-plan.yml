@@ -1,0 +1,24 @@
+name: Implementation Plan
+description: Design plan for a new task
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: Provide a brief description of the problem, any background context, and what the change accomplishes.
+    validations:
+      required: true
+  - type: textarea
+    id: changes
+    attributes:
+      label: Proposed Changes
+      description: Group files by component and order logically.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification Plan
+      description: Summary of how you will verify that your changes have the desired effects.
+    validations:
+      required: true
