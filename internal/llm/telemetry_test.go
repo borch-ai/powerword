@@ -1,11 +1,16 @@
 package llm
 
 import (
+	"math"
 	"strings"
 	"testing"
 
 	"powerword/internal/config"
 )
+
+func almostEqual(a, b float64) bool {
+	return math.Abs(a-b) <= 1e-5
+}
 
 func TestUsageTracker_RecordUsage(t *testing.T) {
 	tracker := NewUsageTracker()
@@ -73,7 +78,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		CachedTokens: 1_000_000,
 	})
 	// Expected cost: 1.0 + 2.0 + 0.5 = 3.5
-	if cost := tracker.EstimatedCost(cfg); cost != 3.5 {
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 3.5) {
 		t.Errorf("Expected cost 3.5, got %f", cost)
 	}
 
@@ -84,7 +89,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		CachedTokens: 0,
 	})
 	// Expected cost: 3.5 + (5.0 + 10.0) = 18.5
-	if cost := tracker.EstimatedCost(cfg); cost != 18.5 {
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 18.5) {
 		t.Errorf("Expected cost 18.5, got %f", cost)
 	}
 
@@ -93,7 +98,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		InputTokens: 1_000_000,
 	})
 	// Expected cost: 18.5
-	if cost := tracker.EstimatedCost(cfg); cost != 18.5 {
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 18.5) {
 		t.Errorf("Expected cost 18.5, got %f", cost)
 	}
 }
@@ -113,7 +118,7 @@ func TestUsageTracker_EstimatedCostPrefixLength(t *testing.T) {
 		InputTokens: 1_000_000,
 	})
 
-	if cost := tracker.EstimatedCost(cfg); cost != 10.0 {
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 10.0) {
 		t.Errorf("Expected cost 10.0, got %f", cost)
 	}
 }

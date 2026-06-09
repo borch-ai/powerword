@@ -116,7 +116,7 @@ func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools [
 	}
 
 	if resp.Usage.TotalTokens > 0 {
-		assistantMsg.Usage = TokenUsage{
+		assistantMsg.Usage = &TokenUsage{
 			InputTokens:  resp.Usage.PromptTokens,
 			OutputTokens: resp.Usage.CompletionTokens,
 		}

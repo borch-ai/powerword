@@ -144,7 +144,7 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 	}
 
 	if resp.UsageMetadata != nil {
-		assistantMsg.Usage = TokenUsage{
+		assistantMsg.Usage = &TokenUsage{
 			InputTokens:  int(resp.UsageMetadata.PromptTokenCount),
 			OutputTokens: int(resp.UsageMetadata.CandidatesTokenCount),
 			CachedTokens: int(resp.UsageMetadata.CachedContentTokenCount),

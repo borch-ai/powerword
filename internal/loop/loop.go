@@ -120,7 +120,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	if cfg.JSONOutput {
 		printJSONPayload(loopErr, updatedMessages, initialLen, tracker)
-	} else if tracker.Turns > 0 {
+	} else if len(tracker.ModelUsages) > 0 {
 		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg))
 	}
 
@@ -177,7 +177,7 @@ func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen i
 	}
 	payload.Response = responseBuilder.String()
 	payload.ToolsExecuted = executedTools
-	if tracker != nil && tracker.Turns > 0 {
+	if tracker != nil && len(tracker.ModelUsages) > 0 {
 		payload.Usage = tracker
 	}
 
@@ -245,7 +245,11 @@ func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient,
 			return nil, fmt.Errorf("failed to generate response: %w", genErr)
 		}
 
-		tracker.RecordUsage(modelName, assistantMsg.Usage)
+		var usage llm.TokenUsage
+		if assistantMsg.Usage != nil {
+			usage = *assistantMsg.Usage
+		}
+		tracker.RecordUsage(modelName, usage)
 
 		if assistantMsg.Content != "" {
 			if _, wErr := formatter.Write([]byte(assistantMsg.Content)); wErr != nil {

@@ -158,7 +158,10 @@ func TestRunLoop_WithSession(t *testing.T) {
 
 	mockClient := &mockLLMClient{
 		genResps: []*llm.Message{
-			{Content: "Assistant response"},
+			{
+				Content: "Assistant response",
+				Usage: &llm.TokenUsage{InputTokens: 10, OutputTokens: 20},
+			},
 		},
 	}
 	newClient = func(cfg *config.Config) (llm.LLMClient, error) {

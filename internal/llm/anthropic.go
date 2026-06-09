@@ -99,7 +99,7 @@ func (a *AnthropicClient) Generate(ctx context.Context, messages []Message, tool
 	assistantMsg := &Message{
 		Role: RoleAssistant,
 	}
-	assistantMsg.Usage = TokenUsage{
+	assistantMsg.Usage = &TokenUsage{
 		InputTokens:  int(msg.Usage.InputTokens),
 		OutputTokens: int(msg.Usage.OutputTokens),
 		CachedTokens: int(msg.Usage.CacheReadInputTokens),
