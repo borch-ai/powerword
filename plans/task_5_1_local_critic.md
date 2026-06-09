@@ -72,7 +72,9 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
 - **Payload Sanitization**: Cleaned up the `parseIssueBody` function to strip out generic empty form placeholders (`_No response_`) provided by GitHub Issue Forms.
 - **Robust Branch Regex**: Tightened up the ID extraction logic in `.git/hooks/pre-push` to accurately isolate branch IDs.
 - **Issue Form Locking**: Added `.github/ISSUE_TEMPLATE/config.yml` to disable blank issues and enforce structured templates for all new issues.
-- **Coverage Mock Logic**: Expanded `internal/review/critic_test.go` and refactored file existence check strategies for `Makefile` and `pw-mcp-git` to allow them to be tested safely across diverse `go test` environments without relying on the actual repo structure.
+- **Coverage Mock Logic**: Expanded `internal/review/critic_test.go` and refactored file existence check strategies for `Makefile` and `pw-mcp-git` to allow them to be tested safely across diverse `go test` environments without relying on the actual repo structure. Tests now inject invalid Git MCP commands to deterministically trigger failures.
+- **Nil Guards & Fallbacks**: Added nil checks to `VerifyWorkspace`, enforced string match validations (e.g. `strings.HasSuffix`), fallback logic for `critic_model`, and URL normalization for OpenAI-compatible base URLs.
+- **Documentation**: Clarified in `GEMINI.md` that `.powerword-critic.md` is transient and cleaned up upon successful execution or when no changes are found.
 
 ---
 
