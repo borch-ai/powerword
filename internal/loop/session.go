@@ -29,11 +29,11 @@ type SessionSummary struct {
 	MessageCount int
 }
 
-var sessionsBaseDir string
+var SessionsBaseDir string
 
 func getSessionsDir() (string, error) {
-	if sessionsBaseDir != "" {
-		dir := filepath.Join(sessionsBaseDir, "sessions")
+	if SessionsBaseDir != "" {
+		dir := filepath.Join(SessionsBaseDir, "sessions")
 		if err := os.MkdirAll(dir, 0750); err != nil {
 			return "", fmt.Errorf("failed to create sessions directory: %w", err)
 		}

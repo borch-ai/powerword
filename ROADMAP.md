@@ -87,18 +87,18 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
     *   [Implementation Plan](plans/task_5_3_autonomous_repair_loop.md)
 
 ---
+## Phase 6: Remote Dashboard Integration
+Focus: Evolving the CLI into a persistent background daemon that coordinates with the AntigravityMobile dashboard over Firebase and WebRTC.
 
-## Phase 6: Remote Control & Mobile Dashboard Pairing
-Focus: Exposing a remote interface to pair the Powerword agent with the AntigravityMobile dashboard via Firebase signaling and WebRTC.
-
-*   **Task 6.1: Daemon Mode & Firebase Realtime Signaling**
-    *   Implement a `powerword daemon` subcommand (or `--daemon` CLI flag) and configure a Go Firebase client to negotiate WebRTC SDP handshakes.
-    *   [Implementation Plan](plans/task_6_1_remote_signaling.md)
+*   **Task 6.1: Daemon Mode & Firebase Realtime Database Signaling**
+    *   Implement a `--daemon` flag (or `powerword daemon` subcommand) to act as a persistent connection broker that negotiates WebRTC handshakes with the mobile dashboard over Firebase.
+    *   [Implementation Plan](plans/task_6_1_daemon_mode.md)
 *   **Task 6.2: Pion WebRTC Data Channel Server**
-    *   Integrate Pion WebRTC to stream terminal log feeds, filesystem navigations, and tool commands over E2EE data channels directly to the mobile PWA.
-    *   [Implementation Plan](plans/task_6_2_webrtc_pion_server.md)
+    *   Integrate the Pion WebRTC library to stream terminal stdout/stderr logs and accept remote commands over encrypted WebRTC data channels.
+    *   [Implementation Plan](plans/task_6_2_webrtc_terminal.md)
 *   **Task 6.3: Asynchronous Permission Interceptor API**
-    *   Refactor the security guard package (`internal/loop/guard.go`) to support asynchronous, remote validation callbacks so interactive tool execution prompts can be approved/rejected on-the-go.
-    *   [Implementation Plan](plans/task_6_3_permission_gate_interceptor.md)
-
-
+    *   Refactor the interactive permission gate to block active tool executions and send approval requests to the mobile device via WebRTC.
+    *   [Implementation Plan](plans/task_6_3_permission_interceptor.md)
+*   **Task 6.4: Local Critic Mobile Dashboard Integration**
+    *   Stream the `powerword review` output (Markdown criticism and Git diffs) over WebRTC to the mobile device for remote push authorization.
+    *   [Implementation Plan](plans/task_6_4_critic_dashboard.md)

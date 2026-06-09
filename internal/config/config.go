@@ -42,6 +42,8 @@ type Config struct {
 	CriticProvider    string                  `mapstructure:"critic_provider"`
 	CriticModel       string                  `mapstructure:"critic_model"`
 	CriticEndpoint    string                  `mapstructure:"critic_endpoint"`
+	Autonomous        bool                    `mapstructure:"autonomous"`
+	Issue             string                  `mapstructure:"issue"`
 	WebhookSecret     string                  `mapstructure:"webhook_secret"`
 	WebhookPort       int                     `mapstructure:"webhook_port"`
 }
@@ -184,6 +186,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "critic_provider", "POWERWORD_CRITIC_PROVIDER")
 	bindEnv(v, "critic_model", "POWERWORD_CRITIC_MODEL")
 	bindEnv(v, "critic_endpoint", "POWERWORD_CRITIC_ENDPOINT")
+	bindEnv(v, "autonomous", "POWERWORD_AUTONOMOUS")
+	bindEnv(v, "issue", "POWERWORD_ISSUE")
 	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")
 	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
 

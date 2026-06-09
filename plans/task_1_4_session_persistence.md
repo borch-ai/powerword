@@ -1,5 +1,7 @@
 # Task 1.4: Session Persistence & Chat History Management
 
+**Status:** Completed (Issue #39)
+
 Implement local session management and persistence schemas to store chat transcript histories, model contexts, system prompts, and configuration states. Enable resuming previous CLI conversations via structured CLI flags.
 
 ## User Review Required

@@ -2,7 +2,7 @@
 
 Integrate the Model Context Protocol (MCP) Go SDK (`github.com/modelcontextprotocol/go-sdk`) into the Powerword binary. Establish client abstractions to initialize sessions, query capabilities, and translate schemas between LLM tools and MCP definitions.
 
-## Status: Completed (Library Only - Not yet wired to CLI)
+## Status: Completed (Library Only - Not yet wired to CLI) (Issue #44)
 
 > [!NOTE]
 > MCP client interactions are encapsulated under the [internal/mcp](../internal/mcp) package.

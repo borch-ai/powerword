@@ -58,7 +58,7 @@ Evolve the single-turn core loop into an iterative reasoning loop (ReAct loop). 
 
 ## Completion Status
 
-Task 2.3 is **COMPLETED**.
+Task 2.3 is **COMPLETED** (Issue #46).
 
 ### Final Design Decisions
 1. **Streaming vs Generate**: The `RunLoop` was updated to utilize blocking `Generate` requests instead of incremental `Stream` during the loop. This guarantees tools are reliably passed in and handled iteratively without requiring a complex parser for partial tool-call streams.

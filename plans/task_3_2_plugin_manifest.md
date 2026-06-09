@@ -1,5 +1,8 @@
 # Task 3.2: Plugin Manifest Configuration & Registration
 
+**Status:** Completed (Issue #52)
+
+
 Establish a configuration-driven mechanism to discover, configure, and mount third-party or local MCP servers. Define a clean TOML configuration schema within `powerword.toml` to register these servers and their runtime parameters.
 
 ## User Review Required

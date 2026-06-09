@@ -1,5 +1,8 @@
 # Task 5.2: GitHub Webhook Listener & Active Session Event Broker
 
+**Status:** Completed (Issue #25)
+
+
 Extend the HTTP listener daemon to handle webhook notifications for issue edits, state transitions, and PR comments, routing them dynamically as reactive MCP events.
 
 ## User Review Required

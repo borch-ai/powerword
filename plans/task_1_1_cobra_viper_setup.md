@@ -1,5 +1,7 @@
 # Task 1.1: Project Initialization & Cobra/Viper Configuration (TOML)
 
+**Status:** Completed (Issue #36)
+
 Establish the Go module foundation, set up the standard directory structure, and implement command-line routing and configuration management using Cobra and Viper with TOML formatting.
 
 ## User Review Required

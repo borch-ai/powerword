@@ -1,5 +1,7 @@
 # Task 1.3: Core Loop & Streaming Output Engine
 
+**Status:** Completed (Issue #38)
+
 Implement the primary non-interactive CLI execution pipeline. Capture prompt streams from the LLM client and render them cleanly in real-time, utilizing styled markdown formatting inside the terminal.
 
 ## User Review Required

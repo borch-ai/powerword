@@ -1,5 +1,8 @@
 # Task 5.1: Structured Issue Templates & Local Critic Integration
 
+**Status:** Completed (Issue #24)
+
+
 Configure a structured GitHub Issue Form template for project plans, and implement the local client engine in `powerword` to parse these issues and verify local workspace diffs against them before pushing.
 
 ## User Review Required
