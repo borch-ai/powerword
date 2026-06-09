@@ -72,47 +72,9 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		messages = session.Messages
 	}
 
-	clientCache := make(map[string]llm.LLMClient)
-
-	defaultClient, err := newClient(cfg)
+	activeClient, targetModel, prompt, err := resolveClientAndRoute(ctx, cfg, prompt)
 	if err != nil {
-		return fmt.Errorf("failed to create LLM client: %w", err)
-	}
-	clientCache[cfg.Model] = defaultClient
-
-	var classifierClient llm.LLMClient
-	if cfg.ClassifierModel != "" {
-		classifierCfg := *cfg
-		classifierCfg.Model = cfg.ClassifierModel
-		classifierClient, err = newClient(&classifierCfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to create classifier client %s: %v\n", cfg.ClassifierModel, err)
-		} else {
-			clientCache[cfg.ClassifierModel] = classifierClient
-		}
-	}
-
-	router := llm.NewRouter(cfg, classifierClient)
-	targetModel, modifiedPrompt, routeErr := router.Route(ctx, prompt)
-	if routeErr != nil {
-		fmt.Fprintf(os.Stderr, "Warning: routing failed: %v\n", routeErr)
-		targetModel = cfg.Model
-		modifiedPrompt = prompt
-	}
-	prompt = modifiedPrompt
-
-	activeClient, exists := clientCache[targetModel]
-	if !exists {
-		targetCfg := *cfg
-		targetCfg.Model = targetModel
-		activeClient, err = newClient(&targetCfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to create client for target model %s: %v, falling back to default\n", targetModel, err)
-			activeClient = defaultClient
-			targetModel = cfg.Model
-		} else {
-			clientCache[targetModel] = activeClient
-		}
+		return err
 	}
 
 	if cfg.Verbose && targetModel != cfg.Model {
@@ -146,6 +108,53 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	}
 
 	return nil
+}
+
+func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt string) (llm.LLMClient, string, string, error) {
+	clientCache := make(map[string]llm.LLMClient)
+
+	defaultClient, err := newClient(cfg)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed to create LLM client: %w", err)
+	}
+	clientCache[cfg.Model] = defaultClient
+
+	var classifierClient llm.LLMClient
+	if cfg.ClassifierModel != "" {
+		classifierCfg := *cfg
+		classifierCfg.Model = cfg.ClassifierModel
+		cc, cErr := newClient(&classifierCfg)
+		if cErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to create classifier client %s: %v\n", cfg.ClassifierModel, cErr)
+		} else {
+			classifierClient = cc
+			clientCache[cfg.ClassifierModel] = cc
+		}
+	}
+
+	router := llm.NewRouter(cfg, classifierClient)
+	targetModel, modifiedPrompt, routeErr := router.Route(ctx, prompt)
+	if routeErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: routing failed: %v\n", routeErr)
+		targetModel = cfg.Model
+		modifiedPrompt = prompt
+	}
+	prompt = modifiedPrompt
+
+	activeClient, exists := clientCache[targetModel]
+	if !exists {
+		targetCfg := *cfg
+		targetCfg.Model = targetModel
+		ac, acErr := newClient(&targetCfg)
+		if acErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to create client for target model %s: %v, falling back to default\n", targetModel, acErr)
+			activeClient = defaultClient
+			targetModel = cfg.Model
+		} else {
+			activeClient = ac
+		}
+	}
+	return activeClient, targetModel, prompt, nil
 }
 
 func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message) ([]llm.Message, error) {

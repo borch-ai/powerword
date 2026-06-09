@@ -26,103 +26,103 @@ func (m *mockClassifierClient) ListModels(ctx context.Context) ([]string, error)
 	return nil, nil
 }
 
-func TestRouter_Route(t *testing.T) {
-	tests := []struct {
-		name           string
-		cfg            *config.Config
-		prompt         string
-		classifierResp string
-		expectedModel  string
-		expectedPrompt string
-	}{
-		{
-			name: "default model",
-			cfg: &config.Config{
-				Model: "default-model",
-			},
-			prompt:         "hello",
-			expectedModel:  "default-model",
-			expectedPrompt: "hello",
+var routerTestCases = []struct {
+	name           string
+	cfg            *config.Config
+	prompt         string
+	classifierResp string
+	expectedModel  string
+	expectedPrompt string
+}{
+	{
+		name: "default model",
+		cfg: &config.Config{
+			Model: "default-model",
 		},
-		{
-			name: "explicit prefix override",
-			cfg: &config.Config{
-				Model: "default-model",
-			},
-			prompt:         "@fast-model list files",
-			expectedModel:  "fast-model",
-			expectedPrompt: "list files",
+		prompt:         "hello",
+		expectedModel:  "default-model",
+		expectedPrompt: "hello",
+	},
+	{
+		name: "explicit prefix override",
+		cfg: &config.Config{
+			Model: "default-model",
 		},
-		{
-			name: "explicit prefix with no trailing prompt",
-			cfg: &config.Config{
-				Model: "default-model",
-			},
-			prompt:         "@fast-model",
-			expectedModel:  "fast-model",
-			expectedPrompt: "",
+		prompt:         "@fast-model list files",
+		expectedModel:  "fast-model",
+		expectedPrompt: "list files",
+	},
+	{
+		name: "explicit prefix with no trailing prompt",
+		cfg: &config.Config{
+			Model: "default-model",
 		},
-		{
-			name: "rule-based routing match",
-			cfg: &config.Config{
-				Model: "default-model",
-				Route: map[string]string{
-					"git.*": "git-model",
-				},
+		prompt:         "@fast-model",
+		expectedModel:  "fast-model",
+		expectedPrompt: "",
+	},
+	{
+		name: "rule-based routing match",
+		cfg: &config.Config{
+			Model: "default-model",
+			Route: map[string]string{
+				"git.*": "git-model",
 			},
-			prompt:         "git status",
-			expectedModel:  "git-model",
-			expectedPrompt: "git status",
 		},
-		{
-			name: "rule-based routing no match",
-			cfg: &config.Config{
-				Model: "default-model",
-				Route: map[string]string{
-					"git.*": "git-model",
-				},
+		prompt:         "git status",
+		expectedModel:  "git-model",
+		expectedPrompt: "git status",
+	},
+	{
+		name: "rule-based routing no match",
+		cfg: &config.Config{
+			Model: "default-model",
+			Route: map[string]string{
+				"git.*": "git-model",
 			},
-			prompt:         "ls -la",
-			expectedModel:  "default-model",
-			expectedPrompt: "ls -la",
 		},
-		{
-			name: "classifier routing",
-			cfg: &config.Config{
-				Model:           "default-model",
-				ClassifierModel: "classifier",
+		prompt:         "ls -la",
+		expectedModel:  "default-model",
+		expectedPrompt: "ls -la",
+	},
+	{
+		name: "classifier routing",
+		cfg: &config.Config{
+			Model:           "default-model",
+			ClassifierModel: "classifier",
+		},
+		prompt:         "complex task",
+		classifierResp: "smart-model",
+		expectedModel:  "smart-model",
+		expectedPrompt: "complex task",
+	},
+	{
+		name: "classifier returns invalid string",
+		cfg: &config.Config{
+			Model:           "default-model",
+			ClassifierModel: "classifier",
+		},
+		prompt:         "complex task",
+		classifierResp: "I think you should use smart-model",
+		expectedModel:  "default-model", // Should fallback because it has spaces
+		expectedPrompt: "complex task",
+	},
+	{
+		name: "rule-based routing invalid regex",
+		cfg: &config.Config{
+			Model: "default-model",
+			Route: map[string]string{
+				"[invalid": "git-model",
 			},
-			prompt:         "complex task",
-			classifierResp: "smart-model",
-			expectedModel:  "smart-model",
-			expectedPrompt: "complex task",
 		},
-		{
-			name: "classifier returns invalid string",
-			cfg: &config.Config{
-				Model:           "default-model",
-				ClassifierModel: "classifier",
-			},
-			prompt:         "complex task",
-			classifierResp: "I think you should use smart-model",
-			expectedModel:  "default-model", // Should fallback because it has spaces
-			expectedPrompt: "complex task",
-		},
-		{
-			name: "rule-based routing invalid regex",
-			cfg: &config.Config{
-				Model: "default-model",
-				Route: map[string]string{
-					"[invalid": "git-model",
-				},
-			},
-			prompt:         "git status",
-			expectedModel:  "default-model",
-			expectedPrompt: "git status",
-		},
-	}
+		prompt:         "git status",
+		expectedModel:  "default-model",
+		expectedPrompt: "git status",
+	},
+}
 
-	for _, tt := range tests {
+func TestRouter_Route(t *testing.T) {
+	for _, tt := range routerTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			var client LLMClient
 			if tt.cfg.ClassifierModel != "" {

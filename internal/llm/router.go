@@ -35,57 +35,72 @@ func (r *ModelRouter) Route(ctx context.Context, prompt string) (string, string,
 		return r.defaultModel, prompt, nil
 	}
 
-	// 1. Explicit Prefixes: e.g., "@gemini-1.5-pro list files"
-	if strings.HasPrefix(prompt, "@") {
-		parts := strings.SplitN(prompt, " ", 2)
-		if len(parts) > 0 {
-			modelOverride := strings.TrimPrefix(parts[0], "@")
-			if modelOverride != "" {
-				newPrompt := ""
-				if len(parts) > 1 {
-					newPrompt = strings.TrimSpace(parts[1])
-				}
-				return modelOverride, newPrompt, nil
-			}
-		}
+	if target, newPrompt := r.checkExplicitPrefix(prompt); target != "" {
+		return target, newPrompt, nil
 	}
 
-	// 2. Rule-based Regex Matching
+	if target := r.checkRegexRules(prompt); target != "" {
+		return target, prompt, nil
+	}
+
+	if target := r.checkClassifier(ctx, prompt); target != "" {
+		return target, prompt, nil
+	}
+
+	return r.defaultModel, prompt, nil
+}
+
+func (r *ModelRouter) checkExplicitPrefix(prompt string) (string, string) {
+	if !strings.HasPrefix(prompt, "@") {
+		return "", prompt
+	}
+	parts := strings.SplitN(prompt, " ", 2)
+	if len(parts) == 0 {
+		return "", prompt
+	}
+	modelOverride := strings.TrimPrefix(parts[0], "@")
+	if modelOverride == "" {
+		return "", prompt
+	}
+	newPrompt := ""
+	if len(parts) > 1 {
+		newPrompt = strings.TrimSpace(parts[1])
+	}
+	return modelOverride, newPrompt
+}
+
+func (r *ModelRouter) checkRegexRules(prompt string) string {
 	for pattern, targetModel := range r.routes {
 		matched, err := regexp.MatchString(pattern, prompt)
-		if err != nil {
-			// Skip invalid regexes
-			continue
-		}
-		if matched {
-			return targetModel, prompt, nil
+		if err == nil && matched {
+			return targetModel
 		}
 	}
+	return ""
+}
 
-	// 3. Prompt-based Classification
-	if r.classifierClient != nil && r.classifierModel != "" {
-		sysPrompt := fmt.Sprintf(`You are an intelligent router. Evaluate the following prompt's complexity and domain.
+func (r *ModelRouter) checkClassifier(ctx context.Context, prompt string) string {
+	if r.classifierClient == nil || r.classifierModel == "" {
+		return ""
+	}
+	sysPrompt := fmt.Sprintf(`You are an intelligent router. Evaluate the following prompt's complexity and domain.
 Available models are: %s.
 Respond with ONLY the exact name of the target model from the list above, and nothing else.`,
-			r.getAvailableModelsStr())
+		r.getAvailableModelsStr())
 
-		messages := []Message{
-			{Role: RoleSystem, Content: sysPrompt},
-			{Role: RoleUser, Content: prompt},
-		}
-
-		resp, err := r.classifierClient.Generate(ctx, messages, nil)
-		if err == nil && resp != nil && resp.Content != "" {
-			targetModel := strings.TrimSpace(resp.Content)
-			// Simple validation to ensure the classifier didn't return a whole paragraph
-			if !strings.Contains(targetModel, " ") && targetModel != "" {
-				return targetModel, prompt, nil
-			}
-		}
+	messages := []Message{
+		{Role: RoleSystem, Content: sysPrompt},
+		{Role: RoleUser, Content: prompt},
 	}
 
-	// 4. Fallback
-	return r.defaultModel, prompt, nil
+	resp, err := r.classifierClient.Generate(ctx, messages, nil)
+	if err == nil && resp != nil && resp.Content != "" {
+		targetModel := strings.TrimSpace(resp.Content)
+		if !strings.Contains(targetModel, " ") && targetModel != "" {
+			return targetModel
+		}
+	}
+	return ""
 }
 
 func (r *ModelRouter) getAvailableModelsStr() string {
