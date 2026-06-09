@@ -57,13 +57,34 @@ var ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, erro
 
 	var diffBuilder strings.Builder
 
-	// 1. Get committed changes against main
-	resCommits, err := srv.Client().CallTool(ctx, "git_diff_commits", map[string]interface{}{"base": "main", "head": "HEAD"})
+	baseBranch := "main"
+	// Check if there's an active PR and use its base
+	ghCmd := execCommand(ctx, "gh", "pr", "view", "--json", "baseRefName", "--jq", ".baseRefName")
+	out, ghErr := ghCmd.Output()
+	if ghErr == nil {
+		if b := strings.TrimSpace(string(out)); b != "" {
+			baseBranch = b
+		}
+	} else {
+		// Fallback to origin/main if main doesn't exist locally but origin/main does
+		gitCmd := execCommand(ctx, "git", "rev-parse", "--verify", "-q", "main")
+		if gitCmd.Run() != nil {
+			gitCmd2 := execCommand(ctx, "git", "rev-parse", "--verify", "-q", "origin/main")
+			if gitCmd2.Run() == nil {
+				baseBranch = "origin/main"
+			}
+		}
+	}
+
+	fmt.Printf("Using base branch %q for diff extraction...\n", baseBranch)
+
+	// 1. Get committed changes against base branch
+	resCommits, err := srv.Client().CallTool(ctx, "git_diff_commits", map[string]interface{}{"base": baseBranch, "head": "HEAD"})
 	if err == nil && !resCommits.IsError && len(resCommits.Content) > 0 {
 		if tc, ok := resCommits.Content[0].(*mcpsdk.TextContent); ok {
 			text := strings.TrimSpace(tc.Text)
 			if text != "No changes" && text != "" {
-				diffBuilder.WriteString("Committed changes (main -> HEAD):\n")
+				fmt.Fprintf(&diffBuilder, "Committed changes (%s -> HEAD):\n", baseBranch)
 				diffBuilder.WriteString(text)
 				diffBuilder.WriteString("\n\n")
 			}

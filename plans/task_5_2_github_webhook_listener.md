@@ -30,7 +30,10 @@ Extend the HTTP listener daemon to handle webhook notifications for issue edits,
 ### CLI Bindings
 
 #### [MODIFY] [config.go](../internal/config/config.go)
-- Add webhook secret and port configurations to Viper bindings.
+- Add webhook secret (`WebhookSecret`) and port (`WebhookPort`) configurations to Viper bindings, mapping to `POWERWORD_WEBHOOK_SECRET` and `POWERWORD_WEBHOOK_PORT`.
+
+#### [MODIFY] [review.go](../cmd/powerword/review.go)
+- Add `--listen` and `--port` flags to the `review` command. If `--listen` is provided, start the HTTP webhook listener.
 
 ---
 
@@ -40,8 +43,10 @@ Extend the HTTP listener daemon to handle webhook notifications for issue edits,
 - Run command: `go test ./internal/review/...`
 - Unit tests verifying:
   - HMAC SHA256 signature verification logic.
-  - Parsing of `issues` and `issue_comment` payloads.
-  - Correct dispatch of events to the active agent session context via MCP.
+  - Parsing of `issues`, `issue_comment`, and `pull_request_review_comment` payloads.
+  - Correct dispatch of events to the internal MCP Server (`WebhookMCPServer`).
+  - Resource schema exposure under `github://issues`.
+- Final Go version used: Go 1.26.4
 
 ### Manual Verification
 - Launch the listener local server: `powerword review --listen --port 8080`.

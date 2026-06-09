@@ -86,4 +86,19 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
     *   Evolve the ReAct execution loop to read tasks directly from GitHub issues, run local checks, push changes, and publish progress updates and state reports back as issue comments.
     *   [Implementation Plan](plans/task_5_3_autonomous_repair_loop.md)
 
+---
+
+## Phase 6: Remote Control & Mobile Dashboard Pairing
+Focus: Exposing a remote interface to pair the Powerword agent with the AntigravityMobile dashboard via Firebase signaling and WebRTC.
+
+*   **Task 6.1: Daemon Mode & Firebase Realtime Signaling**
+    *   Implement a `powerword daemon` subcommand (or `--daemon` CLI flag) and configure a Go Firebase client to negotiate WebRTC SDP handshakes.
+    *   [Implementation Plan](plans/task_6_1_remote_signaling.md)
+*   **Task 6.2: Pion WebRTC Data Channel Server**
+    *   Integrate Pion WebRTC to stream terminal log feeds, filesystem navigations, and tool commands over E2EE data channels directly to the mobile PWA.
+    *   [Implementation Plan](plans/task_6_2_webrtc_pion_server.md)
+*   **Task 6.3: Asynchronous Permission Interceptor API**
+    *   Refactor the security guard package (`internal/loop/guard.go`) to support asynchronous, remote validation callbacks so interactive tool execution prompts can be approved/rejected on-the-go.
+    *   [Implementation Plan](plans/task_6_3_permission_gate_interceptor.md)
+
 
