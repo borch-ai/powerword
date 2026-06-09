@@ -17,12 +17,15 @@ import (
 )
 
 // StartWebhookListener starts an HTTP server listening for GitHub webhooks.
-func StartWebhookListener(ctx context.Context, cfg *config.Config) error {
+func StartWebhookListener(ctx context.Context, cfg *config.Config, port int) error {
 	if cfg == nil {
 		return fmt.Errorf("config cannot be nil")
 	}
+	if cfg.WebhookSecret == "" {
+		return fmt.Errorf("WebhookSecret must be configured")
+	}
 
-	addr := fmt.Sprintf(":%d", cfg.WebhookPort)
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	mux := http.NewServeMux()
 
 	// Initialize MCP Server and HTTP handlers
@@ -71,9 +74,13 @@ func handleWebhook(w http.ResponseWriter, r *http.Request, secret string, mcpSrv
 		return
 	}
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, 10*1024*1024)) // limit to 10MB
+	body, err := io.ReadAll(io.LimitReader(r.Body, 10*1024*1024+1))
 	if err != nil {
 		http.Error(w, "Error reading body", http.StatusInternalServerError)
+		return
+	}
+	if len(body) > 10*1024*1024 {
+		http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 

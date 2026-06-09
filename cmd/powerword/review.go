@@ -27,7 +27,14 @@ func newReviewCmd() *cobra.Command {
 			}
 
 			if listen {
-				return review.StartWebhookListener(cmd.Context(), cfg)
+				listenPort := port
+				if listenPort == 0 {
+					listenPort = cfg.WebhookPort
+					if listenPort == 0 {
+						listenPort = 8080
+					}
+				}
+				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
 			}
 
 			if !localOnly && issueID == "" {

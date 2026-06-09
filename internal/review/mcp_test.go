@@ -72,18 +72,55 @@ func TestWebhookMCPServer_HandleGitHubEvent(t *testing.T) {
 	}
 
 	var issuesData map[string]map[string]interface{}
-	if err := json.Unmarshal([]byte(txtContent.Text), &issuesData); err != nil {
-		t.Fatalf("failed to parse issues json: %v", err)
+	if errJSON := json.Unmarshal([]byte(txtContent.Text), &issuesData); errJSON != nil {
+		t.Fatalf("failed to parse issues json: %v", errJSON)
 	}
 
 	if _, ok := issuesData["42"]; !ok {
 		t.Errorf("expected issue 42 in resource output")
+	}
+
+	// Test handleReadComments
+	reqComments := &mcp.ReadResourceRequest{
+		Params: &mcp.ReadResourceParams{
+			URI: "github://comments",
+		},
+	}
+	resComments, err := srv.handleReadComments(context.Background(), reqComments)
+	if err != nil {
+		t.Fatalf("handleReadComments failed: %v", err)
+	}
+
+	if len(resComments.Contents) == 0 {
+		t.Fatalf("expected resource contents")
+	}
+
+	txtContentComments := resComments.Contents[0]
+	if txtContentComments.Text == "" {
+		t.Fatalf("expected text content")
+	}
+
+	var commentsData map[string]map[string]interface{}
+	if errJSON := json.Unmarshal([]byte(txtContentComments.Text), &commentsData); errJSON != nil {
+		t.Fatalf("failed to parse comments json: %v", errJSON)
+	}
+
+	if _, ok := commentsData["123"]; !ok {
+		t.Errorf("expected comment 123 in resource output")
+	}
+
+	// Test Server()
+	if srv.Server() == nil {
+		t.Errorf("expected non-nil server")
 	}
 }
 
 func TestExtractID(t *testing.T) {
 	if got := extractID(42.0); got != "42" {
 		t.Errorf("expected '42', got %q", got)
+	}
+	if got := extractID(42.5); got != "" {
+		t.Errorf("expected '', got %q for non-integer float", got)
 	}
 	if got := extractID(123); got != "123" {
 		t.Errorf("expected '123', got %q", got)

@@ -38,6 +38,13 @@ func NewMCPServer() *WebhookMCPServer {
 		MIMEType:    "application/json",
 	}, ws.handleReadIssues)
 
+	ws.srv.AddResource(&mcp.Resource{
+		URI:         "github://comments",
+		Name:        "GitHub Comments",
+		Description: "Active comments being tracked",
+		MIMEType:    "application/json",
+	}, ws.handleReadComments)
+
 	return ws
 }
 
@@ -59,6 +66,26 @@ func (ws *WebhookMCPServer) handleReadIssues(ctx context.Context, req *mcp.ReadR
 		Contents: []*mcp.ResourceContents{
 			{
 				URI:      "github://issues",
+				MIMEType: "application/json",
+				Text:     string(data),
+			},
+		},
+	}, nil
+}
+
+func (ws *WebhookMCPServer) handleReadComments(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	ws.mu.RLock()
+	defer ws.mu.RUnlock()
+
+	data, err := json.Marshal(ws.comments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode comments: %w", err)
+	}
+
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      "github://comments",
 				MIMEType: "application/json",
 				Text:     string(data),
 			},
@@ -100,7 +127,10 @@ func (ws *WebhookMCPServer) HandleGitHubEvent(eventType string, payload map[stri
 func extractID(v interface{}) string {
 	switch val := v.(type) {
 	case float64:
-		return fmt.Sprintf("%.0f", val)
+		if val == float64(int64(val)) {
+			return fmt.Sprintf("%.0f", val)
+		}
+		return ""
 	case int:
 		return fmt.Sprintf("%d", val)
 	case string:

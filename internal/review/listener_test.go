@@ -88,11 +88,13 @@ func TestHandleWebhook_IgnoreEvent(t *testing.T) {
 
 func TestStartWebhookListener_Cancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cfg := &config.Config{WebhookSecret: "test", WebhookPort: 0}
+	cfg := &config.Config{
+		WebhookSecret: "test-secret",
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- StartWebhookListener(ctx, cfg)
+		errCh <- StartWebhookListener(ctx, cfg, 0)
 	}()
 
 	cancel()
@@ -148,6 +150,21 @@ func TestHandleWebhook_PullRequestReviewComment(t *testing.T) {
 
 	if status := rr.Code; status != http.StatusOK {
 		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+}
+
+func TestStartWebhookListener_Errors(t *testing.T) {
+	ctx := context.Background()
+
+	// Test nil config
+	if err := StartWebhookListener(ctx, nil, 0); err == nil {
+		t.Errorf("expected error for nil config")
+	}
+
+	// Test empty secret
+	cfg := &config.Config{}
+	if err := StartWebhookListener(ctx, cfg, 0); err == nil {
+		t.Errorf("expected error for empty secret")
 	}
 }
 
