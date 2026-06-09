@@ -109,6 +109,7 @@ func bindEnv(v *viper.Viper, input ...string) {
 }
 
 // LoadConfig loads the configuration using Viper.
+//
 //nolint:funlen // Config loading is inherently lengthy
 func LoadConfig(cfgFile string) (*Config, error) {
 	if err := loadDotEnv(); err != nil {

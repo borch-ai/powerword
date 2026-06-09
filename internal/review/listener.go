@@ -39,10 +39,10 @@ func StartWebhookListener(ctx context.Context, cfg *config.Config, port int) err
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	go func() {
+	go func() { //nolint:gosec // intentional background context for shutdown
 		<-ctx.Done()
 		log.Println("Shutting down webhook listener...")
-		_ = server.Shutdown(context.Background()) //nolint:contextcheck,gosec // graceful shutdown using background context is expected
+		_ = server.Shutdown(context.Background())
 	}()
 
 	log.Printf("Starting webhook listener on %s\n", addr)
@@ -84,11 +84,11 @@ func handleWebhook(w http.ResponseWriter, r *http.Request, secret string, mcpSrv
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
-		
+
 		//nolint:gosec // event is a known header, but silencing taint analysis
 		log.Printf("Received valid %q webhook event\n", event)
 		mcpSrv.HandleGitHubEvent(event, payload)
-		
+
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("Event received"))
 	default:

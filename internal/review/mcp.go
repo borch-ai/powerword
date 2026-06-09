@@ -88,7 +88,8 @@ func (ws *WebhookMCPServer) HandleGitHubEvent(eventType string, payload map[stri
 		}
 	}
 
-	log.Printf("MCP Broker: Updated state with %s event", eventType)
+	//nolint:gosec // silencing taint analysis for known safe event types
+	log.Printf("MCP Broker: Updated state with %q event", eventType)
 }
 
 func extractID(v interface{}) string {

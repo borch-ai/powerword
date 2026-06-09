@@ -21,7 +21,7 @@ func TestHandleWebhook_ValidSignature(t *testing.T) {
 	mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))
 	req.Header.Set("X-Hub-Signature-256", "sha256="+expectedMAC)
 	req.Header.Set("X-GitHub-Event", "issues")
 
@@ -45,7 +45,7 @@ func TestHandleWebhook_InvalidSignature(t *testing.T) {
 	secret := "mysecret"
 	body := []byte(`{"issue": {"number": 123}}`)
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))
 	req.Header.Set("X-Hub-Signature-256", "sha256=invalid")
 	req.Header.Set("X-GitHub-Event", "issues")
 
@@ -67,7 +67,7 @@ func TestHandleWebhook_IgnoreEvent(t *testing.T) {
 	mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", bytes.NewReader(body))
 	req.Header.Set("X-Hub-Signature-256", "sha256="+expectedMAC)
 	req.Header.Set("X-GitHub-Event", "push")
 
@@ -88,12 +88,12 @@ func TestHandleWebhook_IgnoreEvent(t *testing.T) {
 func TestStartWebhookListener_Cancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := &config.Config{WebhookSecret: "test", WebhookPort: 0}
-	
+
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- StartWebhookListener(ctx, cfg, 0)
 	}()
-	
+
 	// Cancel immediately to trigger shutdown
 	cancel()
 	err := <-errCh
