@@ -35,10 +35,10 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
 
 ### Automated Tests
 - Test parsing various TOML syntax layouts (including environment variables, command lists, and custom arguments). Tests are available in `internal/config/config_test.go`.
-- Ensure configuration loading handles empty server arrays, and validates command paths.
+- Ensure configuration loading handles empty server maps, and validates command paths.
 
 ### Manual Verification
-- Launch Powerword using the existing `powerword.toml` which contains the following native plugins:
+- Create a `powerword.toml` file in the project root containing the following native plugins:
   ```toml
   [servers.filesystem]
      command = "go"
