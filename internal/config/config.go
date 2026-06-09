@@ -27,6 +27,8 @@ type Config struct {
 	MaxLoopIterations int                     `mapstructure:"max_loop_iterations"`
 	AutoConfirm       bool                    `mapstructure:"auto_confirm"`
 	Servers           map[string]ServerConfig `mapstructure:"servers"`
+	Route             map[string]string       `mapstructure:"route"`
+	ClassifierModel   string                  `mapstructure:"classifier_model"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -157,6 +159,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "verbose", "POWERWORD_VERBOSE")
 	bindEnv(v, "max_loop_iterations", "POWERWORD_MAX_LOOP_ITERATIONS")
 	bindEnv(v, "auto_confirm", "POWERWORD_AUTO_CONFIRM")
+	bindEnv(v, "route", "POWERWORD_ROUTE")
+	bindEnv(v, "classifier_model", "POWERWORD_CLASSIFIER_MODEL")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
