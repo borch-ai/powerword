@@ -54,7 +54,11 @@ func (u *UsageTracker) EstimatedCost(cfg *config.Config) float64 {
 			continue
 		}
 
-		costInput := float64(usage.InputTokens) * (pricing.Input / 1_000_000.0)
+		billedInput := usage.InputTokens - usage.CachedTokens
+		if billedInput < 0 {
+			billedInput = 0
+		}
+		costInput := float64(billedInput) * (pricing.Input / 1_000_000.0)
 		costOutput := float64(usage.OutputTokens) * (pricing.Output / 1_000_000.0)
 		costCached := float64(usage.CachedTokens) * (pricing.Cached / 1_000_000.0)
 		totalCost += costInput + costOutput + costCached
@@ -94,11 +98,10 @@ func (u *UsageTracker) FormatSummary(cfg *config.Config) string {
 
 	var sb strings.Builder
 	sb.WriteString("Session Metrics:\n")
-	fmt.Fprintf(&sb, "- Total Tokens: %d (%d In, %d Out", total, totalInput, totalOutput)
+	fmt.Fprintf(&sb, "- Total Tokens: %d (%d In, %d Out)\n", total, totalInput, totalOutput)
 	if totalCached > 0 {
-		fmt.Fprintf(&sb, ", %d Cached", totalCached)
+		fmt.Fprintf(&sb, "- Cached Tokens: %d\n", totalCached)
 	}
-	sb.WriteString(")\n")
 
 	if cost > 0 {
 		fmt.Fprintf(&sb, "- Estimated Cost: $%.5f\n", cost)

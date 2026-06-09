@@ -77,9 +77,9 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		OutputTokens: 1_000_000,
 		CachedTokens: 1_000_000,
 	})
-	// Expected cost: 1.0 + 2.0 + 0.5 = 3.5
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 3.5) {
-		t.Errorf("Expected cost 3.5, got %f", cost)
+	// Expected cost: 0.0 + 2.0 + 0.5 = 2.5
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 2.5) {
+		t.Errorf("Expected cost 2.5, got %f", cost)
 	}
 
 	// Prefix match
@@ -88,18 +88,18 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		OutputTokens: 500_000,
 		CachedTokens: 0,
 	})
-	// Expected cost: 3.5 + (5.0 + 10.0) = 18.5
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 18.5) {
-		t.Errorf("Expected cost 18.5, got %f", cost)
+	// Expected cost: 2.5 + (5.0 + 10.0) = 17.5
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 17.5) {
+		t.Errorf("Expected cost 17.5, got %f", cost)
 	}
 
 	// No match
 	tracker.RecordUsage("unknown-model", TokenUsage{
 		InputTokens: 1_000_000,
 	})
-	// Expected cost: 18.5
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 18.5) {
-		t.Errorf("Expected cost 18.5, got %f", cost)
+	// Expected cost: 17.5
+	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 17.5) {
+		t.Errorf("Expected cost 17.5, got %f", cost)
 	}
 }
 
@@ -139,16 +139,10 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 	})
 
 	summary := tracker.FormatSummary(cfg)
-	if !strings.Contains(summary, "Total Tokens: 30") {
+	if !strings.Contains(summary, "Total Tokens: 30 (10 In, 20 Out)") {
 		t.Errorf("Summary missing total tokens: %s", summary)
 	}
-	if !strings.Contains(summary, "10 In") {
-		t.Errorf("Summary missing input tokens: %s", summary)
-	}
-	if !strings.Contains(summary, "20 Out") {
-		t.Errorf("Summary missing output tokens: %s", summary)
-	}
-	if !strings.Contains(summary, "5 Cached") {
+	if !strings.Contains(summary, "Cached Tokens: 5") {
 		t.Errorf("Summary missing cached tokens: %s", summary)
 	}
 	if !strings.Contains(summary, "Turns: 1") {
