@@ -48,7 +48,7 @@ func TestUsageTracker_RecordUsage(t *testing.T) {
 
 func TestUsageTracker_EstimatedCost(t *testing.T) {
 	tracker := NewUsageTracker()
-	
+
 	// Test nil config
 	if cost := tracker.EstimatedCost(nil); cost != 0 {
 		t.Errorf("Expected cost 0 for nil config, got %f", cost)
@@ -100,19 +100,19 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 
 func TestUsageTracker_EstimatedCostPrefixLength(t *testing.T) {
 	tracker := NewUsageTracker()
-	
+
 	cfg := &config.Config{
 		Pricing: map[string]config.ModelPricing{
-			"gpt":    {Input: 1.0, Output: 2.0},
-			"gpt-4":  {Input: 10.0, Output: 20.0},
+			"gpt":   {Input: 1.0, Output: 2.0},
+			"gpt-4": {Input: 10.0, Output: 20.0},
 		},
 	}
 
 	// Should match gpt-4 because it's longer
 	tracker.RecordUsage("gpt-4-turbo", TokenUsage{
-		InputTokens:  1_000_000,
+		InputTokens: 1_000_000,
 	})
-	
+
 	if cost := tracker.EstimatedCost(cfg); cost != 10.0 {
 		t.Errorf("Expected cost 10.0, got %f", cost)
 	}
@@ -120,7 +120,7 @@ func TestUsageTracker_EstimatedCostPrefixLength(t *testing.T) {
 
 func TestUsageTracker_FormatSummary(t *testing.T) {
 	tracker := NewUsageTracker()
-	
+
 	cfg := &config.Config{
 		Pricing: map[string]config.ModelPricing{
 			"test-model": {Input: 1.0, Output: 2.0, Cached: 0.5},
@@ -163,13 +163,13 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		t.Errorf("Summary missing 0 cost format: %s", summary2)
 	}
 
-    // Test formatting with no cost and no pricing configured
-    tracker3 := NewUsageTracker()
-    tracker3.RecordUsage("test-model", TokenUsage{
-        InputTokens: 10,
-    })
-    summary3 := tracker3.FormatSummary(&config.Config{})
-    if strings.Contains(summary3, "Estimated Cost") {
-        t.Errorf("Summary should not contain estimated cost: %s", summary3)
-    }
+	// Test formatting with no cost and no pricing configured
+	tracker3 := NewUsageTracker()
+	tracker3.RecordUsage("test-model", TokenUsage{
+		InputTokens: 10,
+	})
+	summary3 := tracker3.FormatSummary(&config.Config{})
+	if strings.Contains(summary3, "Estimated Cost") {
+		t.Errorf("Summary should not contain estimated cost: %s", summary3)
+	}
 }

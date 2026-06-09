@@ -11,3 +11,12 @@ Implement tracking and reporting of LLM token metrics (input tokens, output toke
 - **Provider SDKs (`gemini.go`, `openai.go`, `anthropic.go`)**: Hooked into both Generate and Stream APIs for all three supported LLM providers to extract and pass back token counts. Resolved streaming challenges by leveraging native SDK stream options and message events instead of client-side tokenizers.
 - **Execution Loop (`loop.go`)**: Instantiates `UsageTracker` per session, captures tokens per turn, and prints formatted summary panel at session termination. Added usage metadata to `JSONPayload` in headless mode.
 - **Testing**: Added `telemetry_test.go` to test model prefix matching and math. Passed `make check-coverage` with `91.0%` test coverage.
+
+## User Review Required
+None remaining.
+
+## Proposed Changes
+See final implementation details above.
+
+## Verification Plan
+Completed via automated tests and manual execution.
