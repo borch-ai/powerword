@@ -43,9 +43,18 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
 #### [NEW] [critic.go](../internal/review/critic.go)
 - Implement `LoadIssuePlan(issueID int)` to execute `gh issue view <id> --json body,comments` and parse the YAML/Markdown sections into a structured Go struct.
 - Implement `VerifyWorkspace(ctx context.Context, plan *Plan)`:
-  - Run the local validation suite (`make all`, which runs `make lint`, `make test`, `make vuln`, `make markdown-lint`).
-  - Extract the current git diff: `git diff HEAD`.
-  - Pass the plan, the local validation output, and the git diff to a local LLM client (configured via Ollama or a cost-effective API endpoint) to verify that all proposed changes have been implemented and verified.
+  - ## Phase 1: Local Validations
+
+    1.  **Pre-requisite Check**:
+        *   The command first determines if the workspace defines a `Makefile`. If `Makefile` is present, it will run `make all` with a timeout of 3 minutes.
+        *   Output is captured. If it fails, the process exits and writes to `.powerword-critic.md` locally.
+
+    2.  **Diff Extraction**:
+        *   Instead of blindly pushing code, the agent extracts the diff using the local `pw-mcp-git` MCP server.
+        *   **Update**: Modified to call both `git_diff_commits` (diff between `main` and `HEAD`) and `git_diff` (uncommitted working tree changes).
+        *   This provides a comprehensive view of all changes related to the implementation plan, preventing the critic from falsely accepting a clean working tree that lacks unpushed commits.
+
+    ## Phase 2: AI Critic Invocationed.
   - Return a detailed report of any omissions, bugs, or untested files.
 
 ### Git Hooks
