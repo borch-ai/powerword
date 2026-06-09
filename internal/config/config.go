@@ -17,6 +17,13 @@ type ServerConfig struct {
 	Env     []string `mapstructure:"env"`
 }
 
+// ModelPricing specifies the cost per 1M tokens.
+type ModelPricing struct {
+	Input  float64 `mapstructure:"input"`
+	Output float64 `mapstructure:"output"`
+	Cached float64 `mapstructure:"cached"`
+}
+
 // Config holds the application configuration.
 type Config struct {
 	Verbose           bool                    `mapstructure:"verbose"`
@@ -31,6 +38,7 @@ type Config struct {
 	Servers           map[string]ServerConfig `mapstructure:"servers"`
 	Route             map[string]string       `mapstructure:"route"`
 	ClassifierModel   string                  `mapstructure:"classifier_model"`
+	Pricing           map[string]ModelPricing `mapstructure:"pricing"`
 }
 
 // APIKeys maps the model providers to their API keys.

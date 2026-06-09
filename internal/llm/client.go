@@ -25,6 +25,13 @@ type ToolCall struct {
 	Arguments string `json:"arguments"` // JSON string representation of tool parameters
 }
 
+// TokenUsage represents the token usage for a single request.
+type TokenUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+	CachedTokens int `json:"cached_tokens"`
+}
+
 // Message represents a single message in the chat history.
 type Message struct {
 	Role    Role   `json:"role"`
@@ -34,6 +41,8 @@ type Message struct {
 	// ToolCallID links this tool message back to the tool call request.
 	// Only set when Role is RoleTool.
 	ToolCallID string `json:"tool_call_id,omitempty"`
+	// Usage may be populated if token usage is available from the provider.
+	Usage *TokenUsage `json:"usage,omitempty"`
 }
 
 // ToolDefinition defines a tool that can be called by the model.
@@ -49,6 +58,8 @@ type ToolDefinition struct {
 type StreamChunk struct {
 	Content string
 	Error   error
+	// Usage may be populated on chunks that report token usage (e.g. at the start or end of the stream).
+	Usage *TokenUsage
 }
 
 // LLMClient is the uniform interface for LLM providers.

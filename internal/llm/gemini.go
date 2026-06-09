@@ -143,6 +143,14 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 		Role: RoleAssistant,
 	}
 
+	if resp.UsageMetadata != nil {
+		assistantMsg.Usage = &TokenUsage{
+			InputTokens:  int(resp.UsageMetadata.PromptTokenCount),
+			OutputTokens: int(resp.UsageMetadata.CandidatesTokenCount),
+			CachedTokens: int(resp.UsageMetadata.CachedContentTokenCount),
+		}
+	}
+
 	var textBuilder strings.Builder
 	for _, part := range candidate.Content.Parts {
 		switch p := part.(type) {
@@ -203,12 +211,25 @@ func (g *GeminiClient) Stream(ctx context.Context, messages []Message, tools []T
 }
 
 func handleStreamChunk(resp *genai.GenerateContentResponse, out chan<- StreamChunk) {
+	var chunk StreamChunk
+	if resp.UsageMetadata != nil {
+		chunk.Usage = &TokenUsage{
+			InputTokens:  int(resp.UsageMetadata.PromptTokenCount),
+			OutputTokens: int(resp.UsageMetadata.CandidatesTokenCount),
+			CachedTokens: int(resp.UsageMetadata.CachedContentTokenCount),
+		}
+	}
+
 	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 		for _, part := range resp.Candidates[0].Content.Parts {
 			if t, ok := part.(genai.Text); ok {
-				out <- StreamChunk{Content: string(t)}
+				chunk.Content += string(t)
 			}
 		}
+	}
+
+	if chunk.Content != "" || chunk.Usage != nil {
+		out <- chunk
 	}
 }
 

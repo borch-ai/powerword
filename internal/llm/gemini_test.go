@@ -35,6 +35,11 @@ func TestGeminiClient_Generate_Success(t *testing.T) {
 						},
 					},
 				},
+				"usageMetadata": map[string]any{
+					"promptTokenCount":        10,
+					"candidatesTokenCount":    20,
+					"cachedContentTokenCount": 5,
+				},
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -64,6 +69,10 @@ func TestGeminiClient_Generate_Success(t *testing.T) {
 
 	if msg.Content != "Hello from Gemini mock!" {
 		t.Errorf("unexpected content: %s", msg.Content)
+	}
+
+	if msg.Usage == nil || msg.Usage.InputTokens != 10 || msg.Usage.OutputTokens != 20 || msg.Usage.CachedTokens != 5 {
+		t.Errorf("unexpected usage: %+v", msg.Usage)
 	}
 }
 

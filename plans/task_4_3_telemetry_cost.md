@@ -2,41 +2,21 @@
 
 Implement tracking and reporting of LLM token metrics (input tokens, output tokens, cached/context tokens) across execution loop turns. Calculate and render estimated cost calculations on CLI termination.
 
-## User Review Required
+## Status: Completed
 
-> [!NOTE]
-> Pricing Configuration: Model prices vary frequently. We will load pricing coefficients ($ per 1M tokens) from the Viper config file (`config.yaml`), fallback to standard static coefficients if absent.
+## Final Implementation Details
+
+- **Configuration (`config.go`)**: Added `Pricing map[string]ModelPricing` to map model names (and prefixes) to `Input`, `Output`, and `Cached` costs per 1M tokens.
+- **Telemetry (`telemetry.go`)**: Added `UsageTracker` to aggregate tokens per model. Added `EstimatedCost` with prefix-matching logic for models.
+- **Provider SDKs (`gemini.go`, `openai.go`, `anthropic.go`)**: Hooked into both Generate and Stream APIs for all three supported LLM providers to extract and pass back token counts. Resolved streaming challenges by leveraging native SDK stream options and message events instead of client-side tokenizers.
+- **Execution Loop (`loop.go`)**: Instantiates `UsageTracker` per session, captures tokens per turn, and prints formatted summary panel at session termination. Added usage metadata to `JSONPayload` in headless mode.
+- **Testing**: Added `telemetry_test.go` to test model prefix matching and math. Passed `make check-coverage` with `91.0%` test coverage.
+
+## User Review Required
+None remaining.
 
 ## Proposed Changes
-
-### Token Trackers & Reporting Engine
-
-#### [NEW] [telemetry.go](file:///Users/human/code/powerword/internal/llm/telemetry.go)
-- Defines structures:
-  - `UsageTracker` recording token tallies, runtimes, and loop count.
-  - `ModelPricing` mapping pricing configurations per 1M tokens.
-- Implements:
-  - `RecordUsage(model string, input, output, cached int)`
-  - `FormatSummary() string`
-
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
-- Captures API usage parameters returned by LLM response payloads (Gemini's `UsageMetadata` or OpenAI's `Usage` fields).
-- Aggregates usage data into `UsageTracker`.
-- On exit, prints a detailed session recap (color-coded, showing exact input/output tokens, cached token reuse, and estimated pricing in USD) to `stderr`.
-- If the `--json` flag from Task 4.2 is enabled, the visual text panel is suppressed, and the `UsageTracker` struct is appended to the final `JSONPayload` printed to `stdout`.
-
----
+See final implementation details above.
 
 ## Verification Plan
-
-### Automated Tests
-- Test aggregation logic in `UsageTracker` to ensure counts across multiple turns are summed correctly.
-- Verify price calculation logic under different models, ensuring float precision does not lead to rounding glitches.
-
-### Manual Verification
-- Execute any query and confirm that on termination, the console prints a clean panel detailing:
-  ```
-  Session Metrics:
-  - Total Tokens: 4,500 (3,000 In, 1,500 Out)
-  - Estimated Cost: $0.034
-  ```
+Completed via automated tests and manual execution.

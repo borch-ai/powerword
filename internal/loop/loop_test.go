@@ -158,7 +158,10 @@ func TestRunLoop_WithSession(t *testing.T) {
 
 	mockClient := &mockLLMClient{
 		genResps: []*llm.Message{
-			{Content: "Assistant response"},
+			{
+				Content: "Assistant response",
+				Usage:   &llm.TokenUsage{InputTokens: 10, OutputTokens: 20},
+			},
 		},
 	}
 	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
@@ -361,10 +364,12 @@ func TestPrintJSONPayload(t *testing.T) {
 	os.Stdout = w
 	defer func() { os.Stdout = oldStdout }()
 
+	tracker := llm.NewUsageTracker()
+	tracker.RecordUsage("test", llm.TokenUsage{InputTokens: 10, OutputTokens: 20})
 	printJSONPayload(nil, []llm.Message{
 		{Role: llm.RoleAssistant, Content: "Hello"},
 		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{Name: "test"}}},
-	}, 0)
+	}, 0, tracker)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
@@ -379,6 +384,9 @@ func TestPrintJSONPayload(t *testing.T) {
 	}
 	if !strings.Contains(output, "success") {
 		t.Errorf("expected payload to contain 'success', got: %s", output)
+	}
+	if !strings.Contains(output, `"usage":`) {
+		t.Errorf("expected payload to contain 'usage', got: %s", output)
 	}
 }
 
