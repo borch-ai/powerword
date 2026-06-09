@@ -12,7 +12,7 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
 ### Configuration Mapping & Startup Logic
 
 #### [MODIFY] [config.go](file:///Users/human/code/powerword/internal/config/config.go)
-- *Already Implemented*: Extends Config structures to support an array of Server definitions via the `servers` TOML block.
+- *Already Implemented*: Extends Config structures to support a map of Server definitions keyed by server name via the `servers` TOML block.
   ```toml
   [servers.filesystem]
      command = "pw-mcp-fs"
