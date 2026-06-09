@@ -336,3 +336,101 @@ func TestRunLoop_ToolCall_NoAutoConfirm(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 }
+
+func TestReadStdinPrompt(t *testing.T) {
+	r, w, _ := os.Pipe()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+
+	_, _ = w.WriteString("piped input\n")
+	_ = w.Close()
+
+	prompt, err := readStdinPrompt()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prompt != "piped input" {
+		t.Errorf("expected 'piped input', got '%s'", prompt)
+	}
+}
+
+func TestPrintJSONPayload(t *testing.T) {
+	oldStdout := os.Stdout
+	_, w, _ := os.Pipe()
+	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+
+	printJSONPayload(nil, []llm.Message{
+		{Role: llm.RoleAssistant, Content: "Hello"},
+		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{Name: "test"}}},
+	}, 0)
+
+	_ = w.Close()
+	// Just need it to execute without panic for coverage
+}
+
+func TestRunLoop_JSONOutput(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{Content: "JSON response"},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		MaxLoopIterations: 3,
+		JSONOutput:        true,
+	}
+
+	oldStdout := os.Stdout
+	_, w, _ := os.Pipe()
+	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+
+	err := RunLoop(ctx, cfg, "test JSON prompt")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	_ = w.Close()
+}
+
+func TestRunLoop_Headless(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Content: "Wait, I will call a tool",
+				ToolCalls: []llm.ToolCall{
+					{
+						ID:        "call_1",
+						Name:      "write_tool",
+						Arguments: `{"arg":"val"}`,
+					},
+				},
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		MaxLoopIterations: 3,
+		Headless:          true,
+	}
+
+	err := RunLoop(ctx, cfg, "test headless prompt")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}

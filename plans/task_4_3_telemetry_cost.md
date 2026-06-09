@@ -22,7 +22,8 @@ Implement tracking and reporting of LLM token metrics (input tokens, output toke
 #### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
 - Captures API usage parameters returned by LLM response payloads (Gemini's `UsageMetadata` or OpenAI's `Usage` fields).
 - Aggregates usage data into `UsageTracker`.
-- On exit, prints a detailed session recap (color-coded, showing exact input/output tokens, cached token reuse, and estimated pricing in USD).
+- On exit, prints a detailed session recap (color-coded, showing exact input/output tokens, cached token reuse, and estimated pricing in USD) to `stderr`.
+- If the `--json` flag from Task 4.2 is enabled, the visual text panel is suppressed, and the `UsageTracker` struct is appended to the final `JSONPayload` printed to `stdout`.
 
 ---
 
