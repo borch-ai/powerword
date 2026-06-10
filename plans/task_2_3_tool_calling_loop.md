@@ -1,4 +1,4 @@
-# Task 2.3: Tool Calling Execution Loop
+# plan: Task 2.3: Tool Calling Execution Loop
 
 Evolve the single-turn core loop into an iterative reasoning loop (ReAct loop). Integrate the plugin registry, fetch available tools, declare them to the active LLM, execute requested tool actions via MCP servers, and feed the results back to the LLM until generation is complete.
 

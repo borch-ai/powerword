@@ -1,4 +1,4 @@
-# Task 1.1: Project Initialization & Cobra/Viper Configuration (TOML)
+# plan: Task 1.1: Project Initialization & Cobra/Viper Configuration (TOML)
 
 **Status:** Completed (Issue #36)
 

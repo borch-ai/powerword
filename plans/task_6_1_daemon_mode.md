@@ -1,6 +1,9 @@
-# Task 6.1: Daemon Mode & Firebase Realtime Database Signaling
+# plan: Task 6.1: Daemon Mode & Firebase Realtime Database Signaling
 
-**Status:** Open (Issue #28)
+**Status:** Superseded (Issue #28)
+
+> [!NOTE]
+> This task has been superseded and fulfilled by **Task 6.5 (Issue #61)**, which implemented both the `--daemon` CLI flag and the Firebase Realtime Database Signaling Broker simultaneously.
 
 Implement a `--daemon` CLI flag (or `powerword daemon` subcommand) in the Go runtime. This subcommand will act as a persistent connection broker that negotiates WebRTC connection handshakes with the AntigravityMobile dashboard over Firebase Realtime Database, replacing the Node.js wrapper daemon.
 

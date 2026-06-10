@@ -1,4 +1,4 @@
-# Task 2.4: Interactive Permission & Consent Manager
+# plan: Task 2.4: Interactive Permission & Consent Manager
 
 **Status:** Completed (Issue #58)
 **Go Version:** 1.26.4

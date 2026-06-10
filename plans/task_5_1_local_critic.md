@@ -1,4 +1,4 @@
-# Task 5.1: Structured Issue Templates & Local Critic Integration
+# plan: Task 5.1: Structured Issue Templates & Local Critic Integration
 
 **Status:** Completed (Issue #24)
 
