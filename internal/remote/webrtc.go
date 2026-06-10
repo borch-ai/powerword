@@ -54,6 +54,13 @@ func NewWebRTCManager(cfg *config.Config) (*WebRTCManager, error) {
 		return nil, fmt.Errorf("failed to create peer connection: %w", err)
 	}
 
+	initSuccess := false
+	defer func() {
+		if !initSuccess {
+			_ = pc.Close()
+		}
+	}()
+
 	m := &WebRTCManager{
 		pc:              pc,
 		TerminalReady:   make(chan struct{}),
@@ -96,6 +103,7 @@ func NewWebRTCManager(cfg *config.Config) (*WebRTCManager, error) {
 		close(m.ControlReady)
 	})
 
+	initSuccess = true
 	return m, nil
 }
 

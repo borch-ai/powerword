@@ -191,6 +191,12 @@ func TestNewWebRTCManager_Config(t *testing.T) {
 		for _, url := range s.URLs {
 			if url == "turn:fake.turn.server:3478" {
 				foundTurn = true
+				if s.Username != "user" {
+					t.Errorf("expected username 'user', got '%s'", s.Username)
+				}
+				if cred, ok := s.Credential.(string); !ok || cred != "password" {
+					t.Errorf("expected password 'password', got '%v'", s.Credential)
+				}
 			}
 		}
 	}

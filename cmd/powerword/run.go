@@ -76,24 +76,28 @@ func runDaemonMode(ctx context.Context, cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to init webrtc manager: %w", err)
 	}
-	defer func() {
-		_ = manager.Close()
-	}()
-
 	offer, err := manager.GenerateOffer()
 	if err != nil {
+		_ = manager.Close()
 		return fmt.Errorf("failed to generate offer: %w", err)
 	}
 
 	answer, err := broker.ExchangeSDP(ctx, tunnelID, offer)
 	if err != nil {
+		_ = manager.Close()
 		return fmt.Errorf("sdp exchange failed: %w", err)
 	}
 	log.Printf("Successfully received SDP answer from dashboard (length: %d)", len(answer))
 
 	if err := manager.ApplyAnswer(answer); err != nil {
+		_ = manager.Close()
 		return fmt.Errorf("failed to apply answer: %w", err)
 	}
+
+	go func() {
+		<-ctx.Done()
+		_ = manager.Close()
+	}()
 
 	log.Printf("Daemon mode WebRTC signaling complete! Waiting for channels...")
 
