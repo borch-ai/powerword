@@ -1,4 +1,4 @@
-# Task 3.2: Plugin Manifest Configuration & Registration
+# plan: Task 3.2: Plugin Manifest Configuration & Registration
 
 **Status:** Completed (Issue #52)
 

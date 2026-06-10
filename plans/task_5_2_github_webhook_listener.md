@@ -1,4 +1,4 @@
-# Task 5.2: GitHub Webhook Listener & Active Session Event Broker
+# plan: Task 5.2: GitHub Webhook Listener & Active Session Event Broker
 
 **Status:** Completed (Issue #25)
 

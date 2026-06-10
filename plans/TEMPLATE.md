@@ -1,4 +1,4 @@
-# Task [Task Number]: [Task Title]
+# plan: Task [Task Number]: [Task Title]
 
 **Status:** Open (Issue #[TBD])
 

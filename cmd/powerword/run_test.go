@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"powerword/internal/config"
 )
@@ -59,5 +60,38 @@ func TestRunCmd_StandardRunner(t *testing.T) {
 	}
 	if !called {
 		t.Errorf("expected Runner to be called")
+	}
+}
+
+func TestGenerateTunnelID(t *testing.T) {
+	id1, err := generateTunnelID()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	id2, err := generateTunnelID()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(id1) != 6 {
+		t.Errorf("expected length 6, got %d", len(id1))
+	}
+	if id1 == id2 {
+		t.Errorf("expected different IDs, got same: %s", id1)
+	}
+}
+
+func TestRunCmd_Daemon(t *testing.T) {
+	origConfig := config.Active
+	config.Active = &config.Config{Daemon: true}
+	defer func() { config.Active = origConfig }()
+
+	cmd := newRunCmd()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	cmd.SetContext(ctx)
+
+	err := cmd.RunE(cmd, []string{})
+	if err == nil {
+		t.Errorf("expected error, got nil")
 	}
 }

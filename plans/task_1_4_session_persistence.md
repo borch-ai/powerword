@@ -1,4 +1,4 @@
-# Task 1.4: Session Persistence & Chat History Management
+# plan: Task 1.4: Session Persistence & Chat History Management
 
 **Status:** Completed (Issue #39)
 

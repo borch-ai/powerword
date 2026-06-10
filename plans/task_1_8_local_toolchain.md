@@ -1,4 +1,4 @@
-# Task 1.8: Local Toolchain Sandbox
+# plan: Task 1.8: Local Toolchain Sandbox
 
 **Status:** Completed (Issue #43)
 

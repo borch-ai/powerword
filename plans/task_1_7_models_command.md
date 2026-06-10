@@ -1,4 +1,4 @@
-# Task 1.7: Models Subcommand
+# plan: Task 1.7: Models Subcommand
 
 **Status:** Completed (Issue #42)
 

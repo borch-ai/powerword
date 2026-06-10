@@ -1,4 +1,4 @@
-# Task 3.1: Standard Native Plugins (FS, Git, Shell)
+# plan: Task 3.1: Standard Native Plugins (FS, Git, Shell)
 
 **Status:** Completed (Issue #51)
 

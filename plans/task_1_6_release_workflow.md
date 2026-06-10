@@ -1,4 +1,4 @@
-# Task 1.6: Automated Release Workflow
+# plan: Task 1.6: Automated Release Workflow
 
 **Status:** Completed (Issue #41)
 

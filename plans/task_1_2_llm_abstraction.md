@@ -1,4 +1,4 @@
-# Task 1.2: LLM Abstraction Layer
+# plan: Task 1.2: LLM Abstraction Layer
 
 **Status:** Completed (Issue #37)
 

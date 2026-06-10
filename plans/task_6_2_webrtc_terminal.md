@@ -1,4 +1,4 @@
-# Task 6.2: Pion WebRTC Data Channel Server
+# plan: Task 6.2: Pion WebRTC Data Channel Server
 
 **Status:** Open (Issue #29)
 
@@ -14,8 +14,14 @@ Integrate the pure Go Pion WebRTC library into the Powerword binary to stream te
 ### WebRTC Layer
 #### [NEW] [internal/remote/webrtc.go](file:///Users/human/code/powerword/internal/remote/webrtc.go)
 - Integrate `github.com/pion/webrtc/v3` library.
-- Implement a `PeerConnection` state manager.
+- Implement a `PeerConnection` state manager that generates the local SDP offer.
 - Declare three WebRTC data channels: `terminal`, `filesystem`, and `control` to match the dashboard expectations.
+
+### Daemon Signaling Integration
+#### [MODIFY] [cmd/powerword/run.go](file:///Users/human/code/powerword/cmd/powerword/run.go)
+- Connect the Pion WebRTC manager to the `FirebaseBroker`.
+- Pass the local Pion SDP offer into `broker.ExchangeSDP(ctx, tunnelID, offer)`.
+- Take the returned remote SDP answer from Firebase and apply it as the `RemoteDescription` in Pion to complete the WebRTC handshake.
 
 ### Terminal Logging Pipe
 #### [MODIFY] [internal/loop/loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)

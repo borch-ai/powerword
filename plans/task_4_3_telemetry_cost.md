@@ -1,4 +1,4 @@
-# Task 4.3: Telemetry, Token Metrics & Cost Accounting
+# plan: Task 4.3: Telemetry, Token Metrics & Cost Accounting
 
 Implement tracking and reporting of LLM token metrics (input tokens, output tokens, cached/context tokens) across execution loop turns. Calculate and render estimated cost calculations on CLI termination.
 

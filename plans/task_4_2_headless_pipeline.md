@@ -1,4 +1,4 @@
-# Task 4.2: Headless Pipelines & Automation
+# plan: Task 4.2: Headless Pipelines & Automation
 
 **Status:** Completed (Issue #54)
 

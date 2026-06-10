@@ -1,4 +1,4 @@
-# Task 1.5: Markdown Linting & Implementation Plan Validation
+# plan: Task 1.5: Markdown Linting & Implementation Plan Validation
 
 **Status:** Completed (Issue #40)
 

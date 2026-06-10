@@ -1,4 +1,4 @@
-# Task 1.3: Core Loop & Streaming Output Engine
+# plan: Task 1.3: Core Loop & Streaming Output Engine
 
 **Status:** Completed (Issue #38)
 

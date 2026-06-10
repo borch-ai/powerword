@@ -11,7 +11,7 @@ import (
 var (
 	headerRegex = regexp.MustCompile(`^(#{1,6})\s+(.*)$`)
 	listRegex   = regexp.MustCompile(`^(\s*)(\d+)\.\s+(.*)$`)
-	planTitleRx = regexp.MustCompile(`^# Task \d+(\.\d+)*:.*$`)
+	planTitleRx = regexp.MustCompile(`^# (plan|feat):.*$`)
 )
 
 type listState struct {
@@ -214,7 +214,7 @@ func LintPlan(filename string, content string) []string {
 	}
 
 	if !hasTitle {
-		errors = append(errors, fmt.Sprintf("%s: missing top-level plan header matching '# Task [Task Number]: [Task Title]'", filename))
+		errors = append(errors, fmt.Sprintf("%s: missing top-level plan header matching '# (plan|feat): ...'", filename))
 	}
 	if !hasReview {
 		errors = append(errors, fmt.Sprintf("%s: missing heading '## User Review Required'", filename))

@@ -1,4 +1,4 @@
-# Task 2.2: Stdio Transport Layer & Server Lifecycle
+# plan: Task 2.2: Stdio Transport Layer & Server Lifecycle
 
 **Status:** Completed (Issue #45)
 

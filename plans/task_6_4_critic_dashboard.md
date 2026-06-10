@@ -1,4 +1,4 @@
-# Task 6.4: Local Critic Mobile Dashboard Integration
+# plan: Task 6.4: Local Critic Mobile Dashboard Integration
 
 **Status:** Open (Issue #31)
 

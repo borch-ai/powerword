@@ -185,7 +185,7 @@ Paragraph text at outer level
 }
 
 func TestLintPlan_Success(t *testing.T) {
-	content := `# Task 1.5: Markdown Linting
+	content := `# plan: Task 1.5: Markdown Linting
 
 ## User Review Required
 Some review text.
@@ -220,7 +220,7 @@ func TestLintPlan_Failures(t *testing.T) {
 		{
 			name: "invalid title format",
 			content: `
-# Task ABC: Invalid Title
+# Invalid Title without plan or feat prefix
 ## User Review Required
 ## Proposed Changes
 ## Verification Plan
@@ -230,7 +230,7 @@ func TestLintPlan_Failures(t *testing.T) {
 		{
 			name: "missing other headings",
 			content: `
-# Task 1.2: Title
+# feat: Task 1.2: Title
 ## User Review Required
 `,
 			expected: []string{
@@ -241,7 +241,7 @@ func TestLintPlan_Failures(t *testing.T) {
 		{
 			name: "headings in code blocks",
 			content: `
-# Task 1.1: Title
+# plan: Task 1.1: Title
 ## User Review Required
 ` + "```" + `
 ## Proposed Changes
