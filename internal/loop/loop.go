@@ -93,10 +93,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		Content: prompt,
 	})
 
-	var outWriter io.Writer = os.Stdout
-	if cfg.JSONOutput {
-		outWriter = io.Discard
-	}
+	outWriter := getOutputWriter(cfg)
 	formatter := NewTerminalFormatter(outWriter, getTerminalWidth())
 	defer func() {
 		flushErr := formatter.Flush()
@@ -335,4 +332,14 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 		})
 	}
 	return messages
+}
+
+func getOutputWriter(cfg *config.Config) io.Writer {
+	if cfg.OutputWriter != nil {
+		return cfg.OutputWriter
+	}
+	if cfg.JSONOutput {
+		return io.Discard
+	}
+	return os.Stdout
 }

@@ -1,0 +1,394 @@
+Fetching vulnerabilities from the database...
+
+Checking the code against the vulnerabilities...
+
+The package pattern matched the following 14 root packages:
+  powerword/internal/config
+  powerword/internal/llm
+  powerword/internal/mcp
+  powerword/internal/loop
+  powerword/internal/remote
+  powerword/internal/review
+  powerword/cmd/powerword
+  powerword/cmd/pw-mcp-fs
+  powerword/cmd/pw-mcp-git
+  powerword/cmd/pw-mcp-shell
+  powerword/internal/linter
+  powerword/scripts
+  powerword/scripts/lint_markdown
+  powerword/scripts/lint_plans
+Govulncheck scanned the following 122 modules and the go1.26.4 standard library:
+  powerword
+  cel.dev/expr@v0.25.2
+  cloud.google.com/go@v0.123.0
+  cloud.google.com/go/ai@v0.8.0
+  cloud.google.com/go/auth@v0.20.0
+  cloud.google.com/go/auth/oauth2adapt@v0.2.8
+  cloud.google.com/go/compute/metadata@v0.9.0
+  cloud.google.com/go/firestore@v1.22.0
+  cloud.google.com/go/iam@v1.11.0
+  cloud.google.com/go/longrunning@v1.0.0
+  cloud.google.com/go/monitoring@v1.29.0
+  cloud.google.com/go/storage@v1.62.1
+  dario.cat/mergo@v1.0.0
+  firebase.google.com/go/v4@v4.20.0
+  github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp@v1.32.0
+  github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric@v0.56.0
+  github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping@v0.56.0
+  github.com/MicahParks/keyfunc@v1.9.0
+  github.com/ProtonMail/go-crypto@v1.1.6
+  github.com/anthropics/anthropic-sdk-go@v1.46.0
+  github.com/bahlo/generic-list-go@v0.2.0
+  github.com/buger/jsonparser@v1.1.2
+  github.com/cespare/xxhash/v2@v2.3.0
+  github.com/cloudflare/circl@v1.6.3
+  github.com/cncf/xds/go@v0.0.0-20260202195803-dba9d589def2
+  github.com/cyphar/filepath-securejoin@v0.6.1
+  github.com/davecgh/go-spew@v1.1.2-0.20180830191138-d8f796af33cc
+  github.com/emirpasic/gods@v1.18.1
+  github.com/envoyproxy/go-control-plane/envoy@v1.37.0
+  github.com/envoyproxy/protoc-gen-validate@v1.3.3
+  github.com/felixge/httpsnoop@v1.0.4
+  github.com/fsnotify/fsnotify@v1.9.0
+  github.com/go-git/gcfg@v1.5.1-0.20230307220236-3a3c6141e376
+  github.com/go-git/go-billy/v5@v5.9.0
+  github.com/go-git/go-git/v5@v5.19.1
+  github.com/go-jose/go-jose/v4@v4.1.4
+  github.com/go-logr/logr@v1.4.3
+  github.com/go-logr/stdr@v1.2.2
+  github.com/go-viper/mapstructure/v2@v2.4.0
+  github.com/golang-jwt/jwt/v4@v4.5.2
+  github.com/golang/groupcache@v0.0.0-20241129210726-2c02b8208cf8
+  github.com/google/generative-ai-go@v0.20.1
+  github.com/google/jsonschema-go@v0.4.3
+  github.com/google/s2a-go@v0.1.9
+  github.com/google/uuid@v1.6.0
+  github.com/googleapis/enterprise-certificate-proxy@v0.3.16
+  github.com/googleapis/gax-go/v2@v2.22.0
+  github.com/invopop/jsonschema@v0.13.0
+  github.com/jbenet/go-context@v0.0.0-20150711004518-d14ea06fba99
+  github.com/kevinburke/ssh_config@v1.2.0
+  github.com/klauspost/cpuid/v2@v2.3.0
+  github.com/mailru/easyjson@v0.7.7
+  github.com/modelcontextprotocol/go-sdk@v1.6.1
+  github.com/pelletier/go-toml/v2@v2.2.4
+  github.com/pion/datachannel@v1.6.0
+  github.com/pion/dtls/v2@v2.2.12
+  github.com/pion/ice/v2@v2.3.38
+  github.com/pion/interceptor@v0.1.45
+  github.com/pion/logging@v0.2.4
+  github.com/pion/mdns@v0.0.12
+  github.com/pion/randutil@v0.1.0
+  github.com/pion/rtcp@v1.2.16
+  github.com/pion/rtp@v1.10.2
+  github.com/pion/sctp@v1.10.0
+  github.com/pion/sdp/v3@v3.0.18
+  github.com/pion/srtp/v2@v2.0.20
+  github.com/pion/stun@v0.6.1
+  github.com/pion/transport/v2@v2.2.10
+  github.com/pion/transport/v4@v4.0.2
+  github.com/pion/turn/v2@v2.1.6
+  github.com/pion/webrtc/v3@v3.3.6
+  github.com/pjbgf/sha1cd@v0.6.0
+  github.com/pmezard/go-difflib@v1.0.1-0.20181226105442-5d4384ee4fb2
+  github.com/sagikazarmark/locafero@v0.11.0
+  github.com/sashabaranov/go-openai@v1.41.2
+  github.com/segmentio/asm@v1.1.3
+  github.com/segmentio/encoding@v0.5.4
+  github.com/sergi/go-diff@v1.3.2-0.20230802210424-5b0b94c5c0d3
+  github.com/skeema/knownhosts@v1.3.1
+  github.com/sourcegraph/conc@v0.3.1-0.20240121214520-5f936abd7ae8
+  github.com/spf13/afero@v1.15.0
+  github.com/spf13/cast@v1.10.0
+  github.com/spf13/cobra@v1.10.2
+  github.com/spf13/pflag@v1.0.10
+  github.com/spf13/viper@v1.21.0
+  github.com/spiffe/go-spiffe/v2@v2.6.0
+  github.com/standard-webhooks/standard-webhooks/libraries@v0.0.1
+  github.com/stretchr/testify@v1.11.1
+  github.com/subosito/gotenv@v1.6.0
+  github.com/tidwall/gjson@v1.18.0
+  github.com/tidwall/match@v1.1.1
+  github.com/tidwall/pretty@v1.2.1
+  github.com/tidwall/sjson@v1.2.5
+  github.com/wk8/go-ordered-map/v2@v2.1.8
+  github.com/wlynxg/anet@v0.0.5
+  github.com/xanzy/ssh-agent@v0.3.3
+  github.com/yosida95/uritemplate/v3@v3.0.2
+  go.opentelemetry.io/auto/sdk@v1.2.1
+  go.opentelemetry.io/contrib/detectors/gcp@v1.43.0
+  go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc@v0.68.0
+  go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp@v0.68.0
+  go.opentelemetry.io/otel@v1.43.0
+  go.opentelemetry.io/otel/metric@v1.43.0
+  go.opentelemetry.io/otel/sdk@v1.43.0
+  go.opentelemetry.io/otel/sdk/metric@v1.43.0
+  go.opentelemetry.io/otel/trace@v1.43.0
+  go.yaml.in/yaml/v3@v3.0.4
+  golang.org/x/crypto@v0.53.0
+  golang.org/x/net@v0.55.0
+  golang.org/x/oauth2@v0.36.0
+  golang.org/x/sync@v0.21.0
+  golang.org/x/sys@v0.46.0
+  golang.org/x/text@v0.38.0
+  golang.org/x/time@v0.15.0
+  google.golang.org/api@v0.283.0
+  google.golang.org/genproto@v0.0.0-20260511170946-3700d4141b60
+  google.golang.org/genproto/googleapis/api@v0.0.0-20260511170946-3700d4141b60
+  google.golang.org/genproto/googleapis/rpc@v0.0.0-20260523011958-0a33c5d7ca68
+  google.golang.org/grpc@v1.81.1
+  google.golang.org/protobuf@v1.36.11
+  gopkg.in/warnings.v0@v0.1.2
+  gopkg.in/yaml.v3@v3.0.1
+
+=== Symbol Results ===
+
+Vulnerability #1: GO-2026-4479
+    Usage of random nonce generation with AES GCM ciphers risks leaking the
+    authentication key in github.com/pion/dtls
+  More info: https://pkg.go.dev/vuln/GO-2026-4479
+  Module: github.com/pion/dtls/v2
+    Found in: github.com/pion/dtls/v2@v2.2.12
+    Fixed in: N/A
+    Example traces found:
+      #1: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls alert.Alert.ContentType
+      #2: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls alert.Alert.Marshal
+      #3: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls alert.Alert.String
+      #4: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls alert.Alert.Unmarshal
+      #5: internal/loop/loop.go:121:15: loop.RunLoop calls fmt.Fprintln, which eventually calls alert.Description.String
+      #6: internal/loop/loop.go:121:15: loop.RunLoop calls fmt.Fprintln, which eventually calls alert.Level.String
+      #7: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls alert.init
+      #8: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ccm.NewCCM
+      #9: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ccm.ccm.Open
+      #10: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ccm.ccm.Seal
+      #11: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ccm.init
+      #12: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.Aes128Ccm.Init
+      #13: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.Aes256Ccm.Init
+      #14: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.AuthenticationType
+      #15: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.CertificateType
+      #16: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.Decrypt
+      #17: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.ECC
+      #18: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.AesCcm.Encrypt
+      #19: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.HashFunc
+      #20: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.ID
+      #21: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.IsInitialized
+      #22: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.KeyExchangeAlgorithm
+      #23: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.AesCcm.String
+      #24: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.CBC.Decrypt
+      #25: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.CBC.Encrypt
+      #26: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.CCM.Decrypt
+      #27: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.CCM.Encrypt
+      #28: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.GCM.Decrypt
+      #29: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.GCM.Encrypt
+      #30: internal/loop/loop.go:121:15: loop.RunLoop calls fmt.Fprintln, which eventually calls ciphersuite.ID.String
+      #31: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.NewCBC
+      #32: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.NewCCM
+      #33: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.NewGCM
+      #34: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.NewTLSEcdheEcdsaWithAes128Ccm
+      #35: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.NewTLSEcdheEcdsaWithAes128Ccm8
+      #36: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.NewTLSEcdhePskWithAes128CbcSha256
+      #37: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.NewTLSPskWithAes128Ccm
+      #38: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.NewTLSPskWithAes128Ccm8
+      #39: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.NewTLSPskWithAes256Ccm8
+      #40: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.AuthenticationType
+      #41: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.CertificateType
+      #42: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.Decrypt
+      #43: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.ECC
+      #44: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.Encrypt
+      #45: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.HashFunc
+      #46: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.ID
+      #47: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.Init
+      #48: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.IsInitialized
+      #49: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.KeyExchangeAlgorithm
+      #50: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes128GcmSha256.String
+      #51: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.AuthenticationType
+      #52: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.CertificateType
+      #53: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.Decrypt
+      #54: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.ECC
+      #55: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.Encrypt
+      #56: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.HashFunc
+      #57: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.ID
+      #58: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.Init
+      #59: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.IsInitialized
+      #60: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.KeyExchangeAlgorithm
+      #61: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256CbcSha.String
+      #62: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256GcmSha384.HashFunc
+      #63: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256GcmSha384.ID
+      #64: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256GcmSha384.Init
+      #65: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheEcdsaWithAes256GcmSha384.String
+      #66: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.AuthenticationType
+      #67: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.CertificateType
+      #68: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.Decrypt
+      #69: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.ECC
+      #70: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.Encrypt
+      #71: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.HashFunc
+      #72: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.ID
+      #73: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.Init
+      #74: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.IsInitialized
+      #75: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.KeyExchangeAlgorithm
+      #76: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdhePskWithAes128CbcSha256.String
+      #77: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes128GcmSha256.CertificateType
+      #78: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes128GcmSha256.ID
+      #79: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes128GcmSha256.String
+      #80: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes256CbcSha.CertificateType
+      #81: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes256CbcSha.ID
+      #82: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes256CbcSha.String
+      #83: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes256GcmSha384.CertificateType
+      #84: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes256GcmSha384.ID
+      #85: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSEcdheRsaWithAes256GcmSha384.String
+      #86: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.AuthenticationType
+      #87: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.CertificateType
+      #88: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.Decrypt
+      #89: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.ECC
+      #90: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.Encrypt
+      #91: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.HashFunc
+      #92: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.ID
+      #93: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.Init
+      #94: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.IsInitialized
+      #95: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.KeyExchangeAlgorithm
+      #96: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128CbcSha256.String
+      #97: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128GcmSha256.AuthenticationType
+      #98: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128GcmSha256.CertificateType
+      #99: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128GcmSha256.ID
+      #100: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128GcmSha256.KeyExchangeAlgorithm
+      #101: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls ciphersuite.TLSPskWithAes128GcmSha256.String
+      #102: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.init
+      #103: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls ciphersuite.init
+      #104: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls clientcertificate.Types
+      #105: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls clientcertificate.init
+      #106: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls closer.Closer.Close
+      #107: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls closer.Closer.Done
+      #108: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls closer.NewCloser
+      #109: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls closer.init
+      #110: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls dtls.Client
+      #111: internal/remote/webrtc.go:92:35: remote.WebRTCManager.GenerateOffer calls webrtc.PeerConnection.SetLocalDescription, which eventually calls dtls.ClientWithContext
+      #112: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls dtls.Conn.Close
+      #113: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls dtls.Conn.ConnectionState
+      #114: internal/remote/webrtc.go:92:35: remote.WebRTCManager.GenerateOffer calls webrtc.PeerConnection.SetLocalDescription, which eventually calls dtls.Conn.LocalAddr
+      #115: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls dtls.Conn.Read
+      #116: internal/remote/webrtc.go:92:35: remote.WebRTCManager.GenerateOffer calls webrtc.PeerConnection.SetLocalDescription, which eventually calls dtls.Conn.RemoteAddr
+      #117: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls dtls.Conn.SelectedSRTPProtectionProfile
+      #118: internal/remote/webrtc.go:92:35: remote.WebRTCManager.GenerateOffer calls webrtc.PeerConnection.SetLocalDescription, which eventually calls dtls.Conn.Write
+      #119: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls dtls.Server
+      #120: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls dtls.State.ExportKeyingMaterial
+      #121: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls dtls.alertError.Error
+      #122: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls dtls.alertError.Is
+      #123: internal/llm/gemini.go:160:33: llm.GeminiClient.Generate calls json.Marshal, which eventually calls dtls.init
+      #124: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which calls dtls.init
+      #125: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls dtls.invalidCipherSuiteError.Error
+      #126: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls dtls.invalidCipherSuiteError.Is
+      #127: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls elliptic.CurveTypes
+      #128: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls elliptic.Curves
+      #129: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls elliptic.GenerateKeypair
+      #130: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which calls elliptic.init
+      #131: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls extension.ALPNProtocolSelection
+      #132: internal/config/config.go:152:24: config.LoadConfig calls viper.Viper.ReadInConfig, which eventually calls extension.Marshal
+      #133: internal/config/config.go:152:24: config.LoadConfig calls viper.Viper.ReadInConfig, which eventually calls extension.Marshal
+      #134: internal/config/config.go:152:24: config.LoadConfig calls viper.Viper.ReadInConfig, which eventually calls extension.Marshal
+      #135: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls extension.Marshal
+      #136: internal/config/config.go:152:24: config.LoadConfig calls viper.Viper.ReadInConfig, which eventually calls extension.Marshal
+      #137: internal/config/config.go:152:24: config.LoadConfig calls viper.Viper.ReadInConfig, which eventually calls extension.Marshal
+      #138: internal/config/config.go:152:24: config.LoadConfig calls viper.Viper.ReadInConfig, which eventually calls extension.Marshal
+      #139: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls extension.Unmarshal
+      #140: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls extension.init
+      #141: internal/remote/webrtc.go:87:32: remote.WebRTCManager.GenerateOffer calls webrtc.PeerConnection.CreateOffer, which eventually calls fingerprint.Fingerprint
+      #142: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls fingerprint.HashFromString
+      #143: internal/remote/webrtc.go:87:32: remote.WebRTCManager.GenerateOffer calls webrtc.PeerConnection.CreateOffer, which eventually calls fingerprint.StringFromHash
+      #144: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which calls fingerprint.init
+      #145: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.Handshake.ContentType
+      #146: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.Handshake.Marshal
+      #147: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls handshake.Handshake.Unmarshal
+      #148: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.Header.Marshal
+      #149: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls handshake.Header.Unmarshal
+      #150: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageCertificate.Marshal
+      #151: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageCertificateRequest.Marshal
+      #152: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageCertificateVerify.Marshal
+      #153: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageClientHello.Marshal
+      #154: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageClientKeyExchange.Marshal
+      #155: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageFinished.Marshal
+      #156: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageHelloVerifyRequest.Marshal
+      #157: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageServerHello.Marshal
+      #158: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageServerHelloDone.Marshal
+      #159: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.MessageServerKeyExchange.Marshal
+      #160: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls handshake.Random.MarshalFixed
+      #161: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls handshake.Random.Populate
+      #162: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls handshake.Random.UnmarshalFixed
+      #163: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls handshake.Type.String
+      #164: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls handshake.init
+      #165: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls hash.Algorithm.CryptoHash
+      #166: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls hash.Algorithm.Digest
+      #167: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls hash.Algorithm.Insecure
+      #168: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls hash.Algorithms
+      #169: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls hash.init
+      #170: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.EcdhePSKPreMasterSecret
+      #171: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.ExtendedMasterSecret
+      #172: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.GenerateEncryptionKeys
+      #173: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.MasterSecret
+      #174: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.PHash
+      #175: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.PSKPreMasterSecret
+      #176: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.PreMasterSecret
+      #177: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.VerifyDataClient
+      #178: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls prf.VerifyDataServer
+      #179: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls prf.init
+      #180: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls protocol.ApplicationData.ContentType
+      #181: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls protocol.ApplicationData.Marshal
+      #182: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls protocol.ApplicationData.Unmarshal
+      #183: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls protocol.ChangeCipherSpec.ContentType
+      #184: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls protocol.ChangeCipherSpec.Marshal
+      #185: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls protocol.ChangeCipherSpec.Unmarshal
+      #186: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls protocol.CompressionMethods
+      #187: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls protocol.DecodeCompressionMethods
+      #188: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls protocol.EncodeCompressionMethods
+      #189: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls protocol.FatalError.Error
+      #190: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.FatalError.Temporary
+      #191: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.FatalError.Timeout
+      #192: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls protocol.FatalError.Unwrap
+      #193: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls protocol.HandshakeError.Error
+      #194: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.HandshakeError.Temporary
+      #195: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.HandshakeError.Timeout
+      #196: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls protocol.HandshakeError.Unwrap
+      #197: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls protocol.InternalError.Error
+      #198: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.InternalError.Temporary
+      #199: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.InternalError.Timeout
+      #200: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls protocol.InternalError.Unwrap
+      #201: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls protocol.TemporaryError.Error
+      #202: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.TemporaryError.Temporary
+      #203: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.TemporaryError.Timeout
+      #204: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls protocol.TemporaryError.Unwrap
+      #205: internal/config/root.go:160:29: config.Execute calls cobra.Command.Execute, which eventually calls protocol.TimeoutError.Error
+      #206: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.TimeoutError.Temporary
+      #207: internal/review/listener.go:60:33: review.StartWebhookListener calls http.Server.ListenAndServe, which eventually calls protocol.TimeoutError.Timeout
+      #208: internal/llm/gemini.go:407:15: llm.GeminiClient.ListModels calls errors.Is, which eventually calls protocol.TimeoutError.Unwrap
+      #209: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls protocol.Version.Equal
+      #210: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls protocol.init
+      #211: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls recordlayer.Header.Marshal
+      #212: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls recordlayer.Header.Unmarshal
+      #213: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls recordlayer.RecordLayer.Marshal
+      #214: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls recordlayer.RecordLayer.Unmarshal
+      #215: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls recordlayer.UnpackDatagram
+      #216: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls recordlayer.init
+      #217: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls signature.Algorithms
+      #218: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls signature.init
+      #219: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls signaturehash.ParseSignatureSchemes
+      #220: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls signaturehash.SelectSignatureScheme
+      #221: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls signaturehash.init
+      #222: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls types.KeyExchangeAlgorithm.Has
+      #223: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls types.init
+      #224: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls util.BigEndianUint24
+      #225: internal/remote/webrtc.go:115:37: remote.WebRTCManager.ApplyAnswer calls webrtc.PeerConnection.SetRemoteDescription, which eventually calls util.Max
+      #226: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls util.PutBigEndianUint24
+      #227: internal/remote/webrtc.go:124:19: remote.WebRTCManager.Close calls webrtc.PeerConnection.Close, which eventually calls util.PutBigEndianUint48
+      #228: internal/remote/webrtc.go:8:2: remote.init calls webrtc.init, which eventually calls util.init
+
+=== Package Results ===
+
+No other vulnerabilities found.
+
+=== Module Results ===
+
+No other vulnerabilities found.
+
+Your code is affected by 1 vulnerability from 1 module.
+This scan found no other vulnerabilities in packages you import or modules you
+require.
+exit status 3

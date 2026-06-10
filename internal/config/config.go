@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,6 +49,8 @@ type Config struct {
 	WebhookPort       int                     `mapstructure:"webhook_port"`
 	Daemon            bool                    `mapstructure:"daemon"`
 	FirebaseProject   string                  `mapstructure:"firebase_project"`
+	TurnServers       []string                `mapstructure:"turn_servers"`
+	OutputWriter      io.Writer               `mapstructure:"-"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -194,6 +197,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
 	bindEnv(v, "daemon", "POWERWORD_DAEMON")
 	bindEnv(v, "firebase_project", "POWERWORD_FIREBASE_PROJECT")
+	bindEnv(v, "turn_servers", "POWERWORD_TURN_SERVERS")
+	bindEnv(v, "turn_servers", "POWERWORD_TURN_SERVERS")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
