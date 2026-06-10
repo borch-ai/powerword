@@ -45,6 +45,14 @@ powerword/
 
 ---
 
+## Cross-Project Boundaries & Distinct Workflows
+
+Powerword works in tandem with other applications (e.g., the Lamplighter dashboard). When contributing, strictly adhere to project boundaries:
+- **Check Existing Plans First:** Before proposing or making any changes that might cross over into another repository, explicitly check the `plans/` directory and GitHub issues of *both* repositories. Do not duplicate work that is already planned or completed in the other project.
+- **Isolate Changes:** Keep project codebases distinct. If a feature requires changes in multiple repositories (e.g., a frontend change in Lamplighter and a backend change in Powerword), create and maintain separate, isolated implementation plans in each respective repository. Do not merge their plans into a single file.
+
+---
+
 ## Coding Guidelines
 
 - **Go Version:** Go 1.23+

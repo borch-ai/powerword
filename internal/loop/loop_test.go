@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -462,5 +463,30 @@ func TestRunLoop_Headless(t *testing.T) {
 	err := RunLoop(ctx, cfg, "test headless prompt")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+func TestGetOutputWriter(t *testing.T) {
+	cfg := &config.Config{}
+
+	// Default
+	w := getOutputWriter(cfg)
+	if w != os.Stdout {
+		t.Errorf("expected os.Stdout, got %v", w)
+	}
+
+	// JSONOutput
+	cfg.JSONOutput = true
+	w = getOutputWriter(cfg)
+	if w != io.Discard {
+		t.Errorf("expected io.Discard, got %v", w)
+	}
+
+	// Custom OutputWriter
+	custom := io.Discard
+	cfg.OutputWriter = custom
+	w = getOutputWriter(cfg)
+	if w != custom {
+		t.Errorf("expected custom writer, got %v", w)
 	}
 }
