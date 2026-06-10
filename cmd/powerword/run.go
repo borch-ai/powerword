@@ -76,6 +76,9 @@ func runDaemonMode(ctx context.Context, cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to init webrtc manager: %w", err)
 	}
+	defer func() {
+		_ = manager.Close()
+	}()
 
 	offer, err := manager.GenerateOffer()
 	if err != nil {

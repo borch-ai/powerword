@@ -168,7 +168,9 @@ func TestDataChannelWriter_Error(t *testing.T) {
 
 func TestNewWebRTCManager_Config(t *testing.T) {
 	cfg := &config.Config{
-		TurnServers: []string{"turn:fake.turn.server:3478"},
+		TurnServers:  []string{"turn:fake.turn.server:3478"},
+		TurnUsername: "user",
+		TurnPassword: "password",
 	}
 
 	manager, err := NewWebRTCManager(cfg)

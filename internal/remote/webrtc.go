@@ -33,11 +33,16 @@ func NewWebRTCManager(cfg *config.Config) (*WebRTCManager, error) {
 	}
 
 	if cfg != nil && len(cfg.TurnServers) > 0 {
-		iceServers = append(iceServers, webrtc.ICEServer{
-			URLs:       cfg.TurnServers,
-			Username:   "powerword",
-			Credential: "password",
-		})
+		iceServer := webrtc.ICEServer{
+			URLs: cfg.TurnServers,
+		}
+		if cfg.TurnUsername != "" {
+			iceServer.Username = cfg.TurnUsername
+		}
+		if cfg.TurnPassword != "" {
+			iceServer.Credential = cfg.TurnPassword
+		}
+		iceServers = append(iceServers, iceServer)
 	}
 
 	pcConfig := webrtc.Configuration{
