@@ -7,13 +7,13 @@ Integrate the pure Go Pion WebRTC library into the Powerword binary to stream te
 ## User Review Required
 
 > [!WARNING]
-> This feature introduces `github.com/pion/webrtc/v3`. Since WebRTC requires managing ICE candidates and connection states, this will be a relatively heavy dependency. 
+> This feature introduces `github.com/pion/webrtc/v4`. Since WebRTC requires managing ICE candidates and connection states, this will be a relatively heavy dependency. 
 
 ## Proposed Changes
 
 ### WebRTC Layer
 #### [NEW] [internal/remote/webrtc.go](file:///Users/human/code/powerword/internal/remote/webrtc.go)
-- Integrate `github.com/pion/webrtc/v3` library.
+- Integrate `github.com/pion/webrtc/v4` library.
 - Implement a `PeerConnection` state manager that generates the local SDP offer.
 - Declare three WebRTC data channels: `terminal`, `filesystem`, and `control` to match the dashboard expectations.
 
