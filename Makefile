@@ -20,6 +20,7 @@ IMAGEGEN_PLUGIN=pw-mcp-imagegen
 KDP_MATH_PLUGIN=pw-mcp-kdp-math
 SEO_PLUGIN=pw-mcp-seo
 VIRAL_PLUGIN=pw-mcp-viral
+CRITIC_PLUGIN=pw-mcp-critic
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -38,6 +39,7 @@ build:
 	@if [ -d cmd/$(KDP_MATH_PLUGIN) ]; then $(GOBUILD) -o bin/$(KDP_MATH_PLUGIN) ./cmd/$(KDP_MATH_PLUGIN); fi
 	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOBUILD) -o bin/$(SEO_PLUGIN) ./cmd/$(SEO_PLUGIN); fi
 	@if [ -d cmd/$(VIRAL_PLUGIN) ]; then $(GOBUILD) -o bin/$(VIRAL_PLUGIN) ./cmd/$(VIRAL_PLUGIN); fi
+	@if [ -d cmd/$(CRITIC_PLUGIN) ]; then $(GOBUILD) -o bin/$(CRITIC_PLUGIN) ./cmd/$(CRITIC_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -49,6 +51,7 @@ install:
 	@if [ -d cmd/$(KDP_MATH_PLUGIN) ]; then $(GOCMD) install ./cmd/$(KDP_MATH_PLUGIN); fi
 	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SEO_PLUGIN); fi
 	@if [ -d cmd/$(VIRAL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(VIRAL_PLUGIN); fi
+	@if [ -d cmd/$(CRITIC_PLUGIN) ]; then $(GOCMD) install ./cmd/$(CRITIC_PLUGIN); fi
 
 install-hooks:
 	@echo "Installing git hooks..."

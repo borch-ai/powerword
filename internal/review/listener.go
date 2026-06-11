@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 // StartWebhookListener starts an HTTP server listening for GitHub webhooks.

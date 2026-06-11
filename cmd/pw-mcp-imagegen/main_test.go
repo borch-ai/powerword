@@ -14,7 +14,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sashabaranov/go-openai"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 func assertResponse(t *testing.T, res *mcp.CallToolResult, wantError bool, wantSubstr string) {

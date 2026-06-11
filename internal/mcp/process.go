@@ -12,7 +12,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 // ServerProcess manages the lifecycle of an external MCP server process.

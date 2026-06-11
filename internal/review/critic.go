@@ -11,9 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/borch-ai/powerword/internal/config"
-	"github.com/borch-ai/powerword/internal/llm"
 	internalmcp "github.com/borch-ai/powerword/internal/mcp"
+	"github.com/borch-ai/powerword/pkg/config"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -32,84 +31,7 @@ var checkMakefileExists = func() bool {
 }
 
 // ExtractGitDiff is a variable so it can be mocked in tests.
-var ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-	srvCfg, ok := cfg.Servers["git"]
-	if !ok {
-		cmd := "pw-mcp-git"
-		if _, err := os.Stat("bin/pw-mcp-git"); err == nil {
-			cmd = "./bin/pw-mcp-git"
-		} else if _, err := exec.LookPath("pw-mcp-git"); err != nil {
-			return "", fmt.Errorf("pw-mcp-git not found in bin/ or PATH, run 'make all' first")
-		}
-		srvCfg = config.ServerConfig{
-			Command: cmd,
-			Args:    []string{},
-		}
-	}
-
-	srv, err := internalmcp.NewServerProcess(ctx, "git", srvCfg)
-	if err != nil {
-		return "", fmt.Errorf("failed to start MCP git server (%s): %w", srvCfg.Command, err)
-	}
-	defer func() {
-		_ = srv.GracefulShutdown(time.Second * 5)
-	}()
-
-	var diffBuilder strings.Builder
-
-	baseBranch := "main"
-	// Check if there's an active PR and use its base
-	ghCmd := execCommand(ctx, "gh", "pr", "view", "--json", "baseRefName", "--jq", ".baseRefName")
-	out, ghErr := ghCmd.Output()
-	if ghErr == nil {
-		if b := strings.TrimSpace(string(out)); b != "" {
-			baseBranch = b
-		}
-	} else {
-		// Fallback to origin/main if main doesn't exist locally but origin/main does
-		gitCmd := execCommand(ctx, "git", "rev-parse", "--verify", "-q", "main")
-		if gitCmd.Run() != nil {
-			gitCmd2 := execCommand(ctx, "git", "rev-parse", "--verify", "-q", "origin/main")
-			if gitCmd2.Run() == nil {
-				baseBranch = "origin/main"
-			}
-		}
-	}
-
-	fmt.Printf("Using base branch %q for diff extraction...\n", baseBranch)
-
-	// 1. Get committed changes against base branch
-	resCommits, err := srv.Client().CallTool(ctx, "git_diff_commits", map[string]interface{}{"base": baseBranch, "head": "HEAD"})
-	if err == nil && !resCommits.IsError && len(resCommits.Content) > 0 {
-		if tc, ok := resCommits.Content[0].(*mcpsdk.TextContent); ok {
-			text := strings.TrimSpace(tc.Text)
-			if text != "No changes" && text != "" {
-				fmt.Fprintf(&diffBuilder, "Committed changes (%s -> HEAD):\n", baseBranch)
-				diffBuilder.WriteString(text)
-				diffBuilder.WriteString("\n\n")
-			}
-		}
-	}
-
-	// 2. Get uncommitted working tree changes
-	resWorking, err := srv.Client().CallTool(ctx, "git_diff", map[string]interface{}{})
-	if err == nil && !resWorking.IsError && len(resWorking.Content) > 0 {
-		if tc, ok := resWorking.Content[0].(*mcpsdk.TextContent); ok {
-			text := strings.TrimSpace(tc.Text)
-			if text != "No changes" && text != "" {
-				diffBuilder.WriteString("Uncommitted changes (Working Tree):\n")
-				diffBuilder.WriteString(text)
-				diffBuilder.WriteString("\n\n")
-			}
-		}
-	}
-
-	if diffBuilder.Len() == 0 {
-		return "", nil
-	}
-
-	return strings.TrimSpace(diffBuilder.String()), nil
-}
+var ExtractGitDiff = internalmcp.ExtractGitDiff
 
 func LoadIssuePlan(ctx context.Context, issueID string) (*Plan, error) {
 	//nolint:gosec // this CLI is intended to be run by the user locally with explicit issue IDs
@@ -169,86 +91,80 @@ func parseIssueBody(body string) (*Plan, error) {
 	return plan, nil
 }
 
+//nolint:gocognit,nestif
 func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error {
 	if plan == nil || cfg == nil {
 		return errors.New("VerifyWorkspace requires non-nil plan and cfg")
 	}
 
-	var validationOutput string
+	validationCmd := ""
 	if checkMakefileExists() {
-		fmt.Println("Running local validation (make all)...")
-
-		makeCtx, makeCancel := context.WithTimeout(ctx, 3*time.Minute)
-		defer makeCancel()
-
-		makeCmd := execCommand(makeCtx, "make", "all")
-		makeOut, err := makeCmd.CombinedOutput()
-		if err != nil {
-			_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Local Validation Failed\n\n```\n%s\n```\n", string(makeOut))), 0600)
-			return fmt.Errorf("local validation failed: %w", err)
-		}
-		validationOutput = string(makeOut)
+		validationCmd = "make all"
+		fmt.Println("Running local validation (make all) via MCP pw-mcp-critic...")
 	} else {
 		fmt.Println("No Makefile found, skipping local validation")
 	}
 
-	fmt.Println("Extracting git diff via MCP pw-mcp-git...")
-	diffStr, err := ExtractGitDiff(ctx, cfg)
+	srvCfg, ok := cfg.Servers["critic"]
+	if !ok {
+		cmd := "pw-mcp-critic"
+		if _, err := os.Stat("bin/pw-mcp-critic"); err == nil {
+			cmd = "./bin/pw-mcp-critic"
+		} else if _, err := exec.LookPath("pw-mcp-critic"); err != nil {
+			return fmt.Errorf("pw-mcp-critic not found in bin/ or PATH, run 'make all' first")
+		}
+		srvCfg = config.ServerConfig{
+			Command: cmd,
+			Args:    []string{},
+		}
+	}
+
+	srv, err := internalmcp.NewServerProcess(ctx, "critic", srvCfg)
 	if err != nil {
-		return fmt.Errorf("failed to extract git diff: %w", err)
+		return fmt.Errorf("failed to start MCP critic server (%s): %w", srvCfg.Command, err)
 	}
+	defer func() {
+		_ = srv.GracefulShutdown(time.Second * 5)
+	}()
 
-	diffStr = strings.TrimSpace(diffStr)
-	if len(diffStr) == 0 {
-		fmt.Println("No local changes found to review.")
-		_ = os.Remove(".powerword-critic.md") // clean up old feedback
-		return nil
-	}
+	planContent := fmt.Sprintf("## Goal\n%s\n\n## Proposed Changes\n%s\n\n## Verification Plan\n%s\n",
+		plan.Goal, plan.Changes, plan.Verification)
 
-	client, err := llm.NewCriticClient(cfg)
+	fmt.Println("Analyzing changes with local critic via MCP...")
+	res, err := srv.Client().CallTool(ctx, "review_workspace", map[string]interface{}{
+		"plan_content":       planContent,
+		"validation_command": validationCmd,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to initialize critic LLM client: %w", err)
+		return fmt.Errorf("critic analysis tool call failed: %w", err)
+	}
+	if res.IsError {
+		var errMsg string
+		if len(res.Content) > 0 {
+			if tc, ok := res.Content[0].(*mcpsdk.TextContent); ok {
+				errMsg = tc.Text
+			}
+		}
+		if errMsg == "" {
+			errMsg = "critic server returned error"
+		}
+		_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Error\n\n%s\n", errMsg)), 0600)
+		return fmt.Errorf("critic analysis failed: %s", errMsg)
 	}
 
-	prompt := fmt.Sprintf(`You are a strict code reviewer. Review the following workspace diff against the implementation plan.
-
-Implementation Plan Goal:
-%s
-
-Implementation Plan Proposed Changes:
-%s
-
-Implementation Plan Verification:
-%s
-
-Local Validation Output:
-%s
-
-Git Diff:
-%s
-
-Check if ALL proposed changes are implemented in the diff. Check for any omissions, bugs, or missing tests.
-If there are any missing changes or issues, clearly list them and end your response with exactly "VERDICT: REJECT".
-If the diff fully implements the plan correctly, end your response with exactly "VERDICT: ACCEPT".`,
-		plan.Goal, plan.Changes, plan.Verification, validationOutput, diffStr)
-
-	messages := []llm.Message{
-		{Role: llm.RoleSystem, Content: "You are an automated pre-push code critic."},
-		{Role: llm.RoleUser, Content: prompt},
-	}
-
-	fmt.Println("Analyzing changes with local critic...")
-	resp, err := client.Generate(ctx, messages, nil)
-	if err != nil {
-		return fmt.Errorf("critic analysis failed: %w", err)
+	var criticOutput string
+	if len(res.Content) > 0 {
+		if tc, ok := res.Content[0].(*mcpsdk.TextContent); ok {
+			criticOutput = tc.Text
+		}
 	}
 
 	fmt.Println("\nCritic Feedback:")
-	fmt.Println(resp.Content)
+	fmt.Println(criticOutput)
 
-	_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Feedback\n\n%s\n", resp.Content)), 0600)
+	_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Feedback\n\n%s\n", criticOutput)), 0600)
 
-	if !strings.HasSuffix(strings.TrimSpace(resp.Content), "VERDICT: ACCEPT") {
+	if !strings.HasSuffix(strings.TrimSpace(criticOutput), "VERDICT: ACCEPT") {
 		return fmt.Errorf("critic rejected the workspace changes")
 	}
 

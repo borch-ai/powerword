@@ -11,7 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/mcp/critic"
+	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func init() {
@@ -50,6 +52,28 @@ func TestParseIssueBody_Empty(t *testing.T) {
 	}
 }
 
+func newTestConfig(endpoint string, gitDiffVal string) *config.Config {
+	return &config.Config{
+		CriticProvider: "openai",
+		CriticModel:    "gpt-4",
+		CriticEndpoint: endpoint,
+		APIKeys: config.APIKeys{
+			OpenAI: "dummy-key",
+		},
+		Servers: map[string]config.ServerConfig{
+			"critic": {
+				Command: os.Args[0],
+				Args:    []string{"-test.run=TestHelperProcess", "--", "pw-mcp-critic"},
+				Env: []string{
+					"GO_WANT_HELPER_PROCESS=1",
+					"CRITIC_ENDPOINT=" + endpoint,
+					"MOCK_GIT_DIFF=" + gitDiffVal,
+				},
+			},
+		},
+	}
+}
+
 // TestHelperProcess is used to mock exec.Command
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
@@ -67,6 +91,41 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 	cmd := args[0]
+	if cmd == "pw-mcp-critic" {
+		cfg := &config.Config{
+			CriticProvider: "openai",
+			CriticModel:    "gpt-4",
+			CriticEndpoint: os.Getenv("CRITIC_ENDPOINT"),
+			APIKeys: config.APIKeys{
+				OpenAI: "dummy-key",
+			},
+		}
+		critic.SetExecCommand(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", name}
+			cs = append(cs, args...)
+			//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		})
+		critic.ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
+			val := os.Getenv("MOCK_GIT_DIFF")
+			if val == "error" {
+				return "", fmt.Errorf("git command failed")
+			}
+			return val, nil
+		}
+
+		srv, err := critic.SetupServer(os.TempDir(), cfg)
+		if err != nil {
+			os.Exit(1)
+		}
+		transport := &mcp.StdioTransport{}
+		if err := srv.Run(context.Background(), transport); err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if cmd == "make" {
 		_, _ = fmt.Fprint(os.Stdout, "mock make all success")
 		os.Exit(0)
@@ -118,15 +177,10 @@ func TestVerifyWorkspace_InvalidConfig(t *testing.T) {
 	}
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "diff", nil
-	}
-	defer func() { ExtractGitDiff = origExtract }()
-
 	plan := &Plan{Goal: "test"}
-	// Missing API key should fail LLM client init
-	cfg := &config.Config{Model: "openai"}
+	// Missing API key in critic server config should fail client init
+	cfg := newTestConfig("http://invalid", "diff")
+	cfg.APIKeys.OpenAI = ""
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -168,14 +222,8 @@ func TestVerifyWorkspace_NoChanges(t *testing.T) {
 	execCommand = mockExecCommandContext
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "", nil // mock no changes
-	}
-	defer func() { ExtractGitDiff = origExtract }()
-
 	plan := &Plan{Goal: "test"}
-	cfg := &config.Config{Model: "openai"}
+	cfg := newTestConfig("http://invalid", "")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err != nil {
@@ -188,18 +236,18 @@ func TestVerifyWorkspace_NoMakefile(t *testing.T) {
 	execCommand = mockExecCommandContext
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "", nil
-	}
-	defer func() { ExtractGitDiff = origExtract }()
-
 	origCheck := checkMakefileExists
 	checkMakefileExists = func() bool { return false }
 	defer func() { checkMakefileExists = origCheck }()
 
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintln(w, `{"choices": [{"message": {"role": "assistant", "content": "All good. VERDICT: ACCEPT"}}]}`)
+	}))
+	defer ts.Close()
+
 	plan := &Plan{Goal: "test"}
-	cfg := &config.Config{Model: "openai"}
+	cfg := newTestConfig(ts.URL, "diff")
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err != nil {
 		t.Errorf("expected nil error for no changes, got: %v", err)
@@ -217,14 +265,14 @@ func TestVerifyWorkspace_MakeFails(t *testing.T) {
 	}
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "diff", nil
-	}
-	defer func() { ExtractGitDiff = origExtract }()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintln(w, `{"choices": [{"message": {"role": "assistant", "content": "Failed validation. VERDICT: REJECT"}}]}`)
+	}))
+	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := &config.Config{Model: "openai"}
+	cfg := newTestConfig(ts.URL, "diff")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -237,14 +285,8 @@ func TestVerifyWorkspace_GitFails(t *testing.T) {
 	execCommand = mockExecCommandContext
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "", fmt.Errorf("mock git fail")
-	}
-	defer func() { ExtractGitDiff = origExtract }()
-
 	plan := &Plan{Goal: "test"}
-	cfg := &config.Config{Model: "openai"}
+	cfg := newTestConfig("http://invalid", "error")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -289,12 +331,6 @@ func TestVerifyWorkspace_Success(t *testing.T) {
 	}
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "diff", nil // mock git diff returns changes
-	}
-	defer func() { ExtractGitDiff = origExtract }()
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintln(w, `{"choices": [{"message": {"role": "assistant", "content": "All good. VERDICT: ACCEPT"}}]}`)
@@ -302,14 +338,7 @@ func TestVerifyWorkspace_Success(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := &config.Config{
-		CriticProvider: "openai",
-		CriticModel:    "gpt-4",
-		CriticEndpoint: ts.URL, // Use our mock server
-		APIKeys: config.APIKeys{
-			OpenAI: "dummy-key",
-		},
-	}
+	cfg := newTestConfig(ts.URL, "diff")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err != nil {
@@ -327,12 +356,6 @@ func TestVerifyWorkspace_Reject(t *testing.T) {
 	}
 	defer func() { execCommand = origExec }()
 
-	origExtract := ExtractGitDiff
-	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-		return "diff", nil // mock git diff returns changes
-	}
-	defer func() { ExtractGitDiff = origExtract }()
-
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintln(w, `{"choices": [{"message": {"role": "assistant", "content": "Issues found. VERDICT: REJECT"}}]}`)
@@ -340,17 +363,40 @@ func TestVerifyWorkspace_Reject(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := &config.Config{
-		CriticProvider: "openai",
-		CriticModel:    "gpt-4",
-		CriticEndpoint: ts.URL, // Use our mock server
-		APIKeys: config.APIKeys{
-			OpenAI: "dummy-key",
-		},
-	}
+	cfg := newTestConfig(ts.URL, "diff")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
 		t.Errorf("expected error for reject, got nil")
+	}
+}
+
+func TestVerifyWorkspace_NilInputs(t *testing.T) {
+	err := VerifyWorkspace(context.Background(), nil, &config.Config{})
+	if err == nil {
+		t.Error("expected error for nil plan")
+	}
+	err = VerifyWorkspace(context.Background(), &Plan{}, nil)
+	if err == nil {
+		t.Error("expected error for nil config")
+	}
+}
+
+func TestVerifyWorkspace_ToolError(t *testing.T) {
+	origExec := execCommand
+	execCommand = mockExecCommandContext
+	defer func() { execCommand = origExec }()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	plan := &Plan{Goal: "test"}
+	cfg := newTestConfig(ts.URL, "diff")
+
+	err := VerifyWorkspace(context.Background(), plan, cfg)
+	if err == nil {
+		t.Error("expected error for tool/LLM failure")
 	}
 }

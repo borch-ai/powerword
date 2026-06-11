@@ -11,8 +11,8 @@ import (
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/borch-ai/powerword/internal/config"
 	"github.com/borch-ai/powerword/internal/plugins/kdpmath"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 func main() {

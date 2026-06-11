@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/borch-ai/powerword/internal/config"
-	"github.com/borch-ai/powerword/internal/llm"
 	"github.com/borch-ai/powerword/internal/mcp"
+	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 // newClient is a package-level variable that defaults to llm.NewClient.

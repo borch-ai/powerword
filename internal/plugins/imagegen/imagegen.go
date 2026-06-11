@@ -17,7 +17,7 @@ import (
 
 	"github.com/sashabaranov/go-openai"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 // StyleProfile stores style definitions.

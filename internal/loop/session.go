@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/borch-ai/powerword/internal/llm"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 // Session represents a stored chat session.

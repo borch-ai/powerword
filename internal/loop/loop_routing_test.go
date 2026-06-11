@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/borch-ai/powerword/internal/config"
-	"github.com/borch-ai/powerword/internal/llm"
+	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 func TestRunLoop_ClassifierCreationError(t *testing.T) {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/borch-ai/powerword/internal/config"
-	"github.com/borch-ai/powerword/internal/llm"
+	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 type mockLLMClient struct {
