@@ -164,4 +164,8 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.12: Speculative: Standalone Plan Linter Subcommand & MCP Tool**
     *   Expose the local plan template validation and relative link conformance checks as a standalone CLI subcommand (e.g. powerword lint-plans) and package it as an independent MCP tool, enabling external CI processes or coding agents to validate plans interactively before submission.
     *   [Implementation Plan](plans/task_6_12_standalone_plan_linter.md)
+*   [ ] **Task 6.13: Isolated Execution via Git Worktrees**
+    *   Introduce support for running agent loops in a completely isolated Git worktree, including copying/mounting uncommitted changes and selectively symlinking caches/dependencies to speed up builds.
+    *   [Implementation Plan](plans/task_6_13_isolated_worktrees.md)
+
 

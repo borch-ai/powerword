@@ -20,14 +20,16 @@ func runCommand(ctx context.Context, name string, args ...string) error {
 	return cmd.Run()
 }
 
-func handleInterrupt(cancel context.CancelFunc) chan os.Signal {
+func handleInterrupt(cancel context.CancelFunc, gitRollback bool) chan os.Signal {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 	go func() {
 		<-sigChan
 		fmt.Println("\nReceived interrupt. Aborting autonomous loop and restoring workspace...")
-		_ = execCommand(context.Background(), "git", "stash").Run()
-		_ = execCommand(context.Background(), "git", "reset", "--hard", "HEAD").Run()
+		if !gitRollback {
+			_ = execCommand(context.Background(), "git", "stash").Run()
+			_ = execCommand(context.Background(), "git", "reset", "--hard", "HEAD").Run()
+		}
 		cancel()
 	}()
 	return sigChan
@@ -83,10 +85,33 @@ func processTurnCompletion(ctx context.Context, cfg *config.Config, autoCfg *con
 }
 
 // RunAutonomousLoop orchestrates a 5-iteration autonomous loop to fix issues.
-func RunAutonomousLoop(ctx context.Context, cfg *config.Config) error {
+//
+//nolint:gocognit,nestif
+func RunAutonomousLoop(ctx context.Context, cfg *config.Config) (retErr error) {
 	loopCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	handleInterrupt(cancel)
+	handleInterrupt(cancel, cfg.GitRollback)
+
+	var snapshot *loop.WorkspaceSnapshot
+	if cfg.GitRollback {
+		var snapErr error
+		snapshot, snapErr = loop.NewWorkspaceSnapshot(ctx, "")
+		if snapErr != nil {
+			return fmt.Errorf("failed to initialize workspace rollback snapshot: %w", snapErr)
+		}
+		defer func() {
+			if retErr != nil {
+				fmt.Printf("Autonomous repair loop failed: %v. Rolling back workspace...\n", retErr)
+				if restoreErr := snapshot.Restore(context.Background()); restoreErr != nil {
+					fmt.Printf("Warning: failed to restore workspace rollback snapshot: %v\n", restoreErr)
+				}
+			} else {
+				if cleanErr := snapshot.CleanUp(context.Background()); cleanErr != nil {
+					fmt.Printf("Warning: failed to clean up workspace snapshot stash: %v\n", cleanErr)
+				}
+			}
+		}()
+	}
 
 	if cfg.Issue == "" {
 		return fmt.Errorf("--issue flag is required for autonomous mode")

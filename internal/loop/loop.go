@@ -44,6 +44,7 @@ func handleListSessions() error {
 	return nil
 }
 
+//nolint:gocognit,nestif,funlen
 func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
 	if cfg.ListSessions {
 		return handleListSessions()
@@ -55,6 +56,27 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	}
 	if prompt == "" && !cfg.ListSessions {
 		return fmt.Errorf("no prompt provided and stdin is empty")
+	}
+
+	var snapshot *WorkspaceSnapshot
+	if cfg.GitRollback {
+		var snapErr error
+		snapshot, snapErr = NewWorkspaceSnapshot(ctx, "")
+		if snapErr != nil {
+			return fmt.Errorf("failed to initialize workspace rollback snapshot: %w", snapErr)
+		}
+		defer func() {
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error in agent loop: %v. Rolling back workspace...\n", err)
+				if restoreErr := snapshot.Restore(context.Background()); restoreErr != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to restore workspace rollback snapshot: %v\n", restoreErr)
+				}
+			} else {
+				if cleanErr := snapshot.CleanUp(context.Background()); cleanErr != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to clean up workspace snapshot stash: %v\n", cleanErr)
+				}
+			}
+		}()
 	}
 
 	// Initialize MCP servers and registry

@@ -117,6 +117,7 @@ gemini = "gemini-key-toml"
 	t.Setenv("POWERWORD_CRITIC_PROVIDER", "ollama")
 	t.Setenv("POWERWORD_CRITIC_MODEL", "llama3")
 	t.Setenv("POWERWORD_CRITIC_ENDPOINT", "http://localhost:11434")
+	t.Setenv("POWERWORD_GIT_ROLLBACK", "true")
 
 	cfg, err := LoadConfig(cfgFilePath)
 	if err != nil {
@@ -146,6 +147,9 @@ gemini = "gemini-key-toml"
 	}
 	if cfg.CriticEndpoint != "http://localhost:11434" {
 		t.Errorf("expected CriticEndpoint overridden to 'http://localhost:11434', got '%s'", cfg.CriticEndpoint)
+	}
+	if !cfg.GitRollback {
+		t.Errorf("expected GitRollback overridden to true, got false")
 	}
 }
 
