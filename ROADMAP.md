@@ -67,7 +67,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.6: KDP Book Geometry & PDF Validator Plugin (KDP Math)**
     *   Implement a native Go MCP server to calculate exact cover, interior, margins, and bleed specs for Amazon KDP print books, and run validation on final compiled PDF page dimensions.
     *   [Implementation Plan](plans/task_3_6_kdp_math_mcp.md)
-*   [ ] **Task 3.7: Viral Promo Asset Builder Plugin (Viral)**
+*   [x] **Task 3.7: Viral Promo Asset Builder Plugin (Viral)**
     *   Implement a native Go MCP server wrapping TTS engines (ElevenLabs) and generative video tools to synthesize ASMR narration and stitch promotional trailers using local ffmpeg commands.
     *   [Implementation Plan](plans/task_3_7_viral_mcp.md)
 *   [x] **Task 3.8: Amazon KDP SEO & Metadata Agent Plugin (SEO)**
@@ -113,3 +113,40 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [ ] **Task 5.4: MCP Telemetry Migration**
     *   Extract local telemetry calculations into a standalone `pw-mcp-telemetry` MCP server, and refactor Powerword to query it over standard I/O.
     *   [Implementation Plan](plans/task_5_4_mcp_telemetry_migration.md)
+
+---
+
+## Phase 6: Enterprise Security, Safety & Developer Experience
+Focus: Advancing agent safety guardrails, remote transport protocols, robust sandboxing, and terminal graphics.
+
+*   [ ] **Task 6.1: Git-Backed Workspace Rollbacks**
+    *   Implement workspace snapshots and rollback mechanics to restore clean working states if an autonomous agent fails run/compile steps.
+    *   [Implementation Plan](plans/task_6_1_workspace_rollbacks.md)
+*   [ ] **Task 6.2: Token & Cost Budgeting Guardrails**
+    *   Add user-defined dollar and token budget safety valves per session or loop to prevent runaway API spend.
+    *   [Implementation Plan](plans/task_6_2_token_budgets.md)
+*   [ ] **Task 6.3: Pause & Resume Session States**
+    *   Introduce mechanisms to serialize execution frames, enabling manual user fixes before resuming a paused agent session.
+    *   [Implementation Plan](plans/task_6_3_session_resumability.md)
+*   [ ] **Task 6.4: Granular Tool Access Profiles**
+    *   Create white/blacklist filters and path restrictions to limit filesystem and command execution scopes.
+    *   [Implementation Plan](plans/task_6_4_tool_access_profiles.md)
+*   [ ] **Task 6.5: WASM-Based Plugin Sandboxing**
+    *   Support running MCP servers compiled to WebAssembly (WASM) to isolate plugin code from host resources.
+    *   [Implementation Plan](plans/task_6_5_wasm_sandboxing.md)
+*   [ ] **Task 6.6: Dry-Run Mode for Operations Plugins**
+    *   Implement non-destructive validation passes for Kubernetes, SQL, and Cloud orchestrators to check actions before execution.
+    *   [Implementation Plan](plans/task_6_6_operations_dry_run.md)
+*   [ ] **Task 6.7: Remote SSE & WebSocket Client Transport**
+    *   Extend the MCP transport layer to connect to remote plugins running over Server-Sent Events (SSE) or WebSockets with TLS/Auth.
+    *   [Implementation Plan](plans/task_6_7_remote_transport.md)
+*   [ ] **Task 6.8: Inline Graphics Rendering**
+    *   Integrate Kitty, iTerm2, and Sixel protocols to render generated graphics (images/plots) directly within supported terminal sessions.
+    *   [Implementation Plan](plans/task_6_8_terminal_graphics.md)
+*   [ ] **Task 6.9: Rich Interactive Consent TUI**
+    *   Replace standard shell prompts with a Bubbletea-based terminal interface detailing tool calls and risk profiles.
+    *   [Implementation Plan](plans/task_6_9_interactive_consent_tui.md)
+*   [ ] **Task 6.10: Headless JSON Envelopes & PR Review Mode**
+    *   Standardize structured JSON outputs for CI integration and build webhooks to orchestrate inline PR comment review loops.
+    *   [Implementation Plan](plans/task_6_10_headless_ci.md)
+
