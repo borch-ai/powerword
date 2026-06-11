@@ -1,1 +1,5 @@
 model = "claude-sonnet-4-6"
+
+[servers.kdp_math]
+   command = "go"
+   args = ["run", "./cmd/pw-mcp-kdp-math"]

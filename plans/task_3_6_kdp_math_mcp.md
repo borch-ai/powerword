@@ -15,7 +15,7 @@ This task implements a native Go-based MCP server (`pw-mcp-kdp-math`) that calcu
 ### KDP Math Plugin Component
 Created the new directory `internal/plugins/kdpmath/` containing the book geometry and validation logic.
 
-#### [NEW] [kdpmath.go](file:///Users/human/code/powerword/internal/plugins/kdpmath/kdpmath.go)
+#### [NEW] [kdpmath.go](../internal/plugins/kdpmath/kdpmath.go)
 - Implemented layout calculations based on KDP hardcover and paperback specification equations.
 - Integrated `rsc.io/pdf` page geometry reader.
 - Exposed the following MCP tools:
@@ -23,22 +23,22 @@ Created the new directory `internal/plugins/kdpmath/` containing the book geomet
   - `kdp_validate_pdf`: Parses an existing PDF to inspect its page count, dimensions in points, and ensures target bleed lines are met.
   - `kdp_generate_manifest`: Creates standard JSON layout configurations for BookBolt/Inkfluence.
 
-#### [NEW] [kdpmath_test.go](file:///Users/human/code/powerword/internal/plugins/kdpmath/kdpmath_test.go)
+#### [NEW] [kdpmath_test.go](../internal/plugins/kdpmath/kdpmath_test.go)
 - Parameterized table-driven unit tests verifying math against official published sizing charts.
 - Programmatic mock PDF generation to verify layout validations, page dimensions, inherited fields, and the `safeReaderAt` EOF virtual correction.
 
 ### Standalone MCP Server Binary
-#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-kdp-math/main.go)
+#### [NEW] [main.go](../cmd/pw-mcp-kdp-math/main.go)
 - Standard stdio Model Context Protocol (MCP) server launching the three book geometry tools.
-#### [NEW] [main_test.go](file:///Users/human/code/powerword/cmd/pw-mcp-kdp-math/main_test.go)
+#### [NEW] [main_test.go](../cmd/pw-mcp-kdp-math/main_test.go)
 - End-to-end integration tests using in-memory transports and clients.
 
 ### CLI Manifest Integration
-#### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](../internal/config/config.go)
 - Registered the `pw-mcp-kdp-math` server config structure.
-#### [MODIFY] [powerword.toml](file:///Users/human/code/powerword/powerword.toml)
-- Registered `servers.kdp_math` calling the local command.
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+#### [MODIFY] [powerword.example.toml](../powerword.example.toml)
+- Added template config `servers.kdp_math` calling the local command.
+#### [MODIFY] [Makefile](../Makefile)
 - Registered `KDP_MATH_PLUGIN` inside standard `build` and `install` Makefile scripts.
 
 ---
