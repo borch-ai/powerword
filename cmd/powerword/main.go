@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"powerword/internal/config"
-	"powerword/internal/loop"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/loop"
 )
 
 func main() {

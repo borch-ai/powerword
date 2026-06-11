@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"powerword/internal/linter"
+	"github.com/borch-ai/powerword/internal/linter"
 )
 
 func main() {

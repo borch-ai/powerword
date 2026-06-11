@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"powerword/internal/config"
-	"powerword/internal/llm"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/llm"
 )
 
 type mockRoundTripper func(req *http.Request) (*http.Response, error)

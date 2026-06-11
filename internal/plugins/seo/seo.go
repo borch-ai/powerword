@@ -18,8 +18,8 @@ import (
 
 	"golang.org/x/net/html"
 
-	"powerword/internal/config"
-	"powerword/internal/llm"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/llm"
 )
 
 var (

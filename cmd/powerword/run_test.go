@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 func TestRunCmd_NotLoaded(t *testing.T) {

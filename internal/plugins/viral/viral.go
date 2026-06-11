@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"powerword/internal/config"
-	"powerword/internal/plugins/imagegen"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/plugins/imagegen"
 )
 
 // ViralService coordinates voiceover generation, video generation, and ffmpeg stitching.

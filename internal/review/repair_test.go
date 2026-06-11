@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"powerword/internal/config"
-	"powerword/internal/llm"
-	"powerword/internal/loop"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/llm"
+	"github.com/borch-ai/powerword/internal/loop"
 )
 
 func TestRunAutonomousLoop_MissingIssue(t *testing.T) {

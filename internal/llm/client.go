@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 // Role defines the role of the message sender.

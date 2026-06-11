@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 type mockClassifierClient struct {

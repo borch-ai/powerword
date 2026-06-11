@@ -15,7 +15,7 @@ import (
 
 	"github.com/sashabaranov/go-openai"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 func TestSlugify(t *testing.T) {

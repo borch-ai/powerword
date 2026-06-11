@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"powerword/internal/config"
-	"powerword/internal/review"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/review"
 
 	"github.com/spf13/cobra"
 )
