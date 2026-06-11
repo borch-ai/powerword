@@ -252,7 +252,7 @@ func TestGenerateListing(t *testing.T) {
 	})
 
 	t.Run("Wrapped markdown code blocks JSON", func(t *testing.T) {
-		llmResponse := "```json\n{\n  \"title\": \"Title 2\",\n  \"subtitle\": \"Sub 2\",\n  \"keywords\": [\"a\"],\n  \"description\": \"desc\"\n}\n```"
+		llmResponse := "```json\n{\n  \"title\": \"Title 2\",\n  \"subtitle\": \"Sub 2\",\n  \"keywords\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"],\n  \"description\": \"desc\"\n}\n```"
 
 		mockL := &mockLLM{
 			response: &llm.Message{
@@ -273,7 +273,40 @@ func TestGenerateListing(t *testing.T) {
 			t.Errorf("expected Title 'Title 2', got %q", res.Title)
 		}
 		if len(res.Keywords) != 7 {
-			t.Errorf("expected padded 7 keywords, got %d", len(res.Keywords))
+			t.Errorf("expected exactly 7 keywords, got %d", len(res.Keywords))
+		}
+	})
+
+	t.Run("Invalid keywords length or empty keywords fails fast", func(t *testing.T) {
+		// Only 2 keywords
+		llmResponse := "{\n  \"title\": \"T\",\n  \"subtitle\": \"S\",\n  \"keywords\": [\"a\", \"b\"],\n  \"description\": \"d\"\n}"
+		mockL := &mockLLM{
+			response: &llm.Message{
+				Role:    llm.RoleAssistant,
+				Content: llmResponse,
+			},
+		}
+
+		svc := NewSEOService(nil)
+		svc.SetLLMClient(mockL)
+
+		_, err := svc.GenerateListing(context.Background(), "Niche", "", nil, "", "")
+		if err == nil {
+			t.Error("expected error for invalid keyword count, got nil")
+		}
+
+		// 7 keywords but one is empty/whitespace
+		llmResponse2 := "{\n  \"title\": \"T\",\n  \"subtitle\": \"S\",\n  \"keywords\": [\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"   \"],\n  \"description\": \"d\"\n}"
+		mockL2 := &mockLLM{
+			response: &llm.Message{
+				Role:    llm.RoleAssistant,
+				Content: llmResponse2,
+			},
+		}
+		svc.SetLLMClient(mockL2)
+		_, err = svc.GenerateListing(context.Background(), "Niche", "", nil, "", "")
+		if err == nil {
+			t.Error("expected error for empty/whitespace keywords, got nil")
 		}
 	})
 }

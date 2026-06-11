@@ -7,7 +7,7 @@ This task implements a native Go-based MCP server (`pw-mcp-seo`) that queries ma
 ## User Review Required
 
 > [!NOTE]
-> This plugin queries public search suggestion endpoints and competitor metadata. It strictly adheres to rate limits, respects target `robots.txt` exclusions, implements standard backoff and caching policies, and prioritizes official APIs/authorized data sources where available to ensure full compliance.
+> This plugin queries public search suggestion endpoints and competitor metadata. It strictly adheres to rate limits, implements standard backoff and caching policies, and uses standard request headers to ensure polite and compliant access.
 > - An isolated local cache is created under `~/.cache/powerword/seo-cache` (using safe SHA-256 keys) to store responses and respect rate throttling.
 > - Go 1.26.4 is utilized as the development environment.
 

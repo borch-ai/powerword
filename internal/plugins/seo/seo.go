@@ -106,7 +106,10 @@ func (s *SEOService) cacheKey(val string) string {
 // readFromCache returns cached bytes if they exist and are within TTL.
 func (s *SEOService) readFromCache(key string) ([]byte, bool) {
 	ttlHours := s.cfg.Plugins.SEO.CacheTTLHours
-	if ttlHours <= 0 {
+	if ttlHours < 0 {
+		return nil, false
+	}
+	if ttlHours == 0 {
 		ttlHours = 4.0
 	}
 
@@ -131,6 +134,9 @@ func (s *SEOService) readFromCache(key string) ([]byte, bool) {
 
 // writeToCache saves data to cache.
 func (s *SEOService) writeToCache(key string, data []byte) {
+	if s.cfg.Plugins.SEO.CacheTTLHours < 0 {
+		return
+	}
 	cacheFile := filepath.Join(s.getCacheDir(), key)
 	_ = os.WriteFile(cacheFile, data, 0600)
 }
@@ -154,6 +160,48 @@ func sleepContext(ctx context.Context, duration time.Duration) error {
 	}
 }
 
+// executeRequestAttempt performs a single HTTP request attempt for getWithRetry.
+func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, backoff time.Duration) ([]byte, bool, time.Duration, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	if err != nil {
+		return nil, false, backoff, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
+			return nil, false, backoff, sleepErr
+		}
+		return nil, true, backoff * 2, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == 503 || resp.StatusCode == 429 {
+		err = fmt.Errorf("amazon rate limited with status: %d", resp.StatusCode)
+		if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
+			return nil, false, backoff, sleepErr
+		}
+		return nil, true, backoff * 2, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, false, backoff, fmt.Errorf("invalid status code: %d", resp.StatusCode)
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, false, backoff, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return bodyBytes, false, backoff, nil
+}
+
 // getWithRetry retrieves URL body with caching, retries, and rate limit backoff.
 func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, error) {
 	key := s.cacheKey(urlStr)
@@ -170,46 +218,15 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 	maxRetries := 3
 
 	for i := 0; i < maxRetries; i++ {
-		req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+		body, retry, newBackoff, err := s.executeRequestAttempt(ctx, urlStr, backoff)
+		backoff = newBackoff
 		if err != nil {
-			return nil, fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-		req.Header.Set("Accept-Language", "en-US,en;q=0.5")
-
-		resp, err := s.client.Do(req)
-		if err != nil {
-			lastErr = err
-			if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
-				return nil, sleepErr
+			if retry {
+				lastErr = err
+				continue
 			}
-			backoff *= 2
-			continue
+			return nil, err
 		}
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-
-		if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == 503 || resp.StatusCode == 429 {
-			lastErr = fmt.Errorf("amazon rate limited with status: %d", resp.StatusCode)
-			if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
-				return nil, sleepErr
-			}
-			backoff *= 2
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("invalid status code: %d", resp.StatusCode)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read response body: %w", err)
-		}
-
 		s.writeToCache(key, body)
 		return body, nil
 	}
@@ -453,17 +470,8 @@ func (s *SEOService) AnalyzeNiche(ctx context.Context, query string, asins []str
 	}, nil
 }
 
-// GenerateListing creates optimized KDP listing using configured LLM client.
-func (s *SEOService) GenerateListing(ctx context.Context, niche string, targetAudience string, seedKeywords []string, bookType string, competitorData string) (*ListingResult, error) {
-	llmClient := s.llmClient
-	var err error
-	if llmClient == nil {
-		llmClient, err = llm.NewClient(s.cfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create LLM client: %w", err)
-		}
-	}
-
+// buildListingPrompt constructs the LLM prompt for listing generation to keep GenerateListing brief.
+func buildListingPrompt(niche string, targetAudience string, seedKeywords []string, bookType string, competitorData string) string {
 	var sb strings.Builder
 	_, _ = sb.WriteString("You are an expert Amazon KDP SEO and Listing copywriter. ")
 	_, _ = sb.WriteString("Generate an optimized title, subtitle, exactly seven search keywords (or keyword phrases), and a HTML/Markdown description for a book in the following niche.\n\n")
@@ -494,6 +502,21 @@ func (s *SEOService) GenerateListing(ctx context.Context, niche string, targetAu
 	_, _ = sb.WriteString("  \"description\": \"string\"\n")
 	_, _ = sb.WriteString("}\n")
 	_, _ = sb.WriteString("Do not include any extra text, markdown code blocks (like ```json), or explanation outside of the JSON object.\n")
+	return sb.String()
+}
+
+// GenerateListing creates optimized KDP listing using configured LLM client.
+func (s *SEOService) GenerateListing(ctx context.Context, niche string, targetAudience string, seedKeywords []string, bookType string, competitorData string) (*ListingResult, error) {
+	llmClient := s.llmClient
+	var err error
+	if llmClient == nil {
+		llmClient, err = llm.NewClient(s.cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create LLM client: %w", err)
+		}
+	}
+
+	prompt := buildListingPrompt(niche, targetAudience, seedKeywords, bookType, competitorData)
 
 	messages := []llm.Message{
 		{
@@ -502,7 +525,7 @@ func (s *SEOService) GenerateListing(ctx context.Context, niche string, targetAu
 		},
 		{
 			Role:    llm.RoleUser,
-			Content: sb.String(),
+			Content: prompt,
 		},
 	}
 
@@ -526,12 +549,18 @@ func (s *SEOService) GenerateListing(ctx context.Context, niche string, targetAu
 		return nil, fmt.Errorf("failed to parse generated listing JSON: %w (raw response: %s)", err, content)
 	}
 
-	if len(result.Keywords) > 7 {
-		result.Keywords = result.Keywords[:7]
+	var validKeywords []string
+	for _, kw := range result.Keywords {
+		trimmed := strings.TrimSpace(kw)
+		if trimmed != "" {
+			validKeywords = append(validKeywords, trimmed)
+		}
 	}
-	for len(result.Keywords) < 7 {
-		result.Keywords = append(result.Keywords, "")
+
+	if len(validKeywords) != 7 {
+		return nil, fmt.Errorf("LLM generated %d valid keywords, but KDP requires exactly 7 search keywords (received: %v)", len(validKeywords), result.Keywords)
 	}
+	result.Keywords = validKeywords
 
 	return &result, nil
 }
