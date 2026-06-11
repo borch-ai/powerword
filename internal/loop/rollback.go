@@ -14,6 +14,17 @@ func SetExecCommand(f func(context.Context, string, ...string) *exec.Cmd) {
 	execCommand = f
 }
 
+// runGitCommand executes a git command and captures combined stdout/stderr for detailed error reporting.
+func runGitCommand(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := execCommand(ctx, "git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git command %v failed: %w (output: %q)", args, err, strings.TrimSpace(string(out)))
+	}
+	return string(out), nil
+}
+
 // WorkspaceSnapshot represents a snapshot of the workspace state before an agent run.
 type WorkspaceSnapshot struct {
 	Dir            string
@@ -25,30 +36,29 @@ type WorkspaceSnapshot struct {
 // NewWorkspaceSnapshot creates and returns a snapshot of the current workspace state.
 // If it fails to run git commands, it returns an error.
 func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, error) {
+	// Robustness check: Ensure git executable is in the PATH
+	if _, err := exec.LookPath("git"); err != nil {
+		return nil, fmt.Errorf("git binary not found in PATH: %w", err)
+	}
+
 	// Check if inside a git repository
-	gitCheck := execCommand(ctx, "git", "rev-parse", "--is-inside-work-tree")
-	gitCheck.Dir = dir
-	if err := gitCheck.Run(); err != nil {
+	if _, err := runGitCommand(ctx, dir, "rev-parse", "--is-inside-work-tree"); err != nil {
 		return nil, fmt.Errorf("workspace %q is not inside a git repository: %w", dir, err)
 	}
 
 	// Get original commit hash
-	gitRev := execCommand(ctx, "git", "rev-parse", "HEAD")
-	gitRev.Dir = dir
-	out, err := gitRev.Output()
+	out, err := runGitCommand(ctx, dir, "rev-parse", "HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get original HEAD commit hash: %w", err)
 	}
-	originalCommit := strings.TrimSpace(string(out))
+	originalCommit := strings.TrimSpace(out)
 
 	// Check if dirty
-	gitStatus := execCommand(ctx, "git", "status", "--porcelain")
-	gitStatus.Dir = dir
-	statusOut, err := gitStatus.Output()
+	statusOut, err := runGitCommand(ctx, dir, "status", "--porcelain")
 	if err != nil {
 		return nil, fmt.Errorf("failed to check git status: %w", err)
 	}
-	isDirty := len(strings.TrimSpace(string(statusOut))) > 0
+	isDirty := len(strings.TrimSpace(statusOut)) > 0
 
 	snap := &WorkspaceSnapshot{
 		Dir:            dir,
@@ -60,22 +70,16 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 		stashMsg := fmt.Sprintf("powerword-snapshot-%s", originalCommit)
 
 		// Push to stash including untracked files
-		stashPush := execCommand(ctx, "git", "stash", "push", "-u", "-m", stashMsg)
-		stashPush.Dir = dir
-		if err := stashPush.Run(); err != nil {
+		if _, err := runGitCommand(ctx, dir, "stash", "push", "-u", "-m", stashMsg); err != nil {
 			return nil, fmt.Errorf("failed to stash uncommitted changes: %w", err)
 		}
 		snap.HasStash = true
 		snap.StashMessage = stashMsg
 
 		// Re-apply stash immediately so the agent can see and modify the changes, preserving index state
-		stashApply := execCommand(ctx, "git", "stash", "apply", "--index", "stash@{0}")
-		stashApply.Dir = dir
-		if err := stashApply.Run(); err != nil {
+		if _, err := runGitCommand(ctx, dir, "stash", "apply", "--index", "stash@{0}"); err != nil {
 			// Clean up stash if apply fails
-			stashDrop := execCommand(ctx, "git", "stash", "drop", "stash@{0}")
-			stashDrop.Dir = dir
-			_ = stashDrop.Run()
+			_, _ = runGitCommand(ctx, dir, "stash", "drop", "stash@{0}")
 			return nil, fmt.Errorf("failed to apply stashed changes: %w", err)
 		}
 	}
@@ -85,17 +89,18 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 
 // Restore rolls back the workspace changes to the snapshot state.
 func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
+	// Robustness check: Ensure git executable is in the PATH
+	if _, err := exec.LookPath("git"); err != nil {
+		return fmt.Errorf("git binary not found in PATH: %w", err)
+	}
+
 	// 1. Reset HEAD and hard reset to original commit
-	resetCmd := execCommand(ctx, "git", "reset", "--hard", s.OriginalCommit)
-	resetCmd.Dir = s.Dir
-	if err := resetCmd.Run(); err != nil {
+	if _, err := runGitCommand(ctx, s.Dir, "reset", "--hard", s.OriginalCommit); err != nil {
 		return fmt.Errorf("failed to reset to original commit %s: %w", s.OriginalCommit, err)
 	}
 
 	// 2. Clean untracked files/directories
-	cleanCmd := execCommand(ctx, "git", "clean", "-fd")
-	cleanCmd.Dir = s.Dir
-	if err := cleanCmd.Run(); err != nil {
+	if _, err := runGitCommand(ctx, s.Dir, "clean", "-fd"); err != nil {
 		return fmt.Errorf("failed to clean untracked files: %w", err)
 	}
 
@@ -109,9 +114,7 @@ func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
 
 		stashRef := fmt.Sprintf("stash@{%d}", stashIndex)
 		// Pop the stash to restore original uncommitted changes, preserving index state
-		stashPop := execCommand(ctx, "git", "stash", "pop", "--index", stashRef)
-		stashPop.Dir = s.Dir
-		if err := stashPop.Run(); err != nil {
+		if _, err := runGitCommand(ctx, s.Dir, "stash", "pop", "--index", stashRef); err != nil {
 			return fmt.Errorf("failed to pop stash %s: %w", stashRef, err)
 		}
 	}
@@ -122,15 +125,18 @@ func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
 // CleanUp cleans up the stash if it was created, without restoring it.
 func (s *WorkspaceSnapshot) CleanUp(ctx context.Context) error {
 	if s.HasStash {
+		// Robustness check: Ensure git executable is in the PATH
+		if _, err := exec.LookPath("git"); err != nil {
+			return fmt.Errorf("git binary not found in PATH: %w", err)
+		}
+
 		stashIndex, err := s.findStashIndex(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to find snapshot stash for cleanup: %w", err)
 		}
 
 		stashRef := fmt.Sprintf("stash@{%d}", stashIndex)
-		stashDrop := execCommand(ctx, "git", "stash", "drop", stashRef)
-		stashDrop.Dir = s.Dir
-		if err := stashDrop.Run(); err != nil {
+		if _, err := runGitCommand(ctx, s.Dir, "stash", "drop", stashRef); err != nil {
 			return fmt.Errorf("failed to drop stash %s: %w", stashRef, err)
 		}
 	}
@@ -139,13 +145,11 @@ func (s *WorkspaceSnapshot) CleanUp(ctx context.Context) error {
 
 // findStashIndex returns the stash index matching the message.
 func (s *WorkspaceSnapshot) findStashIndex(ctx context.Context) (int, error) {
-	stashList := execCommand(ctx, "git", "stash", "list")
-	stashList.Dir = s.Dir
-	out, err := stashList.Output()
+	out, err := runGitCommand(ctx, s.Dir, "stash", "list")
 	if err != nil {
 		return 0, err
 	}
-	lines := strings.Split(string(out), "\n")
+	lines := strings.Split(out, "\n")
 	for i, line := range lines {
 		if strings.Contains(line, s.StashMessage) {
 			return i, nil

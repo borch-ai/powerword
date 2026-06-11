@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/borch-ai/powerword/internal/loop"
 	"github.com/borch-ai/powerword/pkg/config"
@@ -88,7 +89,7 @@ func processTurnCompletion(ctx context.Context, cfg *config.Config, autoCfg *con
 
 // RunAutonomousLoop orchestrates a 5-iteration autonomous loop to fix issues.
 //
-//nolint:gocognit,nestif
+//nolint:gocognit,nestif,funlen
 func RunAutonomousLoop(ctx context.Context, cfg *config.Config) (retErr error) {
 	loopCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -105,11 +106,15 @@ func RunAutonomousLoop(ctx context.Context, cfg *config.Config) (retErr error) {
 		defer func() {
 			if retErr != nil {
 				fmt.Printf("Autonomous repair loop failed: %v. Rolling back workspace...\n", retErr)
-				if restoreErr := snapshot.Restore(context.Background()); restoreErr != nil {
+				restoreCtx, restoreCancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer restoreCancel()
+				if restoreErr := snapshot.Restore(restoreCtx); restoreErr != nil {
 					fmt.Printf("Warning: failed to restore workspace rollback snapshot: %v\n", restoreErr)
 				}
 			} else {
-				if cleanErr := snapshot.CleanUp(context.Background()); cleanErr != nil {
+				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cleanupCancel()
+				if cleanErr := snapshot.CleanUp(cleanupCtx); cleanErr != nil {
 					fmt.Printf("Warning: failed to clean up workspace snapshot stash: %v\n", cleanErr)
 				}
 			}

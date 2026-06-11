@@ -381,3 +381,34 @@ func TestNewWorkspaceSnapshot_StashApplyFails(t *testing.T) {
 		t.Errorf("expected stash apply failure error, got: %v", err)
 	}
 }
+
+func TestWorkspaceSnapshot_GitBinaryNotFound(t *testing.T) {
+	origPath := os.Getenv("PATH")
+	defer func() { _ = os.Setenv("PATH", origPath) }()
+
+	// Temporarily break PATH so git cannot be found
+	_ = os.Setenv("PATH", "")
+
+	ctx := context.Background()
+	_, err := NewWorkspaceSnapshot(ctx, t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "git binary not found") {
+		t.Errorf("expected git binary not found error in NewWorkspaceSnapshot, got: %v", err)
+	}
+
+	snap := &WorkspaceSnapshot{
+		Dir:            t.TempDir(),
+		OriginalCommit: "abcdef",
+		HasStash:       true,
+		StashMessage:   "test-stash",
+	}
+
+	err = snap.Restore(ctx)
+	if err == nil || !strings.Contains(err.Error(), "git binary not found") {
+		t.Errorf("expected git binary not found error in Restore, got: %v", err)
+	}
+
+	err = snap.CleanUp(ctx)
+	if err == nil || !strings.Contains(err.Error(), "git binary not found") {
+		t.Errorf("expected git binary not found error in CleanUp, got: %v", err)
+	}
+}
