@@ -227,6 +227,18 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 		t.Errorf("expected error getting HEAD, got: %v", err)
 	}
 
+	// 1b. failed to get show-toplevel when dir is empty
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "git" && len(args) > 1 && args[0] == "rev-parse" && args[1] == "--show-toplevel" {
+			return exec.CommandContext(ctx, "false")
+		}
+		return origExec(ctx, command, args...)
+	}
+	_, err = NewWorkspaceSnapshot(ctx, "")
+	if err == nil || !strings.Contains(err.Error(), "failed to get git repository root") {
+		t.Errorf("expected error getting git repository root, got: %v", err)
+	}
+
 	// 2. failed to check git status
 	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {

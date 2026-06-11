@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,10 +20,23 @@ func runGitCommand(ctx context.Context, dir string, args ...string) (string, err
 	cmd := execCommand(ctx, "git", args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git command %v failed: %w (output: %q)", args, err, strings.TrimSpace(string(out)))
+
+	outStr := string(out)
+	if strings.Contains(outStr, "warning: GOCOVERDIR not set") {
+		var cleanLines []string
+		for _, line := range strings.Split(outStr, "\n") {
+			if strings.Contains(line, "warning: GOCOVERDIR not set") {
+				continue
+			}
+			cleanLines = append(cleanLines, line)
+		}
+		outStr = strings.Join(cleanLines, "\n")
 	}
-	return string(out), nil
+
+	if err != nil {
+		return "", fmt.Errorf("git command %v failed: %w (output: %q)", args, err, strings.TrimSpace(outStr))
+	}
+	return outStr, nil
 }
 
 // WorkspaceSnapshot represents a snapshot of the workspace state before an agent run.
@@ -41,27 +55,48 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 		return nil, fmt.Errorf("git binary not found in PATH: %w", err)
 	}
 
+	var (
+		out       string
+		err       error
+		targetDir string
+		absDir    string
+	)
+
+	// Resolve and pin the directory path to be stable
+	targetDir = dir
+	if targetDir == "" {
+		// Run in current directory to find the top level of the git repo
+		out, err = runGitCommand(ctx, "", "rev-parse", "--show-toplevel")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get git repository root: %w", err)
+		}
+		targetDir = strings.TrimSpace(out)
+	}
+
+	absDir, _ = filepath.Abs(targetDir)
+	targetDir = absDir
+
 	// Check if inside a git repository
-	if _, err := runGitCommand(ctx, dir, "rev-parse", "--is-inside-work-tree"); err != nil {
-		return nil, fmt.Errorf("workspace %q is not inside a git repository: %w", dir, err)
+	if _, err = runGitCommand(ctx, targetDir, "rev-parse", "--is-inside-work-tree"); err != nil {
+		return nil, fmt.Errorf("workspace %q is not inside a git repository: %w", targetDir, err)
 	}
 
 	// Get original commit hash
-	out, err := runGitCommand(ctx, dir, "rev-parse", "HEAD")
+	out, err = runGitCommand(ctx, targetDir, "rev-parse", "HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get original HEAD commit hash: %w", err)
 	}
 	originalCommit := strings.TrimSpace(out)
 
 	// Check if dirty
-	statusOut, err := runGitCommand(ctx, dir, "status", "--porcelain")
+	statusOut, err := runGitCommand(ctx, targetDir, "status", "--porcelain")
 	if err != nil {
 		return nil, fmt.Errorf("failed to check git status: %w", err)
 	}
 	isDirty := len(strings.TrimSpace(statusOut)) > 0
 
 	snap := &WorkspaceSnapshot{
-		Dir:            dir,
+		Dir:            targetDir,
 		OriginalCommit: originalCommit,
 	}
 
@@ -70,16 +105,16 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 		stashMsg := fmt.Sprintf("powerword-snapshot-%s", originalCommit)
 
 		// Push to stash including untracked files
-		if _, err := runGitCommand(ctx, dir, "stash", "push", "-u", "-m", stashMsg); err != nil {
+		if _, err = runGitCommand(ctx, targetDir, "stash", "push", "-u", "-m", stashMsg); err != nil {
 			return nil, fmt.Errorf("failed to stash uncommitted changes: %w", err)
 		}
 		snap.HasStash = true
 		snap.StashMessage = stashMsg
 
 		// Re-apply stash immediately so the agent can see and modify the changes, preserving index state
-		if _, err := runGitCommand(ctx, dir, "stash", "apply", "--index", "stash@{0}"); err != nil {
+		if _, err = runGitCommand(ctx, targetDir, "stash", "apply", "--index", "stash@{0}"); err != nil {
 			// Clean up stash if apply fails
-			_, _ = runGitCommand(ctx, dir, "stash", "drop", "stash@{0}")
+			_, _ = runGitCommand(ctx, targetDir, "stash", "drop", "stash@{0}")
 			return nil, fmt.Errorf("failed to apply stashed changes: %w", err)
 		}
 	}
@@ -150,9 +185,21 @@ func (s *WorkspaceSnapshot) findStashIndex(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	lines := strings.Split(out, "\n")
-	for i, line := range lines {
-		if strings.Contains(line, s.StashMessage) {
-			return i, nil
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// A strict check to ensure we match our stash message exactly.
+		// The list entry is formatted as: stash@{N}: On <branch>: <message>
+		// or stash@{N}: WIP on <branch>: <hash> <message>
+		if !strings.HasSuffix(line, ": "+s.StashMessage) {
+			continue
+		}
+
+		var n int
+		if _, err := fmt.Sscanf(line, "stash@{%d}", &n); err == nil {
+			return n, nil
 		}
 	}
 	return 0, fmt.Errorf("stash with message %q not found", s.StashMessage)

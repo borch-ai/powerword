@@ -142,8 +142,13 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	sessionID = ""
 	listSessions = false
 	acceptAll = false
+	headless = false
+	jsonOutput = false
 	routeMap = nil
 	classifierModel = ""
+	autonomous = false
+	issueIDString = ""
+	gitRollback = false
 
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")

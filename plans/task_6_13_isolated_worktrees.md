@@ -20,17 +20,17 @@ This task introduces support for running the agent reasoning loop inside an isol
 
 ### Configuration Subsystem
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../pkg/config/config.go)
 - Add `IsolatedWorktree bool` (`isolated_worktree`) to `Config` struct.
 - Add `WorktreeSymlinks []string` (`worktree_symlinks`) to `Config` struct to specify untracked folders to symlink (e.g., `["node_modules", ".venv"]`).
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../pkg/config/root.go)
 - Add a new CLI flag `--worktree` to run the session inside an isolated worktree.
 - Add `--worktree-symlinks` to configure folders to link.
 
 ### Worktree Orchestration Layer
 
-#### [NEW] [worktree.go](file:///Users/human/code/powerword/internal/loop/worktree.go)
+#### [NEW] [worktree.go](file://../internal/loop/worktree.go)
 - Implement `WorktreeSession` struct to manage the life-cycle of the temporary worktree:
   - `Path string` (Path to the temporary worktree directory under `.git/powerword/worktrees/<session_id>`).
   - `BranchName string` (Name of the temporary git branch).
@@ -55,12 +55,12 @@ This task introduces support for running the agent reasoning loop inside an isol
 
 ### Core Execution Loop Integration
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../internal/loop/loop.go)
 - In `RunLoop`:
   - If `cfg.IsolatedWorktree` is enabled, wrap the execution inside `NewWorktreeSession`.
   - Direct all file readers/writers, command execution, and MCP servers to work inside the temp worktree directory.
 
-#### [MODIFY] [repair.go](file:///Users/human/code/powerword/internal/review/repair.go)
+#### [MODIFY] [repair.go](file://../internal/review/repair.go)
 - In `RunAutonomousLoop`:
   - Support running the repair iterations inside the isolated worktree session if configured, ensuring the repository's main copy is never altered during failures.
 

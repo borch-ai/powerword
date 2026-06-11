@@ -16,28 +16,28 @@ This task implements automated workspace rollback mechanisms using Git before an
 
 ### Core Execution Loop & Rollback Engine
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../pkg/config/config.go)
 - [x] Add `GitRollback` field (`git_rollback`) to Viper settings.
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../pkg/config/root.go)
 - [x] Add `--git-rollback` flag to the root CLI command runner.
 
-#### [NEW] [rollback.go](file:///Users/human/code/powerword/internal/loop/rollback.go)
+#### [NEW] [rollback.go](file://../internal/loop/rollback.go)
 - [x] Implement `WorkspaceSnapshot` capturing current HEAD commit, unstaged changes, and untracked files.
 - [x] Implement `Restore` restoring HEAD, clean untracked files, and popping user stashes.
 - [x] Implement `CleanUp` dropping snapshot stashes if successful.
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../internal/loop/loop.go)
 - [x] Take a snapshot (Git stash or temporary branch/commit) before initiating the agent loop.
 - [x] If the agent loop exits with a failure status, automatically run git commands to rollback changes.
 
-#### [MODIFY] [repair.go](file:///Users/human/code/powerword/internal/review/repair.go)
+#### [MODIFY] [repair.go](file://../internal/review/repair.go)
 - [x] Integrate snapshot capture and restore behaviors into the autonomous repair loop.
 
-#### [NEW] [rollback_test.go](file:///Users/human/code/powerword/internal/loop/rollback_test.go)
+#### [NEW] [rollback_test.go](file://../internal/loop/rollback_test.go)
 - [x] Add comprehensive unit tests covering clean repo, dirty repo, stashes, and Git mock errors.
 
-#### [MODIFY] [repair_test.go](file:///Users/human/code/powerword/internal/review/repair_test.go)
+#### [MODIFY] [repair_test.go](file://../internal/review/repair_test.go)
 - [x] Add unit tests for autonomous loop rollback integration.
 
 ---

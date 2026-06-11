@@ -44,7 +44,63 @@ func handleListSessions() error {
 	return nil
 }
 
-//nolint:gocognit,nestif,funlen
+func setupWorkspaceRollback(ctx context.Context, cfg *config.Config, loopFailed *bool) (*WorkspaceSnapshot, func(), error) {
+	if !cfg.GitRollback {
+		return nil, func() {}, nil
+	}
+	snapshot, snapErr := NewWorkspaceSnapshot(ctx, "")
+	if snapErr != nil {
+		return nil, nil, fmt.Errorf("failed to initialize workspace rollback snapshot: %w", snapErr)
+	}
+	cleanupFunc := func() {
+		if *loopFailed {
+			fmt.Fprintln(os.Stderr, "Error in agent loop. Rolling back workspace...")
+			restoreCtx, restoreCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer restoreCancel()
+			if restoreErr := snapshot.Restore(restoreCtx); restoreErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to restore workspace rollback snapshot: %v\n", restoreErr)
+			}
+		} else {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cleanupCancel()
+			if cleanErr := snapshot.CleanUp(cleanupCtx); cleanErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to clean up workspace snapshot stash: %v\n", cleanErr)
+			}
+		}
+	}
+	return snapshot, cleanupFunc, nil
+}
+
+func initializeSessionAndClient(ctx context.Context, cfg *config.Config, prompt string) (*Session, llm.LLMClient, string, string, []llm.Message, error) {
+	var session *Session
+	var messages []llm.Message
+	var err error
+
+	if cfg.Session != "" {
+		session, err = LoadSession(cfg.Session)
+		if err != nil {
+			return nil, nil, "", "", nil, fmt.Errorf("failed to load session %s: %w", cfg.Session, err)
+		}
+		messages = session.Messages
+	}
+
+	activeClient, targetModel, prompt, err := resolveClientAndRoute(ctx, cfg, prompt)
+	if err != nil {
+		return nil, nil, "", "", nil, err
+	}
+
+	if cfg.Verbose && targetModel != cfg.Model {
+		fmt.Fprintf(os.Stderr, "Routed to model: %s\n", targetModel)
+	}
+
+	messages = append(messages, llm.Message{
+		Role:    llm.RoleUser,
+		Content: prompt,
+	})
+
+	return session, activeClient, targetModel, prompt, messages, nil
+}
+
 func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
 	if cfg.ListSessions {
 		return handleListSessions()
@@ -58,30 +114,12 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		return fmt.Errorf("no prompt provided and stdin is empty")
 	}
 
-	var snapshot *WorkspaceSnapshot
-	if cfg.GitRollback {
-		var snapErr error
-		snapshot, snapErr = NewWorkspaceSnapshot(ctx, "")
-		if snapErr != nil {
-			return fmt.Errorf("failed to initialize workspace rollback snapshot: %w", snapErr)
-		}
-		defer func() {
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error in agent loop: %v. Rolling back workspace...\n", err)
-				restoreCtx, restoreCancel := context.WithTimeout(context.Background(), 15*time.Second)
-				defer restoreCancel()
-				if restoreErr := snapshot.Restore(restoreCtx); restoreErr != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to restore workspace rollback snapshot: %v\n", restoreErr)
-				}
-			} else {
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
-				defer cleanupCancel()
-				if cleanErr := snapshot.CleanUp(cleanupCtx); cleanErr != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to clean up workspace snapshot stash: %v\n", cleanErr)
-				}
-			}
-		}()
+	var loopFailed bool
+	_, rollbackCleanup, err := setupWorkspaceRollback(ctx, cfg, &loopFailed)
+	if err != nil {
+		return err
 	}
+	defer rollbackCleanup()
 
 	// Initialize MCP servers and registry
 	manager := mcp.NewProcessManager()
@@ -94,30 +132,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	startServers(loopCtx, cfg, manager, registry)
 
-	var session *Session
-	var messages []llm.Message
-
-	if cfg.Session != "" {
-		session, err = LoadSession(cfg.Session)
-		if err != nil {
-			return fmt.Errorf("failed to load session %s: %w", cfg.Session, err)
-		}
-		messages = session.Messages
+	session, activeClient, targetModel, _, messages, initErr := initializeSessionAndClient(ctx, cfg, prompt)
+	if initErr != nil {
+		loopFailed = true
+		return initErr
 	}
-
-	activeClient, targetModel, prompt, err := resolveClientAndRoute(ctx, cfg, prompt)
-	if err != nil {
-		return err
-	}
-
-	if cfg.Verbose && targetModel != cfg.Model {
-		fmt.Fprintf(os.Stderr, "Routed to model: %s\n", targetModel)
-	}
-
-	messages = append(messages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: prompt,
-	})
 
 	outWriter := getOutputWriter(cfg)
 	formatter := NewTerminalFormatter(outWriter, getTerminalWidth())
@@ -132,12 +151,16 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	initialLen := len(messages)
 	updatedMessages, loopErr := runReActLoop(loopCtx, cfg, activeClient, registry, formatter, messages, tracker, targetModel)
+	if loopErr != nil {
+		loopFailed = true
+	}
 
 	if session != nil && loopErr == nil {
 		session.Model = targetModel
 		session.Messages = updatedMessages
 		if saveErr := SaveSession(session); saveErr != nil {
 			loopErr = fmt.Errorf("failed to save session: %w", saveErr)
+			loopFailed = true
 		}
 	}
 

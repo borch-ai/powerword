@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -339,6 +340,7 @@ func TestHandleInterrupt_WithRollback(t *testing.T) {
 	}
 
 	sigChan := handleInterrupt(cancel, true)
+	defer signal.Stop(sigChan)
 	sigChan <- os.Interrupt
 
 	start := time.Now()
@@ -375,6 +377,7 @@ func TestHandleInterrupt_WithoutRollback(t *testing.T) {
 	}
 
 	sigChan := handleInterrupt(cancel, false)
+	defer signal.Stop(sigChan)
 	sigChan <- os.Interrupt
 
 	start := time.Now()
