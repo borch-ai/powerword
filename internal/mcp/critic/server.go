@@ -34,7 +34,7 @@ const reviewWorkspaceSchema = `{
 		},
 		"validation_command": {
 			"type": "string",
-			"description": "The shell command to execute local validation (e.g. 'make all'). Optional."
+			"description": "The command to execute local validation (split by whitespace, executed directly without a shell, e.g. 'make all'). Optional."
 		}
 	},
 	"required": ["plan_content"]

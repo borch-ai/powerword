@@ -12,10 +12,11 @@ func TestRun_WithConfig(t *testing.T) {
 	// Create a dummy powerword.toml
 	configPath := filepath.Join(tempDir, "powerword.toml")
 	err := os.WriteFile(configPath, []byte(`
-[api_keys]
-openai = "test-openai-key"
 critic_provider = "openai"
 critic_model = "gpt-4"
+
+[api_keys]
+openai = "test-openai-key"
 `), 0600)
 	if err != nil {
 		t.Fatalf("failed to write dummy config: %v", err)

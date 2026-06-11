@@ -27,6 +27,10 @@ func run() error {
 			return fmt.Errorf("failed to get cwd: %w", err)
 		}
 		workspaceRoot = cwd
+	} else {
+		if err := os.Chdir(workspaceRoot); err != nil {
+			return fmt.Errorf("failed to change working directory to %s: %w", workspaceRoot, err)
+		}
 	}
 
 	cfgPath := filepath.Join(workspaceRoot, "powerword.toml")

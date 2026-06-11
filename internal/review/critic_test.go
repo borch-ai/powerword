@@ -52,13 +52,13 @@ func TestParseIssueBody_Empty(t *testing.T) {
 	}
 }
 
-func newTestConfig(endpoint string, gitDiffVal string) *config.Config {
+func newTestConfig(endpoint string, gitDiffVal string, openAIKey string) *config.Config {
 	return &config.Config{
 		CriticProvider: "openai",
 		CriticModel:    "gpt-4",
 		CriticEndpoint: endpoint,
 		APIKeys: config.APIKeys{
-			OpenAI: "dummy-key",
+			OpenAI: openAIKey,
 		},
 		Servers: map[string]config.ServerConfig{
 			"critic": {
@@ -68,6 +68,7 @@ func newTestConfig(endpoint string, gitDiffVal string) *config.Config {
 					"GO_WANT_HELPER_PROCESS=1",
 					"CRITIC_ENDPOINT=" + endpoint,
 					"MOCK_GIT_DIFF=" + gitDiffVal,
+					"MOCK_OPENAI_API_KEY=" + openAIKey,
 				},
 			},
 		},
@@ -97,7 +98,7 @@ func TestHelperProcess(t *testing.T) {
 			CriticModel:    "gpt-4",
 			CriticEndpoint: os.Getenv("CRITIC_ENDPOINT"),
 			APIKeys: config.APIKeys{
-				OpenAI: "dummy-key",
+				OpenAI: os.Getenv("MOCK_OPENAI_API_KEY"),
 			},
 		}
 		critic.SetExecCommand(func(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -179,8 +180,7 @@ func TestVerifyWorkspace_InvalidConfig(t *testing.T) {
 
 	plan := &Plan{Goal: "test"}
 	// Missing API key in critic server config should fail client init
-	cfg := newTestConfig("http://invalid", "diff")
-	cfg.APIKeys.OpenAI = ""
+	cfg := newTestConfig("http://invalid", "diff", "")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -223,7 +223,7 @@ func TestVerifyWorkspace_NoChanges(t *testing.T) {
 	defer func() { execCommand = origExec }()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig("http://invalid", "")
+	cfg := newTestConfig("http://invalid", "", "dummy-key")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err != nil {
@@ -247,7 +247,7 @@ func TestVerifyWorkspace_NoMakefile(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig(ts.URL, "diff")
+	cfg := newTestConfig(ts.URL, "diff", "dummy-key")
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err != nil {
 		t.Errorf("expected nil error for no changes, got: %v", err)
@@ -272,7 +272,7 @@ func TestVerifyWorkspace_MakeFails(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig(ts.URL, "diff")
+	cfg := newTestConfig(ts.URL, "diff", "dummy-key")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -286,7 +286,7 @@ func TestVerifyWorkspace_GitFails(t *testing.T) {
 	defer func() { execCommand = origExec }()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig("http://invalid", "error")
+	cfg := newTestConfig("http://invalid", "error", "dummy-key")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -338,7 +338,7 @@ func TestVerifyWorkspace_Success(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig(ts.URL, "diff")
+	cfg := newTestConfig(ts.URL, "diff", "dummy-key")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err != nil {
@@ -363,7 +363,7 @@ func TestVerifyWorkspace_Reject(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig(ts.URL, "diff")
+	cfg := newTestConfig(ts.URL, "diff", "dummy-key")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
@@ -393,7 +393,7 @@ func TestVerifyWorkspace_ToolError(t *testing.T) {
 	defer ts.Close()
 
 	plan := &Plan{Goal: "test"}
-	cfg := newTestConfig(ts.URL, "diff")
+	cfg := newTestConfig(ts.URL, "diff", "dummy-key")
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
 	if err == nil {
