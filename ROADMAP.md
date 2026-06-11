@@ -116,6 +116,12 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [x] **Task 5.5: Plan Conformance & Validation Integration**
     *   Integrate plan template and relative link conformance checks directly into the `powerword review` command. Parse local plan templates and enforce required status metadata blocks (Go Version, Date Completed, Unit Test Coverage) and link checks as an automated pre-review validation gate.
     *   [Implementation Plan](plans/task_5_5_plan_validation.md)
+*   [x] **Task 5.6: Test Coverage Check Command**
+    *   Add a project-agnostic `powerword check-coverage` subcommand. Parse standard Go coverage output profiles and compare overall statement coverage percentages against specified minimum thresholds, failing with a non-zero exit status if threshold is unmet.
+    *   [Implementation Plan](plans/task_5_6_check_coverage.md)
+*   [ ] **Task 5.7: Multi-Language Coverage Plugin (LCOV & Cobertura)**
+    *   Implement a standalone `pw-mcp-coverage` MCP server to support parsing LCOV (`lcov.info`) and Cobertura (`coverage.xml`) formats. Extend the `powerword check-coverage` command to call this server, enabling automated coverage gates for TypeScript/Vitest (such as in Knurl) and Python codebases.
+    *   [Implementation Plan](plans/task_5_7_multilang_coverage.md)
 
 ---
 
