@@ -63,9 +63,14 @@ type ImageGenConfig struct {
 	GoogleModel               string `mapstructure:"google_model"`
 }
 
+// KDPMathConfig holds parameters for the KDP Math plugin.
+type KDPMathConfig struct {
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
+	KDPMath  KDPMathConfig  `mapstructure:"kdp_math"`
 }
 
 // APIKeys maps the model providers to their API keys.

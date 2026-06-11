@@ -14,6 +14,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	golang.org/x/sys v0.46.0
 	google.golang.org/api v0.283.0
+	rsc.io/pdf v0.1.1
 )
 
 require (
