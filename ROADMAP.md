@@ -113,6 +113,9 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [ ] **Task 5.4: MCP Telemetry Migration**
     *   Extract local telemetry calculations into a standalone `pw-mcp-telemetry` MCP server, and refactor Powerword to query it over standard I/O.
     *   [Implementation Plan](plans/task_5_4_mcp_telemetry_migration.md)
+*   [x] **Task 5.5: Plan Conformance & Validation Integration**
+    *   Integrate plan template and relative link conformance checks directly into the `powerword review` command. Parse local plan templates and enforce required status metadata blocks (Go Version, Date Completed, Unit Test Coverage) and link checks as an automated pre-review validation gate.
+    *   [Implementation Plan](plans/task_5_5_plan_validation.md)
 
 ---
 
@@ -149,4 +152,10 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.10: Headless JSON Envelopes & PR Review Mode**
     *   Standardize structured JSON outputs for CI integration and build webhooks to orchestrate inline PR comment review loops.
     *   [Implementation Plan](plans/task_6_10_headless_ci.md)
+*   [x] **Task 6.11: Generalized MCP Critic Server**
+    *   Refactor the existing Powerword Local Critic subsystem into a standalone, generalized Model Context Protocol (MCP) server (pw-mcp-critic) to be shared across projects.
+    *   [Implementation Plan](plans/task_6_11_critic_mcp.md)
+*   [ ] **Task 6.12: Speculative: Standalone Plan Linter Subcommand & MCP Tool**
+    *   Expose the local plan template validation and relative link conformance checks as a standalone CLI subcommand (e.g. powerword lint-plans) and package it as an independent MCP tool, enabling external CI processes or coding agents to validate plans interactively before submission.
+    *   [Implementation Plan](plans/task_6_12_standalone_plan_linter.md)
 

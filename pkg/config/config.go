@@ -43,6 +43,7 @@ type Config struct {
 	CriticProvider    string                  `mapstructure:"critic_provider"`
 	CriticModel       string                  `mapstructure:"critic_model"`
 	CriticEndpoint    string                  `mapstructure:"critic_endpoint"`
+	PlanTemplate      string                  `mapstructure:"plan_template"`
 	Autonomous        bool                    `mapstructure:"autonomous"`
 	Issue             string                  `mapstructure:"issue"`
 	WebhookSecret     string                  `mapstructure:"webhook_secret"`
@@ -181,6 +182,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("verbose", false)
 	v.SetDefault("model", "gemini-1.5-pro")
 	v.SetDefault("max_loop_iterations", 10)
+	v.SetDefault("plan_template", "")
 	v.SetDefault("auto_confirm", false)
 	v.SetDefault("webhook_port", 8080)
 	v.SetDefault("plugins.imagegen.backend", "openai")
@@ -239,6 +241,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "critic_provider", "POWERWORD_CRITIC_PROVIDER")
 	bindEnv(v, "critic_model", "POWERWORD_CRITIC_MODEL")
 	bindEnv(v, "critic_endpoint", "POWERWORD_CRITIC_ENDPOINT")
+	bindEnv(v, "plan_template", "POWERWORD_PLAN_TEMPLATE")
 	bindEnv(v, "autonomous", "POWERWORD_AUTONOMOUS")
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
 	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")

@@ -69,7 +69,6 @@ check-coverage: test
 
 markdown-lint:
 	$(GOCMD) run scripts/lint_markdown/main.go
-	$(GOCMD) run scripts/lint_plans/main.go
 
 lint:
 	@if command -v golangci-lint >/dev/null; then \

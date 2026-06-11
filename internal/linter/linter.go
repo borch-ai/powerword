@@ -11,7 +11,6 @@ import (
 var (
 	headerRegex = regexp.MustCompile(`^(#{1,6})\s+(.*)$`)
 	listRegex   = regexp.MustCompile(`^(\s*)(\d+)\.\s+(.*)$`)
-	planTitleRx = regexp.MustCompile(`^# (plan|feat):.*$`)
 )
 
 type listState struct {
@@ -168,63 +167,4 @@ func LintMarkdown(filename string, content string) []string {
 		l.errors = append(l.errors, fmt.Sprintf("%s: scanning error: %v", filename, err))
 	}
 	return l.errors
-}
-
-// LintPlan checks if a plan file contains the required headings:
-func LintPlan(filename string, content string) []string {
-	var errors []string
-	scanner := bufio.NewScanner(strings.NewReader(content))
-
-	hasTitle := false
-	hasReview := false
-	hasChanges := false
-	hasVerification := false
-	inCodeBlock := false
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		trimmed := strings.TrimSpace(line)
-
-		if strings.HasPrefix(trimmed, "```") {
-			inCodeBlock = !inCodeBlock
-			continue
-		}
-
-		if inCodeBlock {
-			continue
-		}
-
-		switch {
-		case strings.HasPrefix(line, "# "):
-			if planTitleRx.MatchString(line) {
-				hasTitle = true
-			}
-		case line == "## User Review Required":
-			hasReview = true
-		case line == "## Proposed Changes":
-			hasChanges = true
-		case line == "## Verification Plan":
-			hasVerification = true
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		errors = append(errors, fmt.Sprintf("%s: scanning error: %v", filename, err))
-		return errors
-	}
-
-	if !hasTitle {
-		errors = append(errors, fmt.Sprintf("%s: missing top-level plan header matching '# (plan|feat): ...'", filename))
-	}
-	if !hasReview {
-		errors = append(errors, fmt.Sprintf("%s: missing heading '## User Review Required'", filename))
-	}
-	if !hasChanges {
-		errors = append(errors, fmt.Sprintf("%s: missing heading '## Proposed Changes'", filename))
-	}
-	if !hasVerification {
-		errors = append(errors, fmt.Sprintf("%s: missing heading '## Verification Plan'", filename))
-	}
-
-	return errors
 }
