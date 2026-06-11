@@ -41,19 +41,10 @@ func ValidatePlans(workspaceRoot string, cfg *config.Config) error {
 	}
 
 	templateHeadings, titlePatternStr := parseTemplateHeaders(templateText)
-	var titleRegex *regexp.Regexp
-	if titlePatternStr == "" {
-		titleRegex = regexp.MustCompile(`(?i)^#\s+(plan|feat):\s*Task\s+.*$`)
-	} else {
-		if r, errCompile := regexp.Compile(titlePatternStr); errCompile == nil {
-			titleRegex = r
-		} else {
-			titleRegex = regexp.MustCompile(`(?i)^#\s+(plan|feat):\s*Task\s+.*$`)
-		}
-	}
+	titleRegex := compileTitleRegex(titlePatternStr)
 
-	plansPattern := filepath.Join(workspaceRoot, "plans", "task_*.md")
-	planFiles, err := filepath.Glob(plansPattern)
+	plansDir := filepath.Join(workspaceRoot, "plans")
+	planFiles, err := scanPlanFiles(plansDir)
 	if err != nil {
 		return fmt.Errorf("failed to scan for plan files: %w", err)
 	}
@@ -76,6 +67,44 @@ func ValidatePlans(workspaceRoot string, cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+func compileTitleRegex(pattern string) *regexp.Regexp {
+	if pattern == "" {
+		return regexp.MustCompile(`(?i)^#\s+(plan|feat):\s*Task\s+.*$`)
+	}
+	if r, err := regexp.Compile(pattern); err == nil {
+		return r
+	}
+	return regexp.MustCompile(`(?i)^#\s+(plan|feat):\s*Task\s+.*$`)
+}
+
+func scanPlanFiles(plansDir string) ([]string, error) {
+	if _, err := os.Stat(plansDir); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var planFiles []string
+	err := filepath.WalkDir(plansDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		name := d.Name()
+		if strings.HasPrefix(name, "task_") && strings.HasSuffix(name, ".md") {
+			planFiles = append(planFiles, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return planFiles, nil
 }
 
 func resolveTemplate(workspaceRoot string, cfg *config.Config) (string, error) {
@@ -269,7 +298,7 @@ func validateSinglePlan(workspaceRoot string, planFile string, titleRegex *regex
 func validateLink(workspaceRoot, planFile string, lineNum int, line string, label string, pathStr string, status *string) []string {
 	var errs []string
 
-	absPath, err := getAbsolutePath(workspaceRoot, pathStr)
+	absPath, err := getAbsolutePath(workspaceRoot, planFile, pathStr)
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("%s:%d: failed to resolve path %q: %v", planFile, lineNum, pathStr, err))
 		return errs
@@ -313,7 +342,7 @@ func validateLink(workspaceRoot, planFile string, lineNum int, line string, labe
 	return errs
 }
 
-func getAbsolutePath(workspaceRoot, pathStr string) (string, error) {
+func getAbsolutePath(workspaceRoot, planFile, pathStr string) (string, error) {
 	pathStr = strings.TrimPrefix(pathStr, "file://")
 
 	// Compatibility normalization for historical absolute /Users/human/code/powerword/ paths
@@ -329,7 +358,7 @@ func getAbsolutePath(workspaceRoot, pathStr string) (string, error) {
 	if filepath.IsAbs(pathStr) || strings.HasPrefix(pathStr, "/") {
 		absPath = filepath.Clean(pathStr)
 	} else {
-		absPath = filepath.Clean(filepath.Join(workspaceRoot, "plans", pathStr))
+		absPath = filepath.Clean(filepath.Join(filepath.Dir(planFile), pathStr))
 	}
 
 	return filepath.Abs(absPath)

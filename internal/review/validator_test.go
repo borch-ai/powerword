@@ -292,6 +292,31 @@ None.
 		t.Fatalf("failed to write plan file: %v", err)
 	}
 
+	// Create a subfolder inside plans/
+	subDir := filepath.Join(plansDir, "phase_1")
+	if err := os.Mkdir(subDir, 0750); err != nil {
+		t.Fatalf("failed to create plans subfolder: %v", err)
+	}
+
+	// Write a valid plan inside the subfolder using relative path relative to the subfolder (i.e. ../../some_file.go)
+	nestedPlanContent := `# plan: Task 1.2: Test Plan Nested
+**Status:** Open
+
+## User Review Required
+None.
+
+## Proposed Changes
+#### [MODIFY] [some_file.go](../../some_file.go)
+- Edit it.
+
+## Verification Plan
+### Automated Tests
+- Run tests.
+`
+	if err := os.WriteFile(filepath.Join(subDir, "task_1_2.md"), []byte(nestedPlanContent), 0600); err != nil {
+		t.Fatalf("failed to write nested plan file: %v", err)
+	}
+
 	cfg := &config.Config{}
 	err := ValidatePlans(tmpDir, cfg)
 	if err != nil {
@@ -501,4 +526,30 @@ None
 		}
 	}
 	_ = os.Remove(planPath)
+}
+
+func TestValidatePlans_CoverageBoosters(t *testing.T) {
+	// Test compileTitleRegex with invalid regex pattern
+	r := compileTitleRegex("[invalid-regex")
+	if r == nil {
+		t.Error("expected compileTitleRegex to fall back to default regex, got nil")
+	}
+	if r.String() != `(?i)^#\s+(plan|feat):\s*Task\s+.*$` {
+		t.Errorf("expected fallback regex, got: %s", r.String())
+	}
+
+	// Test compileTitleRegex with empty pattern
+	rEmpty := compileTitleRegex("")
+	if rEmpty == nil {
+		t.Error("expected compileTitleRegex to fall back to default regex on empty pattern, got nil")
+	}
+
+	// Test scanPlanFiles when plans directory does not exist
+	files, err := scanPlanFiles("/non-existent-directory-xyz-123")
+	if err != nil {
+		t.Errorf("expected scanPlanFiles to not return error for non-existent directory, got: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("expected 0 files, got: %d", len(files))
+	}
 }
