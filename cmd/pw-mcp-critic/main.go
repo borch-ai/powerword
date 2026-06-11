@@ -19,29 +19,35 @@ func main() {
 	}
 }
 
-func run() error {
-	workspaceRoot := os.Getenv("POWERWORD_WORKSPACE_ROOT")
+func setupWorkspaceRoot(workspaceRoot string) (string, error) {
 	if workspaceRoot == "" {
 		cwd, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("failed to get cwd: %w", err)
+			return "", fmt.Errorf("failed to get cwd: %w", err)
 		}
-		workspaceRoot = cwd
-	} else {
-		absPath, err := filepath.Abs(workspaceRoot)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path of workspace root: %w", err)
-		}
-		workspaceRoot = absPath
+		return cwd, nil
+	}
 
-		if err := os.Chdir(workspaceRoot); err != nil {
-			return fmt.Errorf("failed to change working directory to %s: %w", workspaceRoot, err)
-		}
+	absPath, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path of workspace root: %w", err)
+	}
+
+	if err := os.Chdir(absPath); err != nil {
+		return "", fmt.Errorf("failed to change working directory to %s: %w", absPath, err)
+	}
+
+	return absPath, nil
+}
+
+func run() error {
+	workspaceRoot, err := setupWorkspaceRoot(os.Getenv("POWERWORD_WORKSPACE_ROOT"))
+	if err != nil {
+		return err
 	}
 
 	cfgPath := filepath.Join(workspaceRoot, "powerword.toml")
 	var cfg *config.Config
-	var err error
 
 	//nolint:gosec // cfgPath is constructed from validated workspaceRoot
 	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
