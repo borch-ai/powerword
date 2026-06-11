@@ -292,6 +292,31 @@ None.
 		t.Fatalf("failed to write plan file: %v", err)
 	}
 
+	// Create a subfolder inside plans/
+	subDir := filepath.Join(plansDir, "phase_1")
+	if err := os.Mkdir(subDir, 0750); err != nil {
+		t.Fatalf("failed to create plans subfolder: %v", err)
+	}
+
+	// Write a valid plan inside the subfolder using relative path relative to the subfolder (i.e. ../../some_file.go)
+	nestedPlanContent := `# plan: Task 1.2: Test Plan Nested
+**Status:** Open
+
+## User Review Required
+None.
+
+## Proposed Changes
+#### [MODIFY] [some_file.go](../../some_file.go)
+- Edit it.
+
+## Verification Plan
+### Automated Tests
+- Run tests.
+`
+	if err := os.WriteFile(filepath.Join(subDir, "task_1_2.md"), []byte(nestedPlanContent), 0600); err != nil {
+		t.Fatalf("failed to write nested plan file: %v", err)
+	}
+
 	cfg := &config.Config{}
 	err := ValidatePlans(tmpDir, cfg)
 	if err != nil {
