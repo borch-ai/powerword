@@ -3,16 +3,16 @@
 
 ## Overview
 
-Powerword is a lightweight, extensible command-line interface designed to bring vendor-agnostic, agentic AI capabilities directly to the terminal. Unlike highly integrated, vendor-locked solutions (such as the Anthropic Claude CLI or Antigravity), Powerword acts as an intelligent shim. It orchestrates communication between multiple Large Language Models (LLMs) and a decentralized ecosystem of tools utilizing the Model Context Protocol (MCP).
+Powerword is a lightweight, extensible command-line interface designed to bring vendor-agnostic, agentic systems engineering capabilities directly to the terminal. It acts as an intelligent command-line operations copilot, orchestrating communication between multiple Large Language Models (LLMs) and a decentralized ecosystem of infrastructure and operations tools utilizing the Model Context Protocol (MCP).
 
-Written entirely in Go, Powerword prioritizes execution speed, straightforward single-binary distribution, and high-performance concurrency suitable for both local development workflows and automated, headless data pipelines.
+Written entirely in Go, Powerword prioritizes execution speed, straightforward single-binary distribution, and high-performance concurrency suitable for local developer environments, staging bastions, and automated, headless CI/CD pipelines.
 
 ## Core Objectives
 
 1. **Vendor Independence:** Users should not be locked into a single model provider. Powerword supports configurable backends (Gemini, Claude, OpenAI) and local, self-hosted models (via Ollama or vLLM).
-2. **Standardized Extensibility:** Instead of a proprietary plugin system, Powerword leverages the open standard of the Model Context Protocol (MCP).
-3. **Agentic Operation:** The CLI goes beyond single turn prompt-response. It supports agentic reasoning loops (ReAct/Tool Calling), allowing the active LLM to securely query local context, execute commands, and read file systems via connected MCP servers.
-4. **Cloud-Native Compatibility:** Designed with a zero-dependency architecture that can easily be containerized or executed as part of distributed jobs within multi-cloud Kubernetes environments.
+2. **Standardized Extensibility:** Instead of a proprietary plugin system, Powerword leverages the open standard of the Model Context Protocol (MCP) to interact with local and remote systems.
+3. **Operations & Systems Automation:** The CLI goes beyond generic coding tasks. It supports targeted agentic reasoning loops (ReAct/Tool Calling) with a specialized suite of system, database, and cloud MCP tools to inspect cluster configurations, debug services, query DB states, and triage system errors.
+4. **Cloud-Native & Headless Execution:** Designed with a lightweight, zero-dependency architecture (ideal for staging environments or remote servers) that can run autonomously as part of automated CI/CD pipelines.
 
 ## Architecture
 
