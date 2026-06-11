@@ -40,7 +40,7 @@ A robust formatting engine to render markdown, syntax-highlighted code, and stru
 
 ## Technology Stack
 
-* **Language:** Go (1.22+)
+* **Language:** Go (1.23+)
 * **CLI Framework:** `spf13/cobra` (Command routing) and `spf13/viper` (Configuration management).
 * **Tooling Protocol:** `github.com/modelcontextprotocol/go-sdk` for standardizing tool descriptions and executions.
 * **LLM SDKs:** Standard Go clients for targeted APIs (e.g., `google.golang.org/api`, `github.com/sashabaranov/go-openai`, etc.).

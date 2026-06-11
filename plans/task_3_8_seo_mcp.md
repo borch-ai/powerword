@@ -7,7 +7,7 @@ This task implements a native Go-based MCP server (`pw-mcp-seo`) that queries ma
 ## User Review Required
 
 > [!NOTE]
-> This plugin will query Amazon auto-complete search volumes and public HTML scrape endpoints. We must implement proper request rate-limiting and user-agent rotations to prevent IP bans or throttling.
+> This plugin will query public search suggestion endpoints and competitor metadata. We must strictly adhere to rate limits, respect target `robots.txt` exclusions, implement standard backoff and caching policies, and prioritize official APIs/authorized data sources where available to ensure full compliance.
 
 ## Proposed Changes
 
