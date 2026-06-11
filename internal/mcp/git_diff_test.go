@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -208,6 +209,22 @@ func TestExtractGitDiff_ServerStartFails(t *testing.T) {
 }
 
 func TestExtractGitDiff_NoConfig(t *testing.T) {
+	origStat := statFile
+	origLook := lookPath
+	statFile = func(name string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
+	}
+	lookPath = func(file string) (string, error) {
+		return "", errors.New("not found")
+	}
+	defer func() {
+		statFile = origStat
+		lookPath = origLook
+	}()
+
 	cfg := &config.Config{}
-	_, _ = ExtractGitDiff(context.Background(), cfg)
+	_, err := ExtractGitDiff(context.Background(), cfg)
+	if err == nil {
+		t.Error("expected error when no git server is configured and pw-mcp-git is missing")
+	}
 }

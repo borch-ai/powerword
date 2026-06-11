@@ -37,6 +37,7 @@ func run() error {
 	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
 		cfg, err = config.LoadConfig("")
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to load default config: %v\n", err)
 			cfg = &config.Config{}
 		}
 	} else {

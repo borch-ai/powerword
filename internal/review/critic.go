@@ -164,7 +164,10 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 
 	_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Feedback\n\n%s\n", criticOutput)), 0600)
 
-	if !strings.HasSuffix(strings.TrimSpace(criticOutput), "VERDICT: ACCEPT") {
+	trimmedOutput := strings.TrimSpace(criticOutput)
+	trimmedOutput = strings.Trim(trimmedOutput, "*_`\"'\n\r\t")
+
+	if !strings.HasSuffix(trimmedOutput, "VERDICT: ACCEPT") {
 		return fmt.Errorf("critic rejected the workspace changes")
 	}
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -78,15 +79,19 @@ func handleReviewWorkspace(workspaceRoot string, cfg *config.Config) func(contex
 		if args.ValidationCommand != "" {
 			fields := strings.Fields(args.ValidationCommand)
 			if len(fields) > 0 {
+				valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
+				defer valCancel()
+
 				//nolint:gosec // execution is explicitly requested by the orchestrator/tool call
-				cmd := execCommand(ctx, fields[0], fields[1:]...)
+				cmd := execCommand(valCtx, fields[0], fields[1:]...)
 				cmd.Dir = workspaceRoot
 				out, err := cmd.CombinedOutput()
 				if err != nil {
-					validationOutput = fmt.Sprintf("Validation command failed: %v\nOutput:\n%s", err, string(out))
-				} else {
-					validationOutput = string(out)
+					return &mcp.CallToolResult{
+						Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Validation command failed: %v\nOutput:\n%s\nVERDICT: REJECT", err, string(out))}},
+					}, nil
 				}
+				validationOutput = string(out)
 			}
 		}
 
@@ -119,8 +124,9 @@ Git Diff:
 %s
 
 Check if ALL proposed changes are implemented in the diff. Check for any omissions, bugs, or missing tests.
+If the Local Validation Output indicates a failure (e.g. compile or test errors), you MUST reject the changes.
 If there are any missing changes or issues, clearly list them and end your response with exactly "VERDICT: REJECT".
-If the diff fully implements the plan correctly, end your response with exactly "VERDICT: ACCEPT".`,
+If the diff fully implements the plan correctly and all validations pass, end your response with exactly "VERDICT: ACCEPT".`,
 			args.PlanContent, validationOutput, diffStr)
 
 		messages := []llm.Message{

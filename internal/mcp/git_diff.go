@@ -13,6 +13,8 @@ import (
 )
 
 var execCommand = exec.CommandContext
+var statFile = os.Stat
+var lookPath = exec.LookPath
 
 // SetExecCommand sets the execCommand variable in the mcp package for mocking in tests.
 func SetExecCommand(f func(context.Context, string, ...string) *exec.Cmd) {
@@ -26,9 +28,9 @@ func ExtractGitDiff(ctx context.Context, cfg *config.Config) (string, error) {
 	srvCfg, ok := cfg.Servers["git"]
 	if !ok {
 		cmd := "pw-mcp-git"
-		if _, err := os.Stat("bin/pw-mcp-git"); err == nil {
+		if _, err := statFile("bin/pw-mcp-git"); err == nil {
 			cmd = "./bin/pw-mcp-git"
-		} else if _, err := exec.LookPath("pw-mcp-git"); err != nil {
+		} else if _, err := lookPath("pw-mcp-git"); err != nil {
 			return "", fmt.Errorf("pw-mcp-git not found in bin/ or PATH, run 'make all' first")
 		}
 		srvCfg = config.ServerConfig{
@@ -65,8 +67,6 @@ func ExtractGitDiff(ctx context.Context, cfg *config.Config) (string, error) {
 			}
 		}
 	}
-
-	fmt.Fprintf(os.Stderr, "Using base branch %q for diff extraction...\n", baseBranch)
 
 	// 1. Get committed changes against base branch
 	resCommits, err := srv.Client().CallTool(ctx, "git_diff_commits", map[string]interface{}{"base": baseBranch, "head": "HEAD"})
