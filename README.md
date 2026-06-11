@@ -16,6 +16,19 @@ Written entirely in Go, Powerword prioritizes execution speed, straightforward s
 - **AI Local Critic (Pre-Push hook):** Enforces strict code review policies by validating local plan structures and relative links before leveraging an LLM to compare local workspace diffs against a proposed GitHub Implementation Plan prior to pushing.
 - **Secure Execution:** Designed with interactive permission guardrails before executing unsafe commands or file modifications.
 
+## Bundled Plugins (Native Go MCP Servers)
+
+Powerword comes packaged with a suite of built-in, lightweight MCP servers compiled directly into the toolchain:
+- **System Tools:**
+  - `pw-mcp-fs` — Secure local filesystem read/write access.
+  - `pw-mcp-git` — Repository introspection, branch management, and diffing.
+  - `pw-mcp-shell` — Sandboxed shell execution with safety parameters.
+- **Domain-Specific Assistants:**
+  - `pw-mcp-critic` — Workspace diff evaluation against implementation plans.
+  - `pw-mcp-seo` — Kindle Direct Publishing (KDP) keyword, search, and catalog optimization tool.
+  - `pw-mcp-kdp-math` — Bleed, margin, and interior layout validation for print cover design.
+  - `pw-mcp-viral` — ASMR audio voiceover generation and ffmpeg video trailer stitching.
+
 ## Getting Started
 
 *(Note: Powerword is actively in development. See the Roadmap for current phase status).*
