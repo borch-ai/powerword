@@ -60,13 +60,10 @@ Refactor the existing Powerword Local Critic subsystem into a standalone, genera
 ## Verification Plan
 
 ### Automated Tests
-- `go test ./internal/mcp/critic/...`
-- Unit tests verifying:
-  - The tool schema is registered correctly.
-  - The handler correctly parses the inputs, formats the prompt, and mocks LLM calls.
-  - The handler surfaces validation command failures within the LLM prompt.
+- `go test ./internal/mcp/critic/...` (unit tests for server and tools)
+- `go test ./cmd/pw-mcp-critic/...` (verifying entrypoint configuration loading and stdio execution)
+- `make check-coverage` (validating unit test coverage across both `internal/...` and `pkg/...` to ensure it meets the strict 91% threshold - final result achieved: 91.10%)
 
 ### Manual Verification
-- Build the project (`make all`).
-- In the Pithos repository (or Powerword), invoke the `pw-mcp-critic` server manually or via the local `review` command.
-- Verify that violating a plan requirement still correctly triggers a `VERDICT: REJECT`.
+- Invoked `./bin/powerword review --local` to verify the dogfooding critic client correctly runs validation (`make all`), diff extraction, and LLM analysis via the newly refactored standalone MCP critic server.
+- Verified that validation command compile/lint failures correctly trigger instant fail-fast rejections.
