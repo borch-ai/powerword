@@ -558,9 +558,46 @@ func TestValidatePDF_EdgeCases_CoverGeometryError(t *testing.T) {
 		t.Fatalf("failed to write inherited.pdf: %v", err)
 	}
 
-	_, err := ValidatePDF(p, "paperback", "invalid_paper", "6x9", 1, true, false)
-	if err == nil {
-		t.Error("expected error due to invalid paper type")
+	res, err := ValidatePDF(p, "paperback", "invalid_paper", "6x9", 1, true, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IsValid {
+		t.Error("expected cover validation to be invalid due to invalid paper type")
+	}
+	foundGeomErr := false
+	for _, e := range res.Errors {
+		if strings.Contains(e, "failed to calculate expected cover geometry") {
+			foundGeomErr = true
+		}
+	}
+	if !foundGeomErr {
+		t.Errorf("expected cover geometry calculation error, got: %v", res.Errors)
+	}
+}
+
+func TestValidatePDF_EdgeCases_CoverMissingPageCount(t *testing.T) {
+	tempDir := t.TempDir()
+	p := filepath.Join(tempDir, "inherited.pdf")
+	if err := os.WriteFile(p, createInheritedPDFBytes(), 0600); err != nil {
+		t.Fatalf("failed to write inherited.pdf: %v", err)
+	}
+
+	res, err := ValidatePDF(p, "paperback", "white", "6x9", 0, true, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IsValid {
+		t.Error("expected cover validation to be invalid due to missing expected page count")
+	}
+	foundPageErr := false
+	for _, e := range res.Errors {
+		if strings.Contains(e, "expected_page_count must be positive") {
+			foundPageErr = true
+		}
+	}
+	if !foundPageErr {
+		t.Errorf("expected missing page count error, got: %v", res.Errors)
 	}
 }
 
@@ -571,9 +608,21 @@ func TestValidatePDF_EdgeCases_InteriorTrimSizeError(t *testing.T) {
 		t.Fatalf("failed to write inherited.pdf: %v", err)
 	}
 
-	_, err := ValidatePDF(p, "paperback", "white", "invalid_trim", 1, false, false)
-	if err == nil {
-		t.Error("expected error due to invalid trim size")
+	res, err := ValidatePDF(p, "paperback", "white", "invalid_trim", 1, false, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.IsValid {
+		t.Error("expected interior validation to be invalid due to invalid trim size")
+	}
+	foundTrimErr := false
+	for _, e := range res.Errors {
+		if strings.Contains(e, "failed to parse trim size") {
+			foundTrimErr = true
+		}
+	}
+	if !foundTrimErr {
+		t.Errorf("expected trim size parsing error, got: %v", res.Errors)
 	}
 }
 

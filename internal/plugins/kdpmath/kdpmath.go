@@ -347,9 +347,15 @@ func validateCoverPDF(r *pdf.Reader, bindingType string, paperType string, trimS
 		res.Errors = append(res.Errors, fmt.Sprintf("expected exactly 1 page for a cover PDF, got %d pages", numPages))
 	}
 
+	if expectedPageCount <= 0 {
+		res.Errors = append(res.Errors, "expected_page_count must be positive for cover validation")
+		return nil
+	}
+
 	geom, gErr := CalculateGeometry(expectedPageCount, bindingType, paperType, trimSize)
 	if gErr != nil {
-		return fmt.Errorf("failed to calculate expected cover geometry: %w", gErr)
+		res.Errors = append(res.Errors, fmt.Sprintf("failed to calculate expected cover geometry: %v", gErr))
+		return nil
 	}
 
 	res.ExpectedWidthPoints = geom.CoverWidthPoints
@@ -385,7 +391,8 @@ func validateInteriorPDF(r *pdf.Reader, trimSize string, expectedPageCount int, 
 
 	tw, th, parseErr := parseTrimSize(trimSize)
 	if parseErr != nil {
-		return fmt.Errorf("failed to parse trim size: %w", parseErr)
+		res.Errors = append(res.Errors, fmt.Sprintf("failed to parse trim size: %v", parseErr))
+		return nil
 	}
 
 	var expectedWInches, expectedHInches float64
