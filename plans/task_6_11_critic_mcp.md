@@ -37,9 +37,11 @@ Refactor the existing Powerword Local Critic subsystem into a standalone, genera
   - `validation_command`: The command to execute locally (e.g., `make all` or `make lint build check-coverage`).
 - The handler will:
   1. Execute the `validation_command` and capture `stdout`/`stderr`.
-  2. Extract the git diff (using `pw-mcp-git` or local `git` commands).
-  3. Construct the strict reviewer prompt using the provided `plan_content`, validation logs, and diff.
-  4. Query the LLM engine and return the textual analysis containing `VERDICT: ACCEPT` or `VERDICT: REJECT`.
+  2. If the validation command fails, return a verdict of `REJECT` immediately to the client without calling the LLM to save tokens and fail fast.
+  3. Extract the git diff (using `pw-mcp-git` or local `git` commands).
+  4. Construct the strict reviewer prompt using the provided `plan_content`, validation logs, and diff.
+  5. Query the LLM engine and return the textual analysis containing `VERDICT: ACCEPT` or `VERDICT: REJECT`.
+  6. The verdict parser trims whitespace, backticks, asterisks, and quotes to ensure robust classification.
 
 ### Dogfooding the Plugin
 
