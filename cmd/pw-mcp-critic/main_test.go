@@ -16,7 +16,7 @@ func TestRun_WithConfig(t *testing.T) {
 openai = "test-openai-key"
 critic_provider = "openai"
 critic_model = "gpt-4"
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("failed to write dummy config: %v", err)
 	}
@@ -28,8 +28,10 @@ critic_model = "gpt-4"
 	if err != nil {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
-	defer r.Close()
-	defer w.Close()
+	defer func() {
+		_ = r.Close()
+		_ = w.Close()
+	}()
 
 	oldStdin := os.Stdin
 	os.Stdin = r
@@ -56,8 +58,10 @@ func TestRun_NoConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
-	defer r.Close()
-	defer w.Close()
+	defer func() {
+		_ = r.Close()
+		_ = w.Close()
+	}()
 
 	oldStdin := os.Stdin
 	os.Stdin = r
@@ -81,7 +85,7 @@ func TestRun_InvalidConfig(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(`
 [api_keys
 openai = "test-openai-key"
-`), 0644)
+`), 0600)
 	if err != nil {
 		t.Fatalf("failed to write invalid config: %v", err)
 	}
