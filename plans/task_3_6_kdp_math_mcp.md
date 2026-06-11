@@ -7,8 +7,11 @@ This task implements a native Go-based MCP server (`pw-mcp-kdp-math`) that calcu
 ## User Review Required
 
 - **Go Version:** Go 1.26.4
-- **PDF Parser Library Choice:** `rsc.io/pdf` was selected as a pure Go dependency. We implemented `safeReaderAt` (a wrapper around `io.ReaderAt`) to virtually insert a `%` right before `%EOF` to bypass a hardcoded parser bug in the library's `read.go` without mutating physical files on disk.
+- **PDF Parser Library Choice:** `rsc.io/pdf` was selected as a pure Go dependency. We implemented `safeReaderAt` (a wrapper around `io.ReaderAt`) to virtually insert a `%` right before `%EOF` to bypass a hardcoded parser bug in the library's `read.go` without mutating physical files on disk. The virtual insertion buffer was expanded to 1024 bytes to handle extensive trailing whitespace before `%EOF`.
+- **Sandbox Security Checks:** Incorporated path traversal protection (`checkSandbox` using `securejoin`) to reject any inputs that fall outside the workspace boundary.
+- **Rounding Tolerances:** Set page dimensions matching tolerance threshold to `3.6pt` (0.05 inches) to prevent false negatives caused by floating-point rounding variations in PDF exporters.
 - **Complexity Management:** Split parsing, cover validations, and interior validations into clean helper subroutines to ensure cognitive complexity of all functions remained below 20 and passed golangci-lint guidelines.
+
 
 ## Proposed Changes
 
