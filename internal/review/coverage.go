@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,7 +24,7 @@ func VerifyCoverage(ctx context.Context, threshold float64, profilePath string) 
 
 	// Run go tool cover
 	//nolint:gosec // subcommand execution in test/build validator context is safe
-	cmd := exec.CommandContext(ctx, "go", "tool", "cover", "-func="+profilePath)
+	cmd := execCommand(ctx, "go", "tool", "cover", "-func="+profilePath)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout

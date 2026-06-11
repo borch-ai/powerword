@@ -13,6 +13,9 @@ func newCheckCoverageCmd() *cobra.Command {
 		Use:   "check-coverage <threshold> [profile_path]",
 		Short: "Check that test coverage meets a specified threshold percentage",
 		Args:  cobra.RangeArgs(1, 2),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			thresholdStr := args[0]
 			threshold, err := strconv.ParseFloat(thresholdStr, 64)
