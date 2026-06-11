@@ -67,10 +67,17 @@ type ImageGenConfig struct {
 type KDPMathConfig struct {
 }
 
+// SEOConfig holds parameters for the SEO plugin.
+type SEOConfig struct {
+	CacheTTLHours float64 `mapstructure:"cache_ttl_hours"`
+	RateLimitMS   int     `mapstructure:"rate_limit_ms"`
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
 	KDPMath  KDPMathConfig  `mapstructure:"kdp_math"`
+	SEO      SEOConfig      `mapstructure:"seo"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -169,6 +176,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.imagegen.midjourney_polling_interval", "5s")
 	v.SetDefault("plugins.imagegen.midjourney_polling_timeout", "5m")
 	v.SetDefault("plugins.imagegen.google_model", "imagen-3.0-generate-002")
+	v.SetDefault("plugins.seo.cache_ttl_hours", 4.0)
+	v.SetDefault("plugins.seo.rate_limit_ms", 500)
 
 	// Read config files in order
 	var readErr error
@@ -227,6 +236,8 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.imagegen.midjourney_polling_timeout", "POWERWORD_IMAGEGEN_MIDJOURNEY_POLLING_TIMEOUT")
 	bindEnv(v, "plugins.imagegen.google_api_key", "POWERWORD_IMAGEGEN_GOOGLE_API_KEY")
 	bindEnv(v, "plugins.imagegen.google_model", "POWERWORD_IMAGEGEN_GOOGLE_MODEL")
+	bindEnv(v, "plugins.seo.cache_ttl_hours", "POWERWORD_SEO_CACHE_TTL_HOURS")
+	bindEnv(v, "plugins.seo.rate_limit_ms", "POWERWORD_SEO_RATE_LIMIT_MS")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

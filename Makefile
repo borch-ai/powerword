@@ -18,6 +18,7 @@ GIT_PLUGIN=pw-mcp-git
 SHELL_PLUGIN=pw-mcp-shell
 IMAGEGEN_PLUGIN=pw-mcp-imagegen
 KDP_MATH_PLUGIN=pw-mcp-kdp-math
+SEO_PLUGIN=pw-mcp-seo
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -34,6 +35,7 @@ build:
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOBUILD) -o bin/$(SHELL_PLUGIN) ./cmd/$(SHELL_PLUGIN); fi
 	@if [ -d cmd/$(IMAGEGEN_PLUGIN) ]; then $(GOBUILD) -o bin/$(IMAGEGEN_PLUGIN) ./cmd/$(IMAGEGEN_PLUGIN); fi
 	@if [ -d cmd/$(KDP_MATH_PLUGIN) ]; then $(GOBUILD) -o bin/$(KDP_MATH_PLUGIN) ./cmd/$(KDP_MATH_PLUGIN); fi
+	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOBUILD) -o bin/$(SEO_PLUGIN) ./cmd/$(SEO_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -43,6 +45,7 @@ install:
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SHELL_PLUGIN); fi
 	@if [ -d cmd/$(IMAGEGEN_PLUGIN) ]; then $(GOCMD) install ./cmd/$(IMAGEGEN_PLUGIN); fi
 	@if [ -d cmd/$(KDP_MATH_PLUGIN) ]; then $(GOCMD) install ./cmd/$(KDP_MATH_PLUGIN); fi
+	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SEO_PLUGIN); fi
 
 install-hooks:
 	@echo "Installing git hooks..."

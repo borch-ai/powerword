@@ -64,13 +64,13 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.5: Creative Asset Generation Plugin (ImageGen)**
     *   Implement a native Go MCP server supporting OpenAI's DALL-E 3 and custom Midjourney wrappers to generate, catalog, and query consistent style referenced images.
     *   [Implementation Plan](plans/task_3_5_imagegen_mcp.md)
-*   [ ] **Task 3.6: KDP Book Geometry & PDF Validator Plugin (KDP Math)**
+*   [x] **Task 3.6: KDP Book Geometry & PDF Validator Plugin (KDP Math)**
     *   Implement a native Go MCP server to calculate exact cover, interior, margins, and bleed specs for Amazon KDP print books, and run validation on final compiled PDF page dimensions.
     *   [Implementation Plan](plans/task_3_6_kdp_math_mcp.md)
 *   [ ] **Task 3.7: Viral Promo Asset Builder Plugin (Viral)**
     *   Implement a native Go MCP server wrapping TTS engines (ElevenLabs) and generative video tools to synthesize ASMR narration and stitch promotional trailers using local ffmpeg commands.
     *   [Implementation Plan](plans/task_3_7_viral_mcp.md)
-*   [ ] **Task 3.8: Amazon KDP SEO & Metadata Agent Plugin (SEO)**
+*   [x] **Task 3.8: Amazon KDP SEO & Metadata Agent Plugin (SEO)**
     *   Implement a native Go MCP server querying keyword volumes and product search suggestions to formulate listing titles, descriptions, and tag payloads.
     *   [Implementation Plan](plans/task_3_8_seo_mcp.md)
 
