@@ -16,19 +16,19 @@ This task implements a native Go-based MCP server (`pw-mcp-seo`) that queries ma
 ### SEO Plugin Component
 Created new directory `internal/plugins/seo/` containing the keyword search engines.
 
-#### [NEW] [seo.go](file:///Users/human/code/powerword/internal/plugins/seo/seo.go)
+#### [NEW] [seo.go](../internal/plugins/seo/seo.go)
 - [x] Implement search endpoint query helpers.
 - [x] Implement HTML parsing logic for Amazon product pages.
 - [x] Expose the following MCP tools:
   - `seo_analyze_niche`: Queries search suggestion networks to retrieve trending search terms and competitor metadata.
   - `seo_generate_listing`: Generates title, subtitle, seven search keywords, and description copy optimized for Amazon index algorithms.
 
-#### [NEW] [seo_test.go](file:///Users/human/code/powerword/internal/plugins/seo/seo_test.go)
+#### [NEW] [seo_test.go](../internal/plugins/seo/seo_test.go)
 - [x] Unit tests validating search suggestion parsers and mock scraper responses using standard mock round trippers and isolated test cache directories.
 
 ### CLI Manifest Integration
-#### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
-- [x] Register the `pw-mcp-seo` server within the native plugin registry under the config key `[plugins.seo]`.
+#### [MODIFY] [config.go](../internal/config/config.go)
+- [x] Register the SEO plugin configuration structure (cache TTL / rate limit) under the config key `[plugins.seo]`.
 
 ---
 

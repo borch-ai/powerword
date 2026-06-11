@@ -265,23 +265,26 @@ func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]stri
 
 	body, err := s.getWithRetry(ctx, u)
 	if err != nil {
-		return nil, err
+		return []string{}, err
 	}
 
 	var raw []json.RawMessage
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("failed to parse autocomplete response: %w", err)
+		return []string{}, fmt.Errorf("failed to parse autocomplete response: %w", err)
 	}
 
 	if len(raw) > 1 {
 		var suggestions []string
 		if err := json.Unmarshal(raw[1], &suggestions); err != nil {
-			return nil, fmt.Errorf("failed to parse suggestions list: %w", err)
+			return []string{}, fmt.Errorf("failed to parse suggestions list: %w", err)
+		}
+		if suggestions == nil {
+			return []string{}, nil
 		}
 		return suggestions, nil
 	}
 
-	return nil, nil
+	return []string{}, nil
 }
 
 // ExtractASINs pulls unique Amazon ASINs from HTML content using a regex pattern.
@@ -596,7 +599,7 @@ func findNodeByID(n *html.Node, id string) *html.Node {
 func findNodeByClass(n *html.Node, className string) *html.Node {
 	if n.Type == html.ElementNode {
 		for _, attr := range n.Attr {
-			if attr.Key == "class" && strings.Contains(attr.Val, className) {
+			if attr.Key == "class" && matchClasses(attr.Val, className) {
 				return n
 			}
 		}
@@ -607,6 +610,26 @@ func findNodeByClass(n *html.Node, className string) *html.Node {
 		}
 	}
 	return nil
+}
+
+func matchClasses(attrVal, className string) bool {
+	reqClasses := strings.Fields(className)
+	if len(reqClasses) == 0 {
+		return false
+	}
+	actualClasses := strings.Fields(attrVal)
+
+	actualMap := make(map[string]bool)
+	for _, c := range actualClasses {
+		actualMap[c] = true
+	}
+
+	for _, rc := range reqClasses {
+		if !actualMap[rc] {
+			return false
+		}
+	}
+	return true
 }
 
 func getElementText(n *html.Node) string {

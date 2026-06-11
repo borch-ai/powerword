@@ -533,6 +533,25 @@ func TestFetchSuggestionsParsingErrors(t *testing.T) {
 			t.Error("expected suggestions list unmarshal error")
 		}
 	})
+
+	t.Run("Returns empty initialized slice instead of nil", func(t *testing.T) {
+		transport := mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`["query"]`)),
+				Header:     make(http.Header),
+			}, nil
+		})
+		svc := NewSEOService(nil)
+		svc.SetHTTPClient(&http.Client{Transport: transport})
+		suggestions, err := svc.FetchSuggestions(context.Background(), "query-short")
+		if err != nil {
+			t.Fatalf("FetchSuggestions failed: %v", err)
+		}
+		if suggestions == nil {
+			t.Error("expected suggestions to be non-nil slice")
+		}
+	})
 }
 
 func TestAnalyzeNicheSuggestionsError(t *testing.T) {
