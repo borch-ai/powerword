@@ -62,7 +62,7 @@ install-hooks:
 
 
 test:
-	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/... ./internal/...
+	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
 
 check-coverage: test
 	@go run scripts/check_coverage.go $(MIN_COVERAGE) coverage.out
