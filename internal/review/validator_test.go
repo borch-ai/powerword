@@ -527,3 +527,29 @@ None
 	}
 	_ = os.Remove(planPath)
 }
+
+func TestValidatePlans_CoverageBoosters(t *testing.T) {
+	// Test compileTitleRegex with invalid regex pattern
+	r := compileTitleRegex("[invalid-regex")
+	if r == nil {
+		t.Error("expected compileTitleRegex to fall back to default regex, got nil")
+	}
+	if r.String() != `(?i)^#\s+(plan|feat):\s*Task\s+.*$` {
+		t.Errorf("expected fallback regex, got: %s", r.String())
+	}
+
+	// Test compileTitleRegex with empty pattern
+	rEmpty := compileTitleRegex("")
+	if rEmpty == nil {
+		t.Error("expected compileTitleRegex to fall back to default regex on empty pattern, got nil")
+	}
+
+	// Test scanPlanFiles when plans directory does not exist
+	files, err := scanPlanFiles("/non-existent-directory-xyz-123")
+	if err != nil {
+		t.Errorf("expected scanPlanFiles to not return error for non-existent directory, got: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("expected 0 files, got: %d", len(files))
+	}
+}
