@@ -73,11 +73,22 @@ type SEOConfig struct {
 	RateLimitMS   int     `mapstructure:"rate_limit_ms"`
 }
 
+// ViralConfig holds parameters for the Viral plugin.
+type ViralConfig struct {
+	TTSProvider  string `mapstructure:"tts_provider"`  // "openai" or "elevenlabs"
+	TTSAPIKey    string `mapstructure:"tts_api_key"`   // optional override
+	TTSVoiceID   string `mapstructure:"tts_voice_id"`  // voice to use
+	VideoBackend string `mapstructure:"video_backend"` // "veo" or "sora" or "mock"
+	VideoAPIKey  string `mapstructure:"video_api_key"` // optional override
+	FFmpegPath   string `mapstructure:"ffmpeg_path"`   // path to ffmpeg executable
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
 	KDPMath  KDPMathConfig  `mapstructure:"kdp_math"`
 	SEO      SEOConfig      `mapstructure:"seo"`
+	Viral    ViralConfig    `mapstructure:"viral"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -178,6 +189,10 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.imagegen.google_model", "imagen-3.0-generate-002")
 	v.SetDefault("plugins.seo.cache_ttl_hours", 4.0)
 	v.SetDefault("plugins.seo.rate_limit_ms", 500)
+	v.SetDefault("plugins.viral.tts_provider", "openai")
+	v.SetDefault("plugins.viral.tts_voice_id", "alloy")
+	v.SetDefault("plugins.viral.video_backend", "mock")
+	v.SetDefault("plugins.viral.ffmpeg_path", "ffmpeg")
 
 	// Read config files in order
 	var readErr error
@@ -238,6 +253,12 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.imagegen.google_model", "POWERWORD_IMAGEGEN_GOOGLE_MODEL")
 	bindEnv(v, "plugins.seo.cache_ttl_hours", "POWERWORD_SEO_CACHE_TTL_HOURS")
 	bindEnv(v, "plugins.seo.rate_limit_ms", "POWERWORD_SEO_RATE_LIMIT_MS")
+	bindEnv(v, "plugins.viral.tts_provider", "POWERWORD_VIRAL_TTS_PROVIDER")
+	bindEnv(v, "plugins.viral.tts_api_key", "POWERWORD_VIRAL_TTS_API_KEY")
+	bindEnv(v, "plugins.viral.tts_voice_id", "POWERWORD_VIRAL_TTS_VOICE_ID")
+	bindEnv(v, "plugins.viral.video_backend", "POWERWORD_VIRAL_VIDEO_BACKEND")
+	bindEnv(v, "plugins.viral.video_api_key", "POWERWORD_VIRAL_VIDEO_API_KEY")
+	bindEnv(v, "plugins.viral.ffmpeg_path", "POWERWORD_VIRAL_FFMPEG_PATH")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
