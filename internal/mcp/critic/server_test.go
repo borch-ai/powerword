@@ -26,6 +26,13 @@ func TestSetupServer(t *testing.T) {
 	}
 }
 
+func TestSetupServer_NilConfig(t *testing.T) {
+	_, err := SetupServer(t.TempDir(), nil)
+	if err == nil {
+		t.Error("expected error when setting up server with nil config, got nil")
+	}
+}
+
 func TestReviewWorkspace_ValidationCommandAndLLM(t *testing.T) {
 	// 1. Mock ExtractGitDiff
 	origExtract := ExtractGitDiff

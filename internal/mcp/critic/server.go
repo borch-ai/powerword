@@ -3,6 +3,7 @@ package critic
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -42,6 +43,10 @@ const reviewWorkspaceSchema = `{
 
 // SetupServer creates and configures the critic MCP server.
 func SetupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) {
+	if cfg == nil {
+		return nil, errors.New("SetupServer requires non-nil configuration")
+	}
+
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "pw-mcp-critic",
 		Version: "1.0.0",

@@ -28,6 +28,12 @@ func run() error {
 		}
 		workspaceRoot = cwd
 	} else {
+		absPath, err := filepath.Abs(workspaceRoot)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path of workspace root: %w", err)
+		}
+		workspaceRoot = absPath
+
 		if err := os.Chdir(workspaceRoot); err != nil {
 			return fmt.Errorf("failed to change working directory to %s: %w", workspaceRoot, err)
 		}
