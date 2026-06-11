@@ -154,7 +154,7 @@ func TestCalculateGeometry_Hardcover(t *testing.T) {
 	}
 }
 
-// createMinimalPDFBytes returns the exact byte array of a minimal valid PDF with 1 page of 432x648pt (6"x9").
+// createMinimalPDFBytes returns the byte array of a minimal PDF with 1 page of 432x648pt (6"x9") but ending in a single-percent EOF (%EOF) to test the virtual safeReaderAt correction logic.
 func createMinimalPDFBytes() []byte {
 	// Byte offsets must match exactly in the xref table.
 	// We'll write the PDF string parts, compute offsets, and construct the final bytes.

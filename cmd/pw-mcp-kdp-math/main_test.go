@@ -34,7 +34,7 @@ func assertResponse(t *testing.T, res *mcp.CallToolResult, wantError bool, wantS
 	}
 }
 
-// createMinimalPDFBytes returns the exact byte array of a minimal valid PDF with 1 page of 432x648pt (6"x9").
+// createMinimalPDFBytes returns the byte array of a minimal PDF with 1 page of 432x648pt (6"x9") but ending in a single-percent EOF (%EOF) to test the virtual safeReaderAt correction logic.
 func createMinimalPDFBytes() []byte {
 	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
 	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
