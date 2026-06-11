@@ -13,7 +13,7 @@ Written entirely in Go, Powerword prioritizes execution speed, straightforward s
 - **Vendor Independence:** Seamlessly configure and swap between multiple LLM backends.
 - **Agentic Reasoning (ReAct):** The execution loop goes beyond single-turn prompts, supporting multi-turn tool calling that allows the LLM to autonomously explore context and perform actions.
 - **Standardized Extensibility:** Uses the `github.com/modelcontextprotocol/go-sdk` to manage tool lifecycles and capabilities, replacing proprietary plugin systems.
-- **AI Local Critic (Pre-Push hook):** Enforces strict code review policies by leveraging an LLM to compare your local workspace diff against a proposed GitHub Implementation Plan before pushing code.
+- **AI Local Critic (Pre-Push hook):** Enforces strict code review policies by validating local plan structures and relative links before leveraging an LLM to compare local workspace diffs against a proposed GitHub Implementation Plan prior to pushing.
 - **Secure Execution:** Designed with interactive permission guardrails before executing unsafe commands or file modifications.
 
 ## Getting Started
