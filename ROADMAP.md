@@ -91,6 +91,10 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [ ] **Task 4.4: Cloud Orchestrator Plugin (AWS/GCP)**
     *   Create a lightweight Go MCP server to parse cloud console resource metadata (EC2/GCE states, cloud watch logs, storage buckets) to query deployment status.
     *   [Implementation Plan](plans/task_4_4_cloud_mcp.md)
+*   [ ] **Task 4.5: Shareable Telemetry Subpackage Refactor**
+    *   Refactor the telemetry and token cost accounting logic from `internal/llm/telemetry.go` to a dependency-free public package `pkg/telemetry`.
+    *   Change the module name of `powerword` to `github.com/borch-ai/powerword` so it is importable.
+    *   [Implementation Plan](plans/task_4_5_telemetry_refactor.md)
 
 ---
 
@@ -106,3 +110,6 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [x] **Task 5.3: Autonomous Review-Repair & Issue Comment Orchestration**
     *   Evolve the ReAct execution loop to read tasks directly from GitHub issues, run local checks, push changes, and publish progress updates and state reports back as issue comments.
     *   [Implementation Plan](plans/task_5_3_autonomous_repair_loop.md)
+*   [ ] **Task 5.4: MCP Telemetry Migration**
+    *   Extract local telemetry calculations into a standalone `pw-mcp-telemetry` MCP server, and refactor Powerword to query it over standard I/O.
+    *   [Implementation Plan](plans/task_5_4_mcp_telemetry_migration.md)

@@ -247,7 +247,11 @@ func (s *ViralService) GenerateVoiceover(ctx context.Context, script string, voi
 		return "", fmt.Errorf("failed to create generated_media directory: %w", mkdirErr)
 	}
 
-	filename := fmt.Sprintf("voiceover_%d.mp3", time.Now().UnixNano())
+	ext := ".mp3"
+	if prov == "mock" {
+		ext = ".m4a"
+	}
+	filename := fmt.Sprintf("voiceover_%d%s", time.Now().UnixNano(), ext)
 	filePath := filepath.Join(dir, filename)
 
 	var audioBytes []byte
@@ -282,7 +286,7 @@ func (s *ViralService) GenerateVoiceover(ctx context.Context, script string, voi
 		}
 		return filePath, nil
 	default:
-		return "", fmt.Errorf("unsupported TTS provider %q", provider)
+		return "", fmt.Errorf("unsupported TTS provider %q", prov)
 	}
 
 	if saveErr := os.WriteFile(filePath, audioBytes, 0600); saveErr != nil {
@@ -357,6 +361,8 @@ func (s *ViralService) StitchTrailer(ctx context.Context, videoPath, audioPath, 
 	outName := outputName
 	if outName == "" {
 		outName = fmt.Sprintf("trailer_%d.mp4", time.Now().UnixNano())
+	} else {
+		outName = filepath.Base(outName)
 	}
 	if !strings.HasSuffix(outName, ".mp4") {
 		outName += ".mp4"

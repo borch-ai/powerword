@@ -75,10 +75,10 @@ type SEOConfig struct {
 
 // ViralConfig holds parameters for the Viral plugin.
 type ViralConfig struct {
-	TTSProvider  string `mapstructure:"tts_provider"`  // "openai" or "elevenlabs"
+	TTSProvider  string `mapstructure:"tts_provider"`  // "openai", "elevenlabs", or "mock"
 	TTSAPIKey    string `mapstructure:"tts_api_key"`   // optional override
 	TTSVoiceID   string `mapstructure:"tts_voice_id"`  // voice to use
-	VideoBackend string `mapstructure:"video_backend"` // "veo" or "sora" or "mock"
+	VideoBackend string `mapstructure:"video_backend"` // "veo" or "mock"
 	VideoAPIKey  string `mapstructure:"video_api_key"` // optional override
 	FFmpegPath   string `mapstructure:"ffmpeg_path"`   // path to ffmpeg executable
 }

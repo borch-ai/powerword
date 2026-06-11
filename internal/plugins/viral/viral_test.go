@@ -697,4 +697,10 @@ func TestUncoveredBranches(t *testing.T) {
 	if err == nil {
 		t.Error("expected mkdir error in StitchTrailer, got nil")
 	}
+
+	// 6. generateTTSMock command run failure (failed command script)
+	err = svcFailed.generateTTSMock(context.Background(), filepath.Join(tmpDir, "out.m4a"))
+	if err == nil {
+		t.Error("expected generateTTSMock ffmpeg command execution failure, got nil")
+	}
 }

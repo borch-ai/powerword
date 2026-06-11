@@ -70,7 +70,7 @@ const (
 			},
 			"provider": {
 				"type": "string",
-				"description": "Optional provider override ('openai' or 'elevenlabs')."
+				"description": "Optional provider override ('openai', 'elevenlabs', or 'mock')."
 			}
 		},
 		"required": ["script"]
