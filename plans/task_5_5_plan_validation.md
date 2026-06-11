@@ -26,16 +26,16 @@ Integrate plan template and relative link conformance checks directly into the `
 
 ### Configuration
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../pkg/config/config.go)
 - Add `PlanTemplate` field to the `Config` structure (`plan_template` mapstructure tag).
 - Bind it to environment variable `POWERWORD_PLAN_TEMPLATE` and default settings.
 
 ### Review Subsystem
 
-#### [NEW] [default_template.md](file:///Users/human/code/powerword/internal/review/default_template.md)
+#### [NEW] [default_template.md](file://../internal/review/default_template.md)
 - Define a generic default implementation plan template to embed.
 
-#### [NEW] [validator.go](file:///Users/human/code/powerword/internal/review/validator.go)
+#### [NEW] [validator.go](file://../internal/review/validator.go)
 - Use `//go:embed default_template.md` to embed the generic fallback template.
 - Implement `ValidatePlans(workspaceRoot string, cfg *config.Config) error` which:
   1. Resolves the active template text using the resolution order (workspace file -> global config path -> embedded fallback).
@@ -52,7 +52,7 @@ Integrate plan template and relative link conformance checks directly into the `
      * Completed new files (`[NEW]` when `Status: Completed`) exist on disk.
 - If any validation errors are found, aggregate all errors across files and return a structured validation error.
 
-#### [MODIFY] [critic.go](file:///Users/human/code/powerword/internal/review/critic.go)
+#### [MODIFY] [critic.go](file://../internal/review/critic.go)
 - At the start of `VerifyWorkspace(...)`, run `ValidatePlans(".", cfg)`.
 - Return the conformance errors immediately on failure to enforce a fail-fast quality gate.
 

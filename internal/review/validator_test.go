@@ -420,3 +420,85 @@ func TestValidatePlans_AdditionalFailures(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePlans_CopilotComments(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{}
+
+	// 1. Unreadable template file (e.g. is a directory) returns error
+	plansDir := filepath.Join(tmpDir, "plans")
+	if err := os.Mkdir(plansDir, 0750); err != nil {
+		t.Fatalf("failed to create plans dir: %v", err)
+	}
+	localTmplDir := filepath.Join(plansDir, "TEMPLATE.md")
+	if err := os.Mkdir(localTmplDir, 0750); err != nil {
+		t.Fatalf("failed to create TEMPLATE.md directory: %v", err)
+	}
+	_, errResolve := resolveTemplate(tmpDir, cfg)
+	if errResolve == nil {
+		t.Error("expected error resolving directory as template, got nil")
+	}
+	_ = os.Remove(localTmplDir)
+
+	// 2. Compatibility normalization for /code/powerword/ and /powerword/ paths
+	dummyFile := filepath.Join(tmpDir, "some_file.go")
+	if errWrite := os.WriteFile(dummyFile, []byte("package main"), 0600); errWrite != nil {
+		t.Fatalf("failed to write dummy file: %v", errWrite)
+	}
+
+	planContent := `# plan: Task 1.1: Compatibility Normalized Plan
+**Status:** Open
+
+## User Review Required
+None
+
+## Proposed Changes
+#### [MODIFY] [some_file.go](file:///Users/human/code/powerword/some_file.go)
+- Edit it.
+
+## Verification Plan
+### Automated Tests
+- Run tests.
+`
+	planPath := filepath.Join(plansDir, "task_1_1.md")
+	if errWritePlan := os.WriteFile(planPath, []byte(planContent), 0600); errWritePlan != nil {
+		t.Fatalf("failed to write plan: %v", errWritePlan)
+	}
+
+	errValidate := ValidatePlans(tmpDir, cfg)
+	if errValidate != nil {
+		t.Errorf("expected compatibility normalization to resolve absolute path, got error: %v", errValidate)
+	}
+	_ = os.Remove(planPath)
+
+	// 3. Outside workspace path returns early
+	outsidePlanContent := `# plan: Task 1.1: Outside Workspace early return
+**Status:** Open
+
+## User Review Required
+None
+
+## Proposed Changes
+#### [MODIFY] [non_existent.go](file:///etc/hosts)
+- Edit it.
+
+## Verification Plan
+`
+	if errWriteOutside := os.WriteFile(planPath, []byte(outsidePlanContent), 0600); errWriteOutside != nil {
+		t.Fatalf("failed to write outside plan: %v", errWriteOutside)
+	}
+	errValidateOutside := ValidatePlans(tmpDir, cfg)
+	if errValidateOutside == nil {
+		t.Error("expected validation to fail for outside path")
+	} else {
+		errMsg := errValidateOutside.Error()
+		if !strings.Contains(errMsg, "outside workspace root") {
+			t.Errorf("expected outside workspace root error, got: %s", errMsg)
+		}
+		// Ensure it didn't do basename checks on /etc/hosts or os.Stat checks
+		if strings.Contains(errMsg, "link label") || strings.Contains(errMsg, "does not exist on disk") {
+			t.Errorf("expected validation to return early on outside path, but got other errors: %s", errMsg)
+		}
+	}
+	_ = os.Remove(planPath)
+}

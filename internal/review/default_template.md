@@ -27,10 +27,10 @@ Detail the changes grouped by package, module, or component layer. List modified
 
 Detailed summary of changes. For specific files, use formatting:
 
-#### [MODIFY] [file_basename](file:///absolute/path/to/modifiedfile)
+#### [MODIFY] [file_basename](file://../relative/path/to/modifiedfile)
 - [ ] Describe the exact changes to be made.
 
-#### [NEW] [file_basename](file:///absolute/path/to/newfile)
+#### [NEW] [file_basename](file://../relative/path/to/newfile)
 - [ ] Describe the structure and functionality of the new file.
 
 ---

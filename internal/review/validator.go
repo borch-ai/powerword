@@ -41,9 +41,15 @@ func ValidatePlans(workspaceRoot string, cfg *config.Config) error {
 	}
 
 	templateHeadings, titlePatternStr := parseTemplateHeaders(templateText)
-	titleRegex, err := regexp.Compile(titlePatternStr)
-	if err != nil {
+	var titleRegex *regexp.Regexp
+	if titlePatternStr == "" {
 		titleRegex = regexp.MustCompile(`(?i)^#\s+(plan|feat):\s*Task\s+.*$`)
+	} else {
+		if r, errCompile := regexp.Compile(titlePatternStr); errCompile == nil {
+			titleRegex = r
+		} else {
+			titleRegex = regexp.MustCompile(`(?i)^#\s+(plan|feat):\s*Task\s+.*$`)
+		}
 	}
 
 	plansPattern := filepath.Join(workspaceRoot, "plans", "task_*.md")
@@ -79,9 +85,10 @@ func resolveTemplate(workspaceRoot string, cfg *config.Config) (string, error) {
 	if _, err := os.Stat(workspacePath); err == nil {
 		//nolint:gosec
 		content, err := os.ReadFile(workspacePath)
-		if err == nil {
-			return string(content), nil
+		if err != nil {
+			return "", fmt.Errorf("failed to read workspace plan template %s: %w", workspacePath, err)
 		}
+		return string(content), nil
 	}
 
 	// 2. Global Config
@@ -90,9 +97,10 @@ func resolveTemplate(workspaceRoot string, cfg *config.Config) (string, error) {
 		if _, err := os.Stat(cfg.PlanTemplate); err == nil {
 			//nolint:gosec
 			content, err := os.ReadFile(cfg.PlanTemplate)
-			if err == nil {
-				return string(content), nil
+			if err != nil {
+				return "", fmt.Errorf("failed to read global plan template %s: %w", cfg.PlanTemplate, err)
 			}
+			return string(content), nil
 		}
 	}
 
@@ -276,6 +284,7 @@ func validateLink(workspaceRoot, planFile string, lineNum int, line string, labe
 	isInside := absPath == cleanRoot || strings.HasPrefix(absPath, cleanRoot+string(filepath.Separator))
 	if !isInside {
 		errs = append(errs, fmt.Sprintf("%s:%d: path %q resolves to %q which is outside workspace root %q", planFile, lineNum, pathStr, absPath, cleanRoot))
+		return errs
 	}
 
 	expectedBasename := filepath.Base(absPath)
@@ -306,6 +315,15 @@ func validateLink(workspaceRoot, planFile string, lineNum int, line string, labe
 
 func getAbsolutePath(workspaceRoot, pathStr string) (string, error) {
 	pathStr = strings.TrimPrefix(pathStr, "file://")
+
+	// Compatibility normalization for historical absolute /Users/human/code/powerword/ paths
+	for _, marker := range []string{"/code/powerword/", "/powerword/"} {
+		if idx := strings.Index(pathStr, marker); idx != -1 {
+			suffix := pathStr[idx+len(marker):]
+			absPath := filepath.Clean(filepath.Join(workspaceRoot, suffix))
+			return filepath.Abs(absPath)
+		}
+	}
 
 	var absPath string
 	if filepath.IsAbs(pathStr) || strings.HasPrefix(pathStr, "/") {
