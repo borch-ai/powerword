@@ -12,9 +12,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"powerword/internal/config"
-	"powerword/internal/llm"
-	"powerword/internal/plugins/seo"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/llm"
+	"github.com/borch-ai/powerword/internal/plugins/seo"
 )
 
 type mockRoundTripper func(req *http.Request) (*http.Response, error)

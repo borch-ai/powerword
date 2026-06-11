@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 func almostEqual(a, b float64) bool {

@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"powerword/internal/config"
-	"powerword/internal/plugins/viral"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/plugins/viral"
 )
 
 func main() {

@@ -6,7 +6,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"powerword/internal/llm"
+	"github.com/borch-ai/powerword/internal/llm"
 )
 
 // TranslateTools converts MCP tools into generic LLM ToolDefinitions.

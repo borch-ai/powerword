@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 // ModelRouter is responsible for determining which LLM model to use

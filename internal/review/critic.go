@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"powerword/internal/config"
-	"powerword/internal/llm"
-	internalmcp "powerword/internal/mcp"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/llm"
+	internalmcp "github.com/borch-ai/powerword/internal/mcp"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )

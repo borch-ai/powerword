@@ -23,7 +23,7 @@ VIRAL_PLUGIN=pw-mcp-viral
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
-LDFLAGS=-ldflags "-X powerword/internal/config.Version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/borch-ai/powerword/internal/config.Version=$(VERSION)"
 
 all: markdown-lint lint vuln check-coverage build
 

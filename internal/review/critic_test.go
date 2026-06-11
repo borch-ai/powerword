@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 func init() {

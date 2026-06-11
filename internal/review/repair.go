@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"strings"
 
-	"powerword/internal/config"
-	"powerword/internal/loop"
+	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/loop"
 )
 
 var loopRunLoop = loop.RunLoop

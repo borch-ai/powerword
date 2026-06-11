@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"powerword/internal/config"
+	"github.com/borch-ai/powerword/internal/config"
 )
 
 func TestNewServerProcess_EmptyCommand(t *testing.T) {
