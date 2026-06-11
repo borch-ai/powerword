@@ -97,6 +97,10 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 		return errors.New("VerifyWorkspace requires non-nil plan and cfg")
 	}
 
+	if err := ValidatePlans(".", cfg); err != nil {
+		return err
+	}
+
 	validationCmd := ""
 	if checkMakefileExists() {
 		validationCmd = "make all"

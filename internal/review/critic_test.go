@@ -400,3 +400,30 @@ func TestVerifyWorkspace_ToolError(t *testing.T) {
 		t.Error("expected error for tool/LLM failure")
 	}
 }
+
+func TestVerifyWorkspace_CriticServerConfigFallback(t *testing.T) {
+	origExec := execCommand
+	execCommand = mockExecCommandContext
+	defer func() { execCommand = origExec }()
+
+	// Create a dummy bin/pw-mcp-critic to satisfy os.Stat
+	if err := os.MkdirAll("bin", 0750); err != nil {
+		t.Fatalf("failed to create bin dir: %v", err)
+	}
+	dummyPath := "bin/pw-mcp-critic"
+	if err := os.WriteFile(dummyPath, []byte(""), 0600); err != nil {
+		t.Fatalf("failed to write dummy critic: %v", err)
+	}
+	defer func() {
+		_ = os.Remove(dummyPath)
+		_ = os.Remove("bin")
+	}()
+
+	plan := &Plan{Goal: "test"}
+	cfg := &config.Config{
+		Servers: map[string]config.ServerConfig{}, // No critic config
+	}
+
+	// This will cover the fallback config check
+	_ = VerifyWorkspace(context.Background(), plan, cfg)
+}

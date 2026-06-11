@@ -1,6 +1,11 @@
 # plan: Task [Task Number]: [Task Title]
 
 **Status:** Open (Issue #[TBD])
+<!-- Note: When status is set to Completed, the following metadata fields must also be provided:
+**Go Version:** [Go Version]
+**Date Completed:** [Date Completed]
+**Unit Test Coverage:** [Unit Test Coverage]
+-->
 
 Provide a brief description of the goal of this task, any background context, and what the changes accomplish.
 
@@ -22,10 +27,10 @@ Detail the changes grouped by package, module, or component layer. List modified
 
 Detailed summary of changes. For specific files, use formatting:
 
-#### [MODIFY] [file_basename](file:///Users/human/code/powerword/path/to/file.go)
+#### [MODIFY] [file_basename](file:///absolute/path/to/modifiedfile)
 - [ ] Describe the exact changes to be made.
 
-#### [NEW] [file_basename](file:///Users/human/code/powerword/path/to/new_file.go)
+#### [NEW] [file_basename](file:///absolute/path/to/newfile)
 - [ ] Describe the structure and functionality of the new file.
 
 ---
