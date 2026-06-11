@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -28,7 +29,12 @@ func newCheckCoverageCmd() *cobra.Command {
 				profilePath = args[1]
 			}
 
-			return review.VerifyCoverage(cmd.Context(), threshold, profilePath)
+			ctx := cmd.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+
+			return review.VerifyCoverage(ctx, threshold, profilePath)
 		},
 	}
 	return cmd

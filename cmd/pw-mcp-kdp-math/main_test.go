@@ -168,7 +168,8 @@ func TestKDPMath_MCP_ValidatePDF(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CallTool kdp_validate_pdf error call failed: %v", err)
 	}
-	assertResponse(t, valErrRes, true, "failed to validate PDF")
+	assertResponse(t, valErrRes, false, "failed to parse trim size")
+	assertResponse(t, valErrRes, false, `"is_valid": false`)
 }
 
 func TestKDPMath_MCP_GenerateManifest(t *testing.T) {
