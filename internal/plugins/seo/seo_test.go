@@ -400,7 +400,14 @@ func TestParserDescriptionFallback(t *testing.T) {
 }
 
 func TestGetCacheDirFallbacks(t *testing.T) {
-	t.Setenv("HOME", "")
+	// Create a temp file to act as the HOME dir, preventing directory creation under it
+	tempFile, err := os.CreateTemp(t.TempDir(), "home-file-*")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	_ = tempFile.Close()
+
+	t.Setenv("HOME", tempFile.Name())
 	svc := NewSEOService(nil)
 	dir := svc.getCacheDir()
 	if !strings.Contains(dir, "powerword-seo-cache") {

@@ -22,6 +22,26 @@ import (
 	"powerword/internal/llm"
 )
 
+var (
+	asinRx          = regexp.MustCompile(`/(?:dp|gp/product)/([A-Z0-9]{10})`)
+	titleRx         = regexp.MustCompile(`id="productTitle"[^>]*>\s*([^<]+?)\s*</span>`)
+	subtitleRx      = regexp.MustCompile(`id="productSubtitle"[^>]*>\s*([^<]+?)\s*</span>`)
+	descRx          = regexp.MustCompile(`bookDescription_feature_div[^>]*>.*?<noscript>\s*<div>\s*([\s\S]+?)\s*</div>\s*</noscript>`)
+	authorRx        = regexp.MustCompile(`class="[^"]*author[^"]*"[^>]*>.*?<a[^>]*>([^<]+)</a>`)
+	authorRx2       = regexp.MustCompile(`contributorNameID[^>]*>([^<]+)`)
+	priceRx         = regexp.MustCompile(`<span class="a-price-whole">([0-9.,]+)`)
+	priceFractionRx = regexp.MustCompile(`<span class="a-price-fraction">([0-9]+)`)
+	priceAltRx      = regexp.MustCompile(`\$([0-9]+\.[0-9]{2})`)
+	ratingRx        = regexp.MustCompile(`([0-9.]+)\s+out of 5 stars`)
+	pubDateRx       = regexp.MustCompile(`Publication date\s*:\s*\x{200e}?([A-Za-z0-9\s,]+)`)
+	publisherRx     = regexp.MustCompile(`Publisher\s*:\s*\x{200e}?([A-Za-z0-9\s,.-]+)`)
+	bsrRx           = regexp.MustCompile(`(?:Best Sellers Rank|Best Seller Rank):\s*#([0-9,]+)`)
+	bsrAltRx        = regexp.MustCompile(`#([0-9,]+)\s+in\s+(?:Books|Kindle Store|Audible Books & Originals)`)
+	reviewsRx       = regexp.MustCompile(`id="acrCustomerReviewText"[^>]*>\s*([0-9,]+)`)
+	reviewsAltRx    = regexp.MustCompile(`([0-9,]+)\s+ratings`)
+	htmlTagRx       = regexp.MustCompile(`<[^>]*>`)
+)
+
 // CompetitorBook represents a competitor's metadata parsed from Amazon.
 type CompetitorBook struct {
 	ASIN            string  `json:"asin"`
@@ -214,7 +234,11 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 	}
 
 	var lastErr error
-	backoff := 500 * time.Millisecond
+	rateLimitMs := s.cfg.Plugins.SEO.RateLimitMS
+	if rateLimitMs <= 0 {
+		rateLimitMs = 500
+	}
+	backoff := time.Duration(rateLimitMs) * time.Millisecond
 	maxRetries := 3
 
 	for i := 0; i < maxRetries; i++ {
@@ -262,8 +286,7 @@ func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]stri
 
 // ExtractASINs pulls unique Amazon ASINs from HTML content using a regex pattern.
 func ExtractASINs(htmlContent string) []string {
-	re := regexp.MustCompile(`/(?:dp|gp/product)/([A-Z0-9]{10})`)
-	matches := re.FindAllStringSubmatch(htmlContent, -1)
+	matches := asinRx.FindAllStringSubmatch(htmlContent, -1)
 
 	seen := make(map[string]bool)
 	var asins []string
@@ -297,18 +320,17 @@ func (s *SEOService) ParseProductPage(asin string, htmlContent string) Competito
 	}
 
 	if book.Title == "" {
-		if m := regexp.MustCompile(`id="productTitle"[^>]*>\s*([^<]+?)\s*</span>`).FindStringSubmatch(htmlContent); len(m) > 1 {
+		if m := titleRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 			book.Title = strings.TrimSpace(m[1])
 		}
 	}
 	if book.Subtitle == "" {
-		if m := regexp.MustCompile(`id="productSubtitle"[^>]*>\s*([^<]+?)\s*</span>`).FindStringSubmatch(htmlContent); len(m) > 1 {
+		if m := subtitleRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 			book.Subtitle = strings.TrimSpace(m[1])
 		}
 	}
 	if book.Description == "" {
-		descRe := regexp.MustCompile(`bookDescription_feature_div[^>]*>.*?<noscript>\s*<div>\s*([\s\S]+?)\s*</div>\s*</noscript>`)
-		if m := descRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+		if m := descRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 			book.Description = strings.TrimSpace(m[1])
 		}
 	}
@@ -326,38 +348,32 @@ func (s *SEOService) ParseProductPage(asin string, htmlContent string) Competito
 }
 
 func parseAuthor(htmlContent string) string {
-	authorRe := regexp.MustCompile(`class="[^"]*author[^"]*"[^>]*>.*?<a[^>]*>([^<]+)</a>`)
-	if m := authorRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := authorRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		return strings.TrimSpace(m[1])
 	}
-	authorRe2 := regexp.MustCompile(`contributorNameID[^>]*>([^<]+)`)
-	if m2 := authorRe2.FindStringSubmatch(htmlContent); len(m2) > 1 {
+	if m2 := authorRx2.FindStringSubmatch(htmlContent); len(m2) > 1 {
 		return strings.TrimSpace(m2[1])
 	}
 	return ""
 }
 
 func parsePrice(htmlContent string) string {
-	priceRe := regexp.MustCompile(`<span class="a-price-whole">([0-9.,]+)`)
-	if m := priceRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := priceRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		fraction := "00"
-		fractionRe := regexp.MustCompile(`<span class="a-price-fraction">([0-9]+)`)
-		if mf := fractionRe.FindStringSubmatch(htmlContent); len(mf) > 1 {
+		if mf := priceFractionRx.FindStringSubmatch(htmlContent); len(mf) > 1 {
 			fraction = mf[1]
 		}
 		whole := strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(m[1]), "."), ",")
 		return "$" + whole + "." + fraction
 	}
-	priceRe2 := regexp.MustCompile(`\$([0-9]+\.[0-9]{2})`)
-	if m2 := priceRe2.FindStringSubmatch(htmlContent); len(m2) > 1 {
+	if m2 := priceAltRx.FindStringSubmatch(htmlContent); len(m2) > 1 {
 		return "$" + m2[1]
 	}
 	return ""
 }
 
 func parseRating(htmlContent string) float64 {
-	ratingRe := regexp.MustCompile(`([0-9.]+)\s+out of 5 stars`)
-	if m := ratingRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := ratingRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		if rate, err := strconv.ParseFloat(m[1], 64); err == nil {
 			return rate
 		}
@@ -366,16 +382,14 @@ func parseRating(htmlContent string) float64 {
 }
 
 func parsePublicationDate(htmlContent string) string {
-	pubDateRe := regexp.MustCompile(`Publication date\s*:\s*\x{200e}?([A-Za-z0-9\s,]+)`)
-	if m := pubDateRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := pubDateRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		return strings.TrimSpace(m[1])
 	}
 	return ""
 }
 
 func parsePublisher(htmlContent string) string {
-	publisherRe := regexp.MustCompile(`Publisher\s*:\s*\x{200e}?([A-Za-z0-9\s,.-]+)`)
-	if m := publisherRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := publisherRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		return strings.TrimSpace(m[1])
 	}
 	return ""
@@ -383,15 +397,13 @@ func parsePublisher(htmlContent string) string {
 
 // parseBSR parses the best seller rank from Amazon product page HTML.
 func parseBSR(htmlContent string) int {
-	bsrRe := regexp.MustCompile(`(?:Best Sellers Rank|Best Seller Rank):\s*#([0-9,]+)`)
-	if m := bsrRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := bsrRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		val := strings.ReplaceAll(m[1], ",", "")
 		if rank, err := strconv.Atoi(val); err == nil {
 			return rank
 		}
 	}
-	bsrRe2 := regexp.MustCompile(`#([0-9,]+)\s+in\s+(?:Books|Kindle Store|Audible Books & Originals)`)
-	if m2 := bsrRe2.FindStringSubmatch(htmlContent); len(m2) > 1 {
+	if m2 := bsrAltRx.FindStringSubmatch(htmlContent); len(m2) > 1 {
 		val := strings.ReplaceAll(m2[1], ",", "")
 		if rank, err := strconv.Atoi(val); err == nil {
 			return rank
@@ -402,15 +414,13 @@ func parseBSR(htmlContent string) int {
 
 // parseReviewsCount parses the number of ratings/reviews from Amazon product page HTML.
 func parseReviewsCount(htmlContent string) int {
-	reviewsRe := regexp.MustCompile(`id="acrCustomerReviewText"[^>]*>\s*([0-9,]+)`)
-	if m := reviewsRe.FindStringSubmatch(htmlContent); len(m) > 1 {
+	if m := reviewsRx.FindStringSubmatch(htmlContent); len(m) > 1 {
 		val := strings.ReplaceAll(m[1], ",", "")
 		if count, err := strconv.Atoi(val); err == nil {
 			return count
 		}
 	}
-	reviewsRe2 := regexp.MustCompile(`([0-9,]+)\s+ratings`)
-	if m2 := reviewsRe2.FindStringSubmatch(htmlContent); len(m2) > 1 {
+	if m2 := reviewsAltRx.FindStringSubmatch(htmlContent); len(m2) > 1 {
 		val := strings.ReplaceAll(m2[1], ",", "")
 		if count, err := strconv.Atoi(val); err == nil {
 			return count
@@ -626,6 +636,5 @@ func extractDescription(n *html.Node) string {
 }
 
 func stripHTML(s string) string {
-	re := regexp.MustCompile(`<[^>]*>`)
-	return strings.TrimSpace(re.ReplaceAllString(s, ""))
+	return strings.TrimSpace(htmlTagRx.ReplaceAllString(s, ""))
 }
