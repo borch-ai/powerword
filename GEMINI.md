@@ -78,7 +78,7 @@ Powerword works in tandem with other applications (e.g., the Lamplighter dashboa
 
 - **Coverage Requirement:** We enforce a strict **91% unit test coverage** across the codebase.
 - **Verification Commands:**
-  - Run tests and check coverage threshold: `make check-coverage` (which utilizes the custom validator script [check_coverage.go](file:///Users/human/code/powerword/scripts/check_coverage.go)).
+  - Run tests and check coverage threshold: `make check-coverage` (which utilizes the CLI subcommand `check-coverage`).
   - Generate visual HTML coverage report: `go tool cover -html=coverage.out` after running tests.
 - **Unit Tests:**
   - Place unit tests in the same directory as the code under test (suffix `_test.go`).

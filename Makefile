@@ -65,7 +65,7 @@ test:
 	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
 
 check-coverage: test
-	@go run scripts/check_coverage.go $(MIN_COVERAGE) coverage.out
+	$(GOCMD) run ./cmd/powerword check-coverage $(MIN_COVERAGE) coverage.out
 
 markdown-lint:
 	$(GOCMD) run scripts/lint_markdown/main.go

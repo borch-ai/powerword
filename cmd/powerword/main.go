@@ -14,6 +14,7 @@ func main() {
 	rootCmd.AddCommand(newModelsCmd())
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRunCmd())
+	rootCmd.AddCommand(newCheckCoverageCmd())
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
