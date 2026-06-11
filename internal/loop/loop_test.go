@@ -11,6 +11,7 @@ import (
 
 	"github.com/borch-ai/powerword/pkg/config"
 	"github.com/borch-ai/powerword/pkg/llm"
+	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
 type mockLLMClient struct {
@@ -365,8 +366,8 @@ func TestPrintJSONPayload(t *testing.T) {
 	os.Stdout = w
 	defer func() { os.Stdout = oldStdout }()
 
-	tracker := llm.NewUsageTracker()
-	tracker.RecordUsage("test", llm.TokenUsage{InputTokens: 10, OutputTokens: 20})
+	tracker := telemetry.NewUsageTracker()
+	tracker.RecordUsage("test", telemetry.TokenUsage{InputTokens: 10, OutputTokens: 20})
 	printJSONPayload(nil, []llm.Message{
 		{Role: llm.RoleAssistant, Content: "Hello"},
 		{Role: llm.RoleAssistant, ToolCalls: []llm.ToolCall{{Name: "test"}}},
@@ -488,5 +489,59 @@ func TestGetOutputWriter(t *testing.T) {
 	w = getOutputWriter(cfg)
 	if w != custom {
 		t.Errorf("expected custom writer, got %v", w)
+	}
+}
+
+func TestRunLoop_TelemetrySummary(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Content: "Hello world!",
+				Usage:   &llm.TokenUsage{InputTokens: 100000, OutputTokens: 200000},
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Verbose:           true,
+		Model:             "test-model",
+		MaxLoopIterations: 3,
+		Pricing: map[string]telemetry.ModelPricing{
+			"test-model": {Input: 1.0, Output: 2.0}, // $1.00 / 1M input, $2.00 / 1M output
+		},
+	}
+
+	// Capture stderr
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	err := RunLoop(ctx, cfg, "test prompt")
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	buf := make([]byte, 4096)
+	n, _ := r.Read(buf)
+	_ = r.Close()
+	output := string(buf[:n])
+
+	// Estimated cost: 100k * 1 / 1M + 200k * 2 / 1M = 0.1 + 0.4 = $0.50
+	if !strings.Contains(output, "Estimated Cost: $0.50000") {
+		t.Errorf("expected telemetry summary to contain 'Estimated Cost: $0.50000', got output: %s", output)
+	}
+	if !strings.Contains(output, "Total Tokens: 300000 (100000 In, 200000 Out)") {
+		t.Errorf("expected telemetry summary to contain correct token counts, got output: %s", output)
 	}
 }

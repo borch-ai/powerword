@@ -1,0 +1,52 @@
+# plan: Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite
+
+**Status:** Open (Issue #[TBD])
+
+Implement a dedicated suite of integration tests (utilizing the `//go:build integration` tag) to verify the compiled binary (`powerword`) execution flows and real Model Context Protocol (MCP) transport connectivity.
+
+## User Review Required
+
+> [!NOTE]
+> **Build Tag Separation**:
+> These integration tests will be excluded from the default `go test ./...` command to maintain the speed of local unit test cycles and prevent test coverage verification issues under `make check-coverage`. They will be executed via a dedicated target (e.g. `make test-integration` or `go test -tags=integration ./...`).
+
+## Proposed Changes
+
+### Integration Testing Component
+
+#### [NEW] [cli_integration_test.go](file:///Users/human/code/powerword/internal/loop/cli_integration_test.go)
+- Create a test file utilizing the `//go:build integration` tag to verify the compiled `powerword` binary.
+- Build the binary dynamically to a temporary path during `TestMain`.
+- Verify the following CLI flows:
+  * Running in headless JSON output mode (`--json`) with mocked LLM environment variables.
+  * Loading and unmarshaling a custom `powerword.toml` configuration containing token pricing.
+  * Correct CLI exit codes for success, configuration parsing error, and connection timeouts.
+  * Resuming past session state files from a temporary directory using `--session`.
+
+#### [NEW] [mcp_integration_test.go](file:///Users/human/code/powerword/internal/mcp/mcp_integration_test.go)
+- Create a test file utilizing the `//go:build integration` tag to test native Go MCP plugin execution.
+- Compile one of the native plugins (e.g. `pw-mcp-fs`) dynamically.
+- Spawn the plugin subprocess and establish a real `stdio` MCP transport connection.
+- Verify:
+  * Handshake and schema/capability discovery (`tools/list`).
+  * Executing a basic file-read tool and asserting response payload serialization.
+  * Proper process cleanup and signal handling when transport closes.
+
+---
+
+### Makefile
+
+#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+- Add a new `test-integration` target:
+  ```makefile
+  test-integration:
+  	go test -v -tags=integration ./...
+  ```
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run command: `make test-integration`
+- Verify that both CLI pipeline tests and real stdio MCP plugin tests pass.

@@ -12,6 +12,7 @@ import (
 	"github.com/borch-ai/powerword/internal/mcp"
 	"github.com/borch-ai/powerword/pkg/config"
 	"github.com/borch-ai/powerword/pkg/llm"
+	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
 // newClient is a package-level variable that defaults to llm.NewClient.
@@ -20,10 +21,10 @@ var newClient = llm.NewClient
 
 // JSONPayload represents the structured output for headless mode.
 type JSONPayload struct {
-	Response        string            `json:"response"`
-	ToolsExecuted   []llm.ToolCall    `json:"tools_executed,omitempty"`
-	ExecutionStatus string            `json:"execution_status"`
-	Usage           *llm.UsageTracker `json:"usage,omitempty"`
+	Response        string                  `json:"response"`
+	ToolsExecuted   []llm.ToolCall          `json:"tools_executed,omitempty"`
+	ExecutionStatus string                  `json:"execution_status"`
+	Usage           *telemetry.UsageTracker `json:"usage,omitempty"`
 }
 
 // handleListSessions processes the session listing output.
@@ -147,7 +148,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		}
 	}()
 
-	tracker := llm.NewUsageTracker()
+	tracker := telemetry.NewUsageTracker()
 
 	initialLen := len(messages)
 	updatedMessages, loopErr := runReActLoop(loopCtx, cfg, activeClient, registry, formatter, messages, tracker, targetModel)
@@ -167,7 +168,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	if cfg.JSONOutput {
 		printJSONPayload(loopErr, updatedMessages, initialLen, tracker)
 	} else if len(tracker.ModelUsages) > 0 {
-		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg))
+		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg.Pricing))
 	}
 
 	return loopErr
@@ -202,7 +203,7 @@ func readStdinPrompt() (string, error) {
 	return "", nil
 }
 
-func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen int, tracker *llm.UsageTracker) {
+func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen int, tracker *telemetry.UsageTracker) {
 	payload := JSONPayload{
 		ExecutionStatus: "success",
 	}
@@ -278,7 +279,7 @@ func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt strin
 	return activeClient, targetModel, prompt, nil
 }
 
-func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *llm.UsageTracker, modelName string) ([]llm.Message, error) {
+func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string) ([]llm.Message, error) {
 	for i := 0; i < cfg.MaxLoopIterations; i++ {
 		mcpTools, listErr := registry.ListAllTools(ctx)
 		if listErr != nil {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
 // Role defines the role of the message sender.
@@ -27,11 +28,7 @@ type ToolCall struct {
 }
 
 // TokenUsage represents the token usage for a single request.
-type TokenUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
-	CachedTokens int `json:"cached_tokens"`
-}
+type TokenUsage = telemetry.TokenUsage
 
 // Message represents a single message in the chat history.
 type Message struct {
