@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 // ModelUsage stores token counts for a specific model.

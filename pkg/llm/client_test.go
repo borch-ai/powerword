@@ -3,7 +3,7 @@ package llm
 import (
 	"testing"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 func TestNewClient(t *testing.T) {

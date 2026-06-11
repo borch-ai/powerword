@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/borch-ai/powerword/internal/config"
+	"github.com/borch-ai/powerword/pkg/config"
 )
 
 func TestHandleWebhook_ValidSignature(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/borch-ai/powerword/internal/llm"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 func setupTestSessions(t *testing.T) string {
