@@ -15,27 +15,27 @@ This task implements a lightweight native Go-based MCP server (`pw-mcp-cloud`) t
 Create a new directory `internal/plugins/cloud/` to contain the cloud orchestrator clients.
 
 #### [NEW] [cloud.go](file:///Users/human/code/powerword/internal/plugins/cloud/cloud.go)
-- Initialize AWS/GCP clients using standard SDK credential configuration.
-- Expose the following MCP tools:
+- [ ] Initialize AWS/GCP clients using standard SDK credential configuration.
+- [ ] Expose the following MCP tools:
   - `cloud_list_instances`: Retrieves the state of VM instances (EC2/GCE) filtered by tags or status.
   - `cloud_get_logs`: Retrieves container or infrastructure log streams (CloudWatch/Stackdriver).
   - `cloud_check_bucket`: Verifies bucket configuration and checks basic object metadata.
 
 #### [NEW] [cloud_test.go](file:///Users/human/code/powerword/internal/plugins/cloud/cloud_test.go)
-- Mock AWS/GCP service client interfaces to verify parameter routing and metadata serialization without live cloud calls.
+- [ ] Mock AWS/GCP service client interfaces to verify parameter routing and metadata serialization without live cloud calls.
 
 ### CLI Manifest Integration
 #### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
-- Register the `pw-mcp-cloud` server within the native plugin registry under the config key `[plugins.cloud]`.
+- [ ] Register the `pw-mcp-cloud` server within the native plugin registry under the config key `[plugins.cloud]`.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `go test ./internal/plugins/cloud/...` to assert mock client outputs and config bindings.
-- Enforce the 91% unit test coverage requirement.
+- [ ] Run `go test ./internal/plugins/cloud/...` to assert mock client outputs and config bindings.
+- [ ] Enforce the 91% unit test coverage requirement.
 
 ### Manual Verification
-- Set up a sandbox AWS or GCP environment.
-- Run `powerword "check deployment status of ec2 instances with tag environment=production"` and verify instance details are displayed cleanly.
+- [ ] Set up a sandbox AWS or GCP environment.
+- [ ] Run `powerword "check deployment status of ec2 instances with tag environment=production"` and verify instance details are displayed cleanly.

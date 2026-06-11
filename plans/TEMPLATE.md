@@ -23,10 +23,10 @@ Detail the changes grouped by package, module, or component layer. List modified
 Detailed summary of changes. For specific files, use formatting:
 
 #### [MODIFY] [file_basename](file:///Users/human/code/powerword/path/to/file.go)
-- Describe the exact changes to be made.
+- [ ] Describe the exact changes to be made.
 
 #### [NEW] [file_basename](file:///Users/human/code/powerword/path/to/new_file.go)
-- Describe the structure and functionality of the new file.
+- [ ] Describe the structure and functionality of the new file.
 
 ---
 
@@ -35,8 +35,8 @@ Detailed summary of changes. For specific files, use formatting:
 Outline the verification strategy to ensure correct behavior and avoid regressions.
 
 ### Automated Tests
-- Run command: `go test ./...`
-- Details of unit, mock, and package tests added or executed.
+- [ ] Run command: `go test ./...`
+- [ ] Details of unit, mock, and package tests added or executed.
 
 ### Manual Verification
-- Steps to execute, commands to run, and expected outcomes to check.
+- [ ] Steps to execute, commands to run, and expected outcomes to check.

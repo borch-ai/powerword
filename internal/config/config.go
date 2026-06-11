@@ -47,7 +47,25 @@ type Config struct {
 	Issue             string                  `mapstructure:"issue"`
 	WebhookSecret     string                  `mapstructure:"webhook_secret"`
 	WebhookPort       int                     `mapstructure:"webhook_port"`
+	Plugins           PluginsConfig           `mapstructure:"plugins"`
 	OutputWriter      io.Writer               `mapstructure:"-"`
+}
+
+// ImageGenConfig holds parameters for the image generator.
+type ImageGenConfig struct {
+	Backend                   string `mapstructure:"backend"`
+	OpenAIAPIKey              string `mapstructure:"openai_api_key"`
+	MidjourneyAPIURL          string `mapstructure:"midjourney_api_url"`
+	MidjourneyAPIKey          string `mapstructure:"midjourney_api_key"`
+	MidjourneyPollingInterval string `mapstructure:"midjourney_polling_interval"`
+	MidjourneyPollingTimeout  string `mapstructure:"midjourney_polling_timeout"`
+	GoogleAPIKey              string `mapstructure:"google_api_key"`
+	GoogleModel               string `mapstructure:"google_model"`
+}
+
+// PluginsConfig holds configurations for individual plugins.
+type PluginsConfig struct {
+	ImageGen ImageGenConfig `mapstructure:"imagegen"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -142,6 +160,10 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("max_loop_iterations", 10)
 	v.SetDefault("auto_confirm", false)
 	v.SetDefault("webhook_port", 8080)
+	v.SetDefault("plugins.imagegen.backend", "openai")
+	v.SetDefault("plugins.imagegen.midjourney_polling_interval", "5s")
+	v.SetDefault("plugins.imagegen.midjourney_polling_timeout", "5m")
+	v.SetDefault("plugins.imagegen.google_model", "imagen-3.0-generate-002")
 
 	// Read config files in order
 	var readErr error
@@ -192,6 +214,14 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
 	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")
 	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
+	bindEnv(v, "plugins.imagegen.backend", "POWERWORD_IMAGEGEN_BACKEND")
+	bindEnv(v, "plugins.imagegen.openai_api_key", "POWERWORD_IMAGEGEN_OPENAI_API_KEY")
+	bindEnv(v, "plugins.imagegen.midjourney_api_url", "POWERWORD_IMAGEGEN_MIDJOURNEY_API_URL")
+	bindEnv(v, "plugins.imagegen.midjourney_api_key", "POWERWORD_IMAGEGEN_MIDJOURNEY_API_KEY")
+	bindEnv(v, "plugins.imagegen.midjourney_polling_interval", "POWERWORD_IMAGEGEN_MIDJOURNEY_POLLING_INTERVAL")
+	bindEnv(v, "plugins.imagegen.midjourney_polling_timeout", "POWERWORD_IMAGEGEN_MIDJOURNEY_POLLING_TIMEOUT")
+	bindEnv(v, "plugins.imagegen.google_api_key", "POWERWORD_IMAGEGEN_GOOGLE_API_KEY")
+	bindEnv(v, "plugins.imagegen.google_model", "POWERWORD_IMAGEGEN_GOOGLE_MODEL")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

@@ -16,6 +16,7 @@ BINARY_NAME=powerword
 FS_PLUGIN=pw-mcp-fs
 GIT_PLUGIN=pw-mcp-git
 SHELL_PLUGIN=pw-mcp-shell
+IMAGEGEN_PLUGIN=pw-mcp-imagegen
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -30,6 +31,7 @@ build:
 	@if [ -d cmd/$(FS_PLUGIN) ]; then $(GOBUILD) -o bin/$(FS_PLUGIN) ./cmd/$(FS_PLUGIN); fi
 	@if [ -d cmd/$(GIT_PLUGIN) ]; then $(GOBUILD) -o bin/$(GIT_PLUGIN) ./cmd/$(GIT_PLUGIN); fi
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOBUILD) -o bin/$(SHELL_PLUGIN) ./cmd/$(SHELL_PLUGIN); fi
+	@if [ -d cmd/$(IMAGEGEN_PLUGIN) ]; then $(GOBUILD) -o bin/$(IMAGEGEN_PLUGIN) ./cmd/$(IMAGEGEN_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -37,6 +39,7 @@ install:
 	@if [ -d cmd/$(FS_PLUGIN) ]; then $(GOCMD) install ./cmd/$(FS_PLUGIN); fi
 	@if [ -d cmd/$(GIT_PLUGIN) ]; then $(GOCMD) install ./cmd/$(GIT_PLUGIN); fi
 	@if [ -d cmd/$(SHELL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SHELL_PLUGIN); fi
+	@if [ -d cmd/$(IMAGEGEN_PLUGIN) ]; then $(GOCMD) install ./cmd/$(IMAGEGEN_PLUGIN); fi
 
 install-hooks:
 	@echo "Installing git hooks..."
@@ -50,7 +53,7 @@ test:
 	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/... ./internal/...
 
 check-coverage: test
-	@go tool cover -func=coverage.out | go run scripts/check_coverage.go $(MIN_COVERAGE)
+	@go run scripts/check_coverage.go $(MIN_COVERAGE) coverage.out
 
 markdown-lint:
 	$(GOCMD) run scripts/lint_markdown/main.go

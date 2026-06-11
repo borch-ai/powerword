@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
 
 	"powerword/internal/config"
@@ -92,7 +93,18 @@ func mockExecCommandContext(ctx context.Context, command string, args ...string)
 	cs = append(cs, args...)
 	//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
 	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+
+	// Clean GOCOVERDIR to prevent helper subprocess from corrupting/writing to coverage profile
+	env := os.Environ()
+	var cleanEnv []string
+	for _, e := range env {
+		if strings.HasPrefix(e, "GOCOVERDIR=") {
+			continue
+		}
+		cleanEnv = append(cleanEnv, e)
+	}
+	cleanEnv = append(cleanEnv, "GO_WANT_HELPER_PROCESS=1")
+	cmd.Env = cleanEnv
 	return cmd
 }
 
