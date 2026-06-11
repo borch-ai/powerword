@@ -47,11 +47,6 @@ type Config struct {
 	Issue             string                  `mapstructure:"issue"`
 	WebhookSecret     string                  `mapstructure:"webhook_secret"`
 	WebhookPort       int                     `mapstructure:"webhook_port"`
-	Daemon            bool                    `mapstructure:"daemon"`
-	FirebaseProject   string                  `mapstructure:"firebase_project"`
-	TurnServers       []string                `mapstructure:"turn_servers"`
-	TurnUsername      string                  `mapstructure:"turn_username"`
-	TurnPassword      string                  `mapstructure:"turn_password"`
 	OutputWriter      io.Writer               `mapstructure:"-"`
 }
 
@@ -197,11 +192,6 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
 	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")
 	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
-	bindEnv(v, "daemon", "POWERWORD_DAEMON")
-	bindEnv(v, "firebase_project", "POWERWORD_FIREBASE_PROJECT")
-	bindEnv(v, "turn_servers", "POWERWORD_TURN_SERVERS")
-	bindEnv(v, "turn_username", "POWERWORD_TURN_USERNAME")
-	bindEnv(v, "turn_password", "POWERWORD_TURN_PASSWORD")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

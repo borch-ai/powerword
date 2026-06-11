@@ -46,8 +46,8 @@ Focus: Integrating the Model Context Protocol (MCP) and adapting the execution l
 
 ---
 
-## Phase 3: The Go Plugin Ecosystem
-Focus: Delivering a standard set of native, high-performance Go MCP servers and a configuration schema for runtime discovery.
+## Phase 3: The Go Plugin Ecosystem & Systems Integration
+Focus: Delivering a standard set of native, high-performance Go MCP servers, a configuration schema, and specialized operations tools.
 
 *   **Task 3.1: Standard Native Plugins (FS, Git, Shell)**
     *   Author a suite of lightweight Go-based MCP servers for reading local files, introspecting Git repositories, and executing shell commands with strict security profiles.
@@ -55,11 +55,29 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers and 
 *   **Task 3.2: Plugin Manifest Configuration & Registration**
     *   Create a YAML-based plugins manifest schema. Enable the CLI to parse user configuration files to mount and spin up custom local MCP servers on launch.
     *   [Implementation Plan](plans/task_3_2_plugin_manifest.md)
+*   **Task 3.3: Kubernetes Diagnostician Plugin (K8s)**
+    *   Implement a native Go MCP server to communicate with local/remote Kubernetes clusters to inspect namespaces, check service states, dump failing pod logs, and run diagnostics.
+    *   [Implementation Plan](plans/task_3_3_k8s_mcp.md)
+*   **Task 3.4: SQL Database Inspector Plugin**
+    *   Build a database bridge Go MCP server supporting Postgres, MySQL, and SQLite. Support listing schemas, describing table structures, executing read-only check queries, and alerting on locks or long-running queries.
+    *   [Implementation Plan](plans/task_3_4_db_mcp.md)
+*   **Task 3.5: Creative Asset Generation Plugin (ImageGen)**
+    *   Implement a native Go MCP server supporting OpenAI's DALL-E 3 and custom Midjourney wrappers to generate, catalog, and query consistent style referenced images.
+    *   [Implementation Plan](plans/task_3_5_imagegen_mcp.md)
+*   **Task 3.6: KDP Book Geometry & PDF Validator Plugin (KDP Math)**
+    *   Implement a native Go MCP server to calculate exact cover, interior, margins, and bleed specs for Amazon KDP print books, and run validation on final compiled PDF page dimensions.
+    *   [Implementation Plan](plans/task_3_6_kdp_math_mcp.md)
+*   **Task 3.7: Viral Promo Asset Builder Plugin (Viral)**
+    *   Implement a native Go MCP server wrapping TTS engines (ElevenLabs) and generative video tools to synthesize ASMR narration and stitch promotional trailers using local ffmpeg commands.
+    *   [Implementation Plan](plans/task_3_7_viral_mcp.md)
+*   **Task 3.8: Amazon KDP SEO & Metadata Agent Plugin (SEO)**
+    *   Implement a native Go MCP server querying keyword volumes and product search suggestions to formulate listing titles, descriptions, and tag payloads.
+    *   [Implementation Plan](plans/task_3_8_seo_mcp.md)
 
 ---
 
-## Phase 4: Advanced Agentic Features
-Focus: Enhancing coordination, scaling capability, and enabling headless environments.
+## Phase 4: Operations Automation & Advanced Features
+Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-interactive execution engines.
 
 *   **Task 4.1: Multi-Model Orchestration & Intelligent Routing**
     *   Create a routing component to allocate tasks dynamically. For example, route simple context checks to smaller local/fast models, reserving large reasoning models for complex tool orchestration.
@@ -70,6 +88,9 @@ Focus: Enhancing coordination, scaling capability, and enabling headless environ
 *   **Task 4.3: Telemetry, Token Metrics & Cost Accounting**
     *   Implement usage accounting to track input, output, and cached tokens consumed during loops. Calculate and display cost metrics on execution exit.
     *   [Implementation Plan](plans/task_4_3_telemetry_cost.md)
+*   **Task 4.4: Cloud Orchestrator Plugin (AWS/GCP)**
+    *   Create a lightweight Go MCP server to parse cloud console resource metadata (EC2/GCE states, cloud watch logs, storage buckets) to query deployment status.
+    *   [Implementation Plan](plans/task_4_4_cloud_mcp.md)
 
 ---
 
@@ -85,20 +106,3 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   **Task 5.3: Autonomous Review-Repair & Issue Comment Orchestration**
     *   Evolve the ReAct execution loop to read tasks directly from GitHub issues, run local checks, push changes, and publish progress updates and state reports back as issue comments.
     *   [Implementation Plan](plans/task_5_3_autonomous_repair_loop.md)
-
----
-## Phase 6: Remote Dashboard Integration
-Focus: Evolving the CLI into a persistent background daemon that coordinates with the AntigravityMobile dashboard over Firebase and WebRTC.
-
-*   **Task 6.1: Daemon Mode & Firebase Realtime Database Signaling**
-    *   Implement a `--daemon` flag (or `powerword daemon` subcommand) to act as a persistent connection broker that negotiates WebRTC handshakes with the mobile dashboard over Firebase.
-    *   [Implementation Plan](plans/task_6_1_daemon_mode.md)
-*   **Task 6.2: Pion WebRTC Data Channel Server**
-    *   Integrate the Pion WebRTC library to stream terminal stdout/stderr logs and accept remote commands over encrypted WebRTC data channels.
-    *   [Implementation Plan](plans/task_6_2_webrtc_terminal.md)
-*   **Task 6.3: Asynchronous Permission Interceptor API**
-    *   Refactor the interactive permission gate to block active tool executions and send approval requests to the mobile device via WebRTC.
-    *   [Implementation Plan](plans/task_6_3_permission_interceptor.md)
-*   **Task 6.4: Local Critic Mobile Dashboard Integration**
-    *   Stream the `powerword review` output (Markdown criticism and Git diffs) over WebRTC to the mobile device for remote push authorization.
-    *   [Implementation Plan](plans/task_6_4_critic_dashboard.md)
