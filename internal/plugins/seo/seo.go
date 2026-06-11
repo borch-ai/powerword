@@ -135,13 +135,23 @@ func (s *SEOService) writeToCache(key string, data []byte) {
 	_ = os.WriteFile(cacheFile, data, 0600)
 }
 
-// waitBeforeRequest throttles queries.
-func (s *SEOService) waitBeforeRequest() {
+// waitBeforeRequest throttles queries in a context-aware way.
+func (s *SEOService) waitBeforeRequest(ctx context.Context) error {
 	rateLimitMs := s.cfg.Plugins.SEO.RateLimitMS
 	if rateLimitMs <= 0 {
 		rateLimitMs = 500
 	}
-	time.Sleep(time.Duration(rateLimitMs) * time.Millisecond)
+	return sleepContext(ctx, time.Duration(rateLimitMs)*time.Millisecond)
+}
+
+// sleepContext sleeps in a context-aware manner, returning early if the context is cancelled.
+func sleepContext(ctx context.Context, duration time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(duration):
+		return nil
+	}
 }
 
 // getWithRetry retrieves URL body with caching, retries, and rate limit backoff.
@@ -151,7 +161,9 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 		return data, nil
 	}
 
-	s.waitBeforeRequest()
+	if err := s.waitBeforeRequest(ctx); err != nil {
+		return nil, err
+	}
 
 	var lastErr error
 	backoff := 500 * time.Millisecond
@@ -170,7 +182,9 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 		resp, err := s.client.Do(req)
 		if err != nil {
 			lastErr = err
-			time.Sleep(backoff)
+			if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
+				return nil, sleepErr
+			}
 			backoff *= 2
 			continue
 		}
@@ -180,7 +194,9 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 
 		if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == 503 || resp.StatusCode == 429 {
 			lastErr = fmt.Errorf("amazon rate limited with status: %d", resp.StatusCode)
-			time.Sleep(backoff)
+			if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
+				return nil, sleepErr
+			}
 			backoff *= 2
 			continue
 		}
@@ -227,7 +243,7 @@ func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]stri
 	return nil, nil
 }
 
-// ExtractASINs pulls up to 10 unique Amazon ASINs from HTML content using a regex pattern.
+// ExtractASINs pulls unique Amazon ASINs from HTML content using a regex pattern.
 func ExtractASINs(htmlContent string) []string {
 	re := regexp.MustCompile(`/(?:dp|gp/product)/([A-Z0-9]{10})`)
 	matches := re.FindAllStringSubmatch(htmlContent, -1)

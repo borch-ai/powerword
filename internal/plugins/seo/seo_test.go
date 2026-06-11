@@ -520,3 +520,19 @@ func TestAnalyzeNicheSuggestionsError(t *testing.T) {
 		t.Errorf("expected 0 suggestions, got %v", res.SearchSuggestions)
 	}
 }
+
+func TestSleepContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	svc := NewSEOService(nil)
+	err := svc.waitBeforeRequest(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled error, got %v", err)
+	}
+
+	err = sleepContext(ctx, 10*time.Second)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled error, got %v", err)
+	}
+}
