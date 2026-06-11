@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/borch-ai/powerword/internal/loop"
 	"github.com/borch-ai/powerword/pkg/config"
@@ -20,14 +21,18 @@ func runCommand(ctx context.Context, name string, args ...string) error {
 	return cmd.Run()
 }
 
-func handleInterrupt(cancel context.CancelFunc) chan os.Signal {
+func handleInterrupt(cancel context.CancelFunc, gitRollback bool) chan os.Signal {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 	go func() {
 		<-sigChan
-		fmt.Println("\nReceived interrupt. Aborting autonomous loop and restoring workspace...")
-		_ = execCommand(context.Background(), "git", "stash").Run()
-		_ = execCommand(context.Background(), "git", "reset", "--hard", "HEAD").Run()
+		if gitRollback {
+			fmt.Println("\nReceived interrupt. Aborting autonomous loop...")
+		} else {
+			fmt.Println("\nReceived interrupt. Aborting autonomous loop and restoring workspace...")
+			_ = execCommand(context.Background(), "git", "stash").Run()
+			_ = execCommand(context.Background(), "git", "reset", "--hard", "HEAD").Run()
+		}
 		cancel()
 	}()
 	return sigChan
@@ -82,11 +87,83 @@ func processTurnCompletion(ctx context.Context, cfg *config.Config, autoCfg *con
 	return false, nil
 }
 
+func setupAutonomousRollback(ctx context.Context, cfg *config.Config, retErr *error) (*loop.WorkspaceSnapshot, func(), error) {
+	if !cfg.GitRollback {
+		return nil, func() {}, nil
+	}
+	snapshot, snapErr := loop.NewWorkspaceSnapshot(ctx, "")
+	if snapErr != nil {
+		return nil, nil, fmt.Errorf("failed to initialize workspace rollback snapshot: %w", snapErr)
+	}
+	cleanupFunc := func() {
+		if *retErr != nil {
+			fmt.Printf("Autonomous repair loop failed: %v. Rolling back workspace...\n", *retErr)
+			restoreCtx, restoreCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer restoreCancel()
+			if restoreErr := snapshot.Restore(restoreCtx); restoreErr != nil {
+				fmt.Printf("Warning: failed to restore workspace rollback snapshot: %v\n", restoreErr)
+			}
+		} else {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cleanupCancel()
+			if cleanErr := snapshot.CleanUp(cleanupCtx); cleanErr != nil {
+				fmt.Printf("Warning: failed to clean up workspace snapshot stash: %v\n", cleanErr)
+			}
+		}
+	}
+	return snapshot, cleanupFunc, nil
+}
+
+func runAutonomousIteration(ctx context.Context, cfg *config.Config, autoCfg *config.Config, plan *Plan, iteration int, maxIterations int) (bool, error) {
+	fmt.Printf("\n--- Autonomous Iteration %d/%d ---\n", iteration, maxIterations)
+
+	fmt.Println("Running local validation (make all)...")
+	makeOut, makeErr := execCommand(ctx, "make", "all").CombinedOutput()
+
+	diffStr, extErr := ExtractGitDiff(ctx, autoCfg)
+	if extErr != nil {
+		return false, fmt.Errorf("failed to extract git diff: %w", extErr)
+	}
+
+	prompt := buildPrompt(plan, diffStr, makeOut, makeErr)
+
+	commentBody := fmt.Sprintf("Starting autonomous iteration %d...\n\nLocal Validation Status: %v", iteration, makeErr == nil)
+	//nolint:gosec // local CLI intended with dynamic issue IDs
+	_ = runCommand(ctx, "gh", "issue", "comment", cfg.Issue, "--body", commentBody)
+
+	fmt.Println("Handing over to agent...")
+	if runErr := loopRunLoop(ctx, autoCfg, prompt); runErr != nil {
+		fmt.Printf("Agent loop returned error: %v\n", runErr)
+	}
+
+	completed, cErr := processTurnCompletion(ctx, cfg, autoCfg, makeErr)
+	if cErr != nil {
+		return false, cErr
+	}
+	if completed {
+		return true, nil
+	}
+
+	_ = runCommand(ctx, "git", "add", ".")
+	//nolint:gosec // safe usage
+	_ = runCommand(ctx, "git", "commit", "-m", fmt.Sprintf("chore: autonomous repair turn %d", iteration))
+	_ = runCommand(ctx, "git", "push")
+
+	return false, nil
+}
+
 // RunAutonomousLoop orchestrates a 5-iteration autonomous loop to fix issues.
-func RunAutonomousLoop(ctx context.Context, cfg *config.Config) error {
+func RunAutonomousLoop(ctx context.Context, cfg *config.Config) (retErr error) {
 	loopCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	handleInterrupt(cancel)
+	sigChan := handleInterrupt(cancel, cfg.GitRollback)
+	defer signal.Stop(sigChan)
+
+	_, rollbackCleanup, err := setupAutonomousRollback(ctx, cfg, &retErr)
+	if err != nil {
+		return err
+	}
+	defer rollbackCleanup()
 
 	if cfg.Issue == "" {
 		return fmt.Errorf("--issue flag is required for autonomous mode")
@@ -108,39 +185,13 @@ func RunAutonomousLoop(ctx context.Context, cfg *config.Config) error {
 		if loopCtx.Err() != nil {
 			return loopCtx.Err()
 		}
-		fmt.Printf("\n--- Autonomous Iteration %d/%d ---\n", i, maxIterations)
-
-		fmt.Println("Running local validation (make all)...")
-		makeOut, makeErr := execCommand(loopCtx, "make", "all").CombinedOutput()
-
-		diffStr, extErr := ExtractGitDiff(loopCtx, &autoCfg)
-		if extErr != nil {
-			return fmt.Errorf("failed to extract git diff: %w", extErr)
-		}
-
-		prompt := buildPrompt(plan, diffStr, makeOut, makeErr)
-
-		commentBody := fmt.Sprintf("Starting autonomous iteration %d...\n\nLocal Validation Status: %v", i, makeErr == nil)
-		//nolint:gosec // local CLI intended with dynamic issue IDs
-		_ = runCommand(loopCtx, "gh", "issue", "comment", cfg.Issue, "--body", commentBody)
-
-		fmt.Println("Handing over to agent...")
-		if runErr := loopRunLoop(loopCtx, &autoCfg, prompt); runErr != nil {
-			fmt.Printf("Agent loop returned error: %v\n", runErr)
-		}
-
-		completed, cErr := processTurnCompletion(loopCtx, cfg, &autoCfg, makeErr)
-		if cErr != nil {
-			return cErr
+		completed, iterErr := runAutonomousIteration(loopCtx, cfg, &autoCfg, plan, i, maxIterations)
+		if iterErr != nil {
+			return iterErr
 		}
 		if completed {
 			return nil
 		}
-
-		_ = runCommand(loopCtx, "git", "add", ".")
-		//nolint:gosec // safe usage
-		_ = runCommand(loopCtx, "git", "commit", "-m", fmt.Sprintf("chore: autonomous repair turn %d", i))
-		_ = runCommand(loopCtx, "git", "push")
 	}
 
 	return fmt.Errorf("reached maximum autonomous iterations (%d)", maxIterations)

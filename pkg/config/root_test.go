@@ -82,7 +82,20 @@ gemini = "gemini-key"
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
 	// Override model via flag
-	cmd.SetArgs([]string{"--config", cfgFilePath, "--model", "flag-model", "--verbose", "--accept-all", "--headless", "--json", "test prompt"})
+	cmd.SetArgs([]string{
+		"--config", cfgFilePath,
+		"--model", "flag-model",
+		"--verbose",
+		"--accept-all",
+		"--headless",
+		"--json",
+		"--git-rollback",
+		"--autonomous",
+		"--issue", "456",
+		"--classifier-model", "classifier",
+		"--route", "foo=bar",
+		"test prompt",
+	})
 
 	err := cmd.Execute()
 	if err != nil {
@@ -111,6 +124,26 @@ gemini = "gemini-key"
 
 	if !Active.JSONOutput {
 		t.Errorf("expected Active.JSONOutput to be overridden to true, got false")
+	}
+
+	if !Active.GitRollback {
+		t.Errorf("expected Active.GitRollback to be overridden to true, got false")
+	}
+
+	if !Active.Autonomous {
+		t.Errorf("expected Active.Autonomous to be overridden to true, got false")
+	}
+
+	if Active.Issue != "456" {
+		t.Errorf("expected Active.Issue to be overridden to '456', got '%s'", Active.Issue)
+	}
+
+	if Active.ClassifierModel != "classifier" {
+		t.Errorf("expected Active.ClassifierModel to be overridden to 'classifier', got '%s'", Active.ClassifierModel)
+	}
+
+	if Active.Route == nil || Active.Route["foo"] != "bar" {
+		t.Errorf("expected Active.Route to be overridden, got %v", Active.Route)
 	}
 }
 

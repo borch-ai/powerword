@@ -20,6 +20,7 @@ var (
 	classifierModel string
 	autonomous      bool
 	issueIDString   string
+	gitRollback     bool
 )
 
 // Active holds the successfully loaded application configuration.
@@ -128,6 +129,9 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	if cmd.Flags().Changed("issue") {
 		cfg.Issue = issueIDString
 	}
+	if cmd.Flags().Changed("git-rollback") {
+		cfg.GitRollback = gitRollback
+	}
 }
 
 func setupPersistentFlags(cmd *cobra.Command) {
@@ -138,8 +142,13 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	sessionID = ""
 	listSessions = false
 	acceptAll = false
+	headless = false
+	jsonOutput = false
 	routeMap = nil
 	classifierModel = ""
+	autonomous = false
+	issueIDString = ""
+	gitRollback = false
 
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
@@ -153,6 +162,7 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&classifierModel, "classifier-model", "", "model to use for zero-shot prompt-based routing")
 	cmd.PersistentFlags().BoolVar(&autonomous, "autonomous", false, "run an autonomous repair loop")
 	cmd.PersistentFlags().StringVar(&issueIDString, "issue", "", "GitHub issue ID for autonomous review/repair")
+	cmd.PersistentFlags().BoolVar(&gitRollback, "git-rollback", false, "enable automated workspace rollbacks on execution loop failure")
 }
 
 // Execute executes the root command.

@@ -49,6 +49,7 @@ type Config struct {
 	WebhookSecret     string                  `mapstructure:"webhook_secret"`
 	WebhookPort       int                     `mapstructure:"webhook_port"`
 	Plugins           PluginsConfig           `mapstructure:"plugins"`
+	GitRollback       bool                    `mapstructure:"git_rollback"`
 	OutputWriter      io.Writer               `mapstructure:"-"`
 }
 
@@ -185,6 +186,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plan_template", "")
 	v.SetDefault("auto_confirm", false)
 	v.SetDefault("webhook_port", 8080)
+	v.SetDefault("git_rollback", false)
 	v.SetDefault("plugins.imagegen.backend", "openai")
 	v.SetDefault("plugins.imagegen.midjourney_polling_interval", "5s")
 	v.SetDefault("plugins.imagegen.midjourney_polling_timeout", "5m")
@@ -246,6 +248,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
 	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")
 	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
+	bindEnv(v, "git_rollback", "POWERWORD_GIT_ROLLBACK")
 	bindEnv(v, "plugins.imagegen.backend", "POWERWORD_IMAGEGEN_BACKEND")
 	bindEnv(v, "plugins.imagegen.openai_api_key", "POWERWORD_IMAGEGEN_OPENAI_API_KEY")
 	bindEnv(v, "plugins.imagegen.midjourney_api_url", "POWERWORD_IMAGEGEN_MIDJOURNEY_API_URL")
