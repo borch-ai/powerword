@@ -68,8 +68,8 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 		snap.HasStash = true
 		snap.StashMessage = stashMsg
 
-		// Re-apply stash immediately so the agent can see and modify the changes
-		stashApply := execCommand(ctx, "git", "stash", "apply", "stash@{0}")
+		// Re-apply stash immediately so the agent can see and modify the changes, preserving index state
+		stashApply := execCommand(ctx, "git", "stash", "apply", "--index", "stash@{0}")
 		stashApply.Dir = dir
 		if err := stashApply.Run(); err != nil {
 			// Clean up stash if apply fails
@@ -108,8 +108,8 @@ func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
 		}
 
 		stashRef := fmt.Sprintf("stash@{%d}", stashIndex)
-		// Pop the stash to restore original uncommitted changes
-		stashPop := execCommand(ctx, "git", "stash", "pop", stashRef)
+		// Pop the stash to restore original uncommitted changes, preserving index state
+		stashPop := execCommand(ctx, "git", "stash", "pop", "--index", stashRef)
 		stashPop.Dir = s.Dir
 		if err := stashPop.Run(); err != nil {
 			return fmt.Errorf("failed to pop stash %s: %w", stashRef, err)

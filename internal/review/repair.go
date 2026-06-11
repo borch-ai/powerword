@@ -25,8 +25,10 @@ func handleInterrupt(cancel context.CancelFunc, gitRollback bool) chan os.Signal
 	signal.Notify(sigChan, os.Interrupt)
 	go func() {
 		<-sigChan
-		fmt.Println("\nReceived interrupt. Aborting autonomous loop and restoring workspace...")
-		if !gitRollback {
+		if gitRollback {
+			fmt.Println("\nReceived interrupt. Aborting autonomous loop...")
+		} else {
+			fmt.Println("\nReceived interrupt. Aborting autonomous loop and restoring workspace...")
 			_ = execCommand(context.Background(), "git", "stash").Run()
 			_ = execCommand(context.Background(), "git", "reset", "--hard", "HEAD").Run()
 		}
@@ -90,7 +92,8 @@ func processTurnCompletion(ctx context.Context, cfg *config.Config, autoCfg *con
 func RunAutonomousLoop(ctx context.Context, cfg *config.Config) (retErr error) {
 	loopCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	handleInterrupt(cancel, cfg.GitRollback)
+	sigChan := handleInterrupt(cancel, cfg.GitRollback)
+	defer signal.Stop(sigChan)
 
 	var snapshot *loop.WorkspaceSnapshot
 	if cfg.GitRollback {

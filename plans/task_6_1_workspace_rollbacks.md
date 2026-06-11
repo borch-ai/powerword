@@ -44,8 +44,6 @@ This task implements automated workspace rollback mechanisms using Git before an
 
 ## Verification Plan
 
-## Verification Plan
-
 ### Automated Tests
 - [x] Run `go test ./internal/loop/...` to verify rollback triggers under success/failure conditions.
 - [x] Run `make check-coverage` to assert coverage exceeds the 91.0% threshold.
