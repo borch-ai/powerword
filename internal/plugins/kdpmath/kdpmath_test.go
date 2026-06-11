@@ -367,6 +367,33 @@ func TestSafeReaderAt_VirtualInsertion(t *testing.T) {
 	}
 }
 
+func TestSafeReaderAt_LargeTrailingWhitespace(t *testing.T) {
+	spaces := "                    "
+	data := []byte("hello %EOF" + spaces)
+	r := &mockReaderAt{data: data}
+	gotR, gotSz := newSafeReaderAt(r, int64(len(data)))
+	if gotR == r {
+		t.Fatal("expected wrapped reader for large trailing whitespace")
+	}
+	expectedVirtualSize := int64(len(data) + 1)
+	if gotSz != expectedVirtualSize {
+		t.Errorf("expected virtual size %d, got %d", expectedVirtualSize, gotSz)
+	}
+
+	buf := make([]byte, expectedVirtualSize)
+	n, err := gotR.ReadAt(buf, 0)
+	if err != nil && err != io.EOF {
+		t.Fatalf("unexpected read error: %v", err)
+	}
+	if int64(n) != expectedVirtualSize {
+		t.Errorf("read %d bytes, want %d", n, expectedVirtualSize)
+	}
+	expectedStr := "hello %%EOF" + spaces
+	if string(buf) != expectedStr {
+		t.Errorf("got content %q, want %q", string(buf), expectedStr)
+	}
+}
+
 func createInheritedPDFBytes() []byte {
 	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
 	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 432 648] >>\nendobj\n"

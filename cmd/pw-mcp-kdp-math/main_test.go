@@ -236,3 +236,26 @@ func TestKDPMath_MCP_UnmarshalErrors(t *testing.T) {
 		t.Error("expected JSON unmarshal error")
 	}
 }
+
+func TestKDPMath_MCP_SandboxEscape(t *testing.T) {
+	tempDir := t.TempDir()
+	session, ctx, cleanup := startTestServer(t, tempDir)
+	defer cleanup()
+
+	valRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "kdp_validate_pdf",
+		Arguments: json.RawMessage(`{
+			"pdf_path": "../escaped_secret.pdf",
+			"binding_type": "paperback",
+			"paper_type": "white",
+			"trim_size": "6x9",
+			"expected_page_count": 1,
+			"is_cover": false,
+			"has_bleed": false
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("CallTool kdp_validate_pdf failed: %v", err)
+	}
+	assertResponse(t, valRes, true, "is outside of workspace")
+}

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"powerword/internal/config"
@@ -56,16 +58,8 @@ func run() error {
 	return srv.Run(context.Background(), transport)
 }
 
-func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) {
-	srv := mcp.NewServer(&mcp.Implementation{
-		Name:    "pw-mcp-kdp-math",
-		Version: "1.0.0",
-	}, nil)
-
-	srv.AddTool(&mcp.Tool{
-		Name:        "kdp_calculate_geometry",
-		Description: "Computes exact book cover, interior page dimensions, safety margins, and spine thickness based on page count, binding type, paper type, and trim size.",
-		InputSchema: json.RawMessage(`{
+const (
+	calculateGeometrySchema = `{
 			"type": "object",
 			"properties": {
 				"page_count": {
@@ -86,13 +80,9 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 				}
 			},
 			"required": ["page_count", "binding_type", "paper_type", "trim_size"]
-		}`),
-	}, handleCalculateGeometry())
+		}`
 
-	srv.AddTool(&mcp.Tool{
-		Name:        "kdp_validate_pdf",
-		Description: "Parses an existing PDF to inspect its page count, dimensions in points/inches, and validates target bleed line layout compliance for covers or interiors.",
-		InputSchema: json.RawMessage(`{
+	validatePDFSchema = `{
 			"type": "object",
 			"properties": {
 				"pdf_path": {
@@ -125,13 +115,9 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 				}
 			},
 			"required": ["pdf_path", "binding_type", "paper_type", "trim_size"]
-		}`),
-	}, handleValidatePDF(workspaceRoot))
+		}`
 
-	srv.AddTool(&mcp.Tool{
-		Name:        "kdp_generate_manifest",
-		Description: "Generates structured JSON cover layout templates compatible with BookBolt/Inkfluence configurations.",
-		InputSchema: json.RawMessage(`{
+	generateManifestSchema = `{
 			"type": "object",
 			"properties": {
 				"page_count": {
@@ -152,7 +138,36 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 				}
 			},
 			"required": ["page_count", "binding_type", "paper_type", "trim_size"]
-		}`),
+		}`
+)
+
+func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) {
+	absRoot, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute workspace root: %w", err)
+	}
+
+	srv := mcp.NewServer(&mcp.Implementation{
+		Name:    "pw-mcp-kdp-math",
+		Version: "1.0.0",
+	}, nil)
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "kdp_calculate_geometry",
+		Description: "Computes exact book cover, interior page dimensions, safety margins, and spine thickness based on page count, binding type, paper type, and trim size.",
+		InputSchema: json.RawMessage(calculateGeometrySchema),
+	}, handleCalculateGeometry())
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "kdp_validate_pdf",
+		Description: "Parses an existing PDF to inspect its page count, dimensions in points/inches, and validates target bleed line layout compliance for covers or interiors.",
+		InputSchema: json.RawMessage(validatePDFSchema),
+	}, handleValidatePDF(absRoot))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "kdp_generate_manifest",
+		Description: "Generates structured JSON cover layout templates compatible with BookBolt/Inkfluence configurations.",
+		InputSchema: json.RawMessage(generateManifestSchema),
 	}, handleGenerateManifest())
 
 	return srv, nil
@@ -189,7 +204,7 @@ func handleCalculateGeometry() func(context.Context, *mcp.CallToolRequest) (*mcp
 	}
 }
 
-func handleValidatePDF(workspaceRoot string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleValidatePDF(absRoot string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args struct {
 			PDFPath           string `json:"pdf_path"`
@@ -204,9 +219,12 @@ func handleValidatePDF(workspaceRoot string) func(context.Context, *mcp.CallTool
 			return nil, err
 		}
 
-		path := args.PDFPath
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(workspaceRoot, path)
+		path, err := checkSandbox(absRoot, args.PDFPath)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to validate PDF path: %v", err)}},
+			}, nil
 		}
 
 		res, err := kdpmath.ValidatePDF(path, args.BindingType, args.PaperType, args.TrimSize, args.ExpectedPageCount, args.IsCover, args.HasBleed)
@@ -226,6 +244,23 @@ func handleValidatePDF(workspaceRoot string) func(context.Context, *mcp.CallTool
 			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
 		}, nil
 	}
+}
+
+func checkSandbox(absRoot, target string) (string, error) {
+	if filepath.IsAbs(target) {
+		rel, err := filepath.Rel(absRoot, target)
+		if err != nil {
+			return "", err
+		}
+		target = rel
+	}
+
+	clean := filepath.Clean(target)
+	if strings.HasPrefix(clean, "..") {
+		return "", fmt.Errorf("path %s is outside of workspace", target)
+	}
+
+	return securejoin.SecureJoin(absRoot, target)
 }
 
 func handleGenerateManifest() func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

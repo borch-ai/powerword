@@ -227,11 +227,15 @@ type safeReaderAt struct {
 }
 
 func newSafeReaderAt(r io.ReaderAt, size int64) (io.ReaderAt, int64) {
-	if size < 10 {
+	bufSize := int64(1024)
+	if size < bufSize {
+		bufSize = size
+	}
+	if bufSize < 10 {
 		return r, size
 	}
-	buf := make([]byte, 10)
-	offset := size - 10
+	buf := make([]byte, bufSize)
+	offset := size - bufSize
 	n, err := r.ReadAt(buf, offset)
 	if err != nil && n == 0 {
 		return r, size
@@ -291,7 +295,7 @@ func (s *safeReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	return totalRead, eof
 }
 
-// ValidatePDF checks PDF integrity, total page numbers, dimensions in points and checks margins alignment.
+// ValidatePDF checks PDF integrity, total page numbers, and page box dimensions (trim size and bleed compliance) in points.
 func ValidatePDF(pdfPath string, bindingType string, paperType string, trimSize string, expectedPageCount int, isCover bool, hasBleed bool) (*ValidationResult, error) {
 	//nolint:gosec // pdfPath is expected to be a dynamic path checked/provided by the user
 	f, err := os.Open(pdfPath)
@@ -420,10 +424,10 @@ func validateInteriorPageDimensions(r *pdf.Reader, numPages int, expectedWPoints
 			res.HeightPoints = h
 			validateFirstPageDimensions(w, h, expectedWPoints, expectedHPoints, expectedWInches, expectedHInches, res)
 		} else {
-			if math.Abs(w-firstW) > 0.1 {
+			if math.Abs(w-firstW) > 3.6 {
 				res.Errors = append(res.Errors, fmt.Sprintf("page %d width (%.2f pt) does not match page 1 width (%.2f pt)", i, w, firstW))
 			}
-			if math.Abs(h-firstH) > 0.1 {
+			if math.Abs(h-firstH) > 3.6 {
 				res.Errors = append(res.Errors, fmt.Sprintf("page %d height (%.2f pt) does not match page 1 height (%.2f pt)", i, h, firstH))
 			}
 		}
