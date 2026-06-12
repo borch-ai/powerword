@@ -420,12 +420,14 @@ func TestGeminiClient_ListModels_Error(t *testing.T) {
 }
 
 func TestGeminiClient_Generate_JSONMode(t *testing.T) {
-	var capturedPayload map[string]any
+	capturedChan := make(chan map[string]any, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
+		var capturedPayload map[string]any
 		if err == nil {
 			_ = json.Unmarshal(body, &capturedPayload)
 		}
+		capturedChan <- capturedPayload
 
 		resp := []any{
 			map[string]any{
@@ -467,12 +469,17 @@ func TestGeminiClient_Generate_JSONMode(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	genCfg, ok := capturedPayload["generationConfig"].(map[string]any)
-	if !ok {
-		t.Fatalf("generationConfig not found in payload: %+v", capturedPayload)
-	}
-	mimeType, ok := genCfg["responseMimeType"].(string)
-	if !ok || mimeType != "application/json" {
-		t.Errorf("expected responseMimeType to be 'application/json', got %v", mimeType)
+	select {
+	case capturedPayload := <-capturedChan:
+		genCfg, ok := capturedPayload["generationConfig"].(map[string]any)
+		if !ok {
+			t.Fatalf("generationConfig not found in payload: %+v", capturedPayload)
+		}
+		mimeType, ok := genCfg["responseMimeType"].(string)
+		if !ok || mimeType != "application/json" {
+			t.Errorf("expected responseMimeType to be 'application/json', got %v", mimeType)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request to be captured")
 	}
 }

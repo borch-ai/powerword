@@ -170,9 +170,13 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.14: Publish Automated Binary Releases of MCP Plugins**
     *   Extend the release CI workflow to compile and attach all MCP plugin binaries (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`) to GitHub Releases.
     *   [Implementation Plan](plans/phase_6/task_6_14_publish_mcp_releases.md)
-*   [ ] **Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite**
+*   [x] **Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite**
     *   Implement a dedicated integration test suite using build tags (`//go:build integration`) to test the compiled binary CLI workflows, session file operations, and native stdio MCP plugin transport handshakes.
     *   [Implementation Plan](plans/phase_6/task_6_15_integration_tests.md)
+*   [x] **Task 6.16: LLM JSON Mode & Client Options**
+    *   Refactor `pkg/llm` in Powerword to support structured JSON generation via response MIME-type parameters, and ensure clients can be easily instantiated without tight coupling to Powerword's internal config.
+    *   [Implementation Plan](plans/phase_6/task_6_16_llm_json_mode.md)
+
 
 
 

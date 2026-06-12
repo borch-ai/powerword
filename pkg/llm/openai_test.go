@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -291,16 +292,15 @@ func TestOpenAIClient_ListModels_Error(t *testing.T) {
 }
 
 func TestOpenAIClient_Generate_JSONMode(t *testing.T) {
-	var capturedRequest openai.ChatCompletionRequest
+	capturedChan := make(chan openai.ChatCompletionRequest, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Read raw request body to capture serialization
-		var raw map[string]interface{}
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Errorf("failed to read body: %v", err)
 		}
-		_ = json.Unmarshal(bodyBytes, &raw)
+		var capturedRequest openai.ChatCompletionRequest
 		_ = json.Unmarshal(bodyBytes, &capturedRequest)
+		capturedChan <- capturedRequest
 
 		resp := openai.ChatCompletionResponse{
 			Choices: []openai.ChatCompletionChoice{
@@ -330,11 +330,16 @@ func TestOpenAIClient_Generate_JSONMode(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if capturedRequest.ResponseFormat == nil {
-		t.Fatal("expected ResponseFormat to be set, got nil")
-	}
-	if capturedRequest.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONObject {
-		t.Errorf("expected ResponseFormat type %s, got %s",
-			openai.ChatCompletionResponseFormatTypeJSONObject, capturedRequest.ResponseFormat.Type)
+	select {
+	case capturedRequest := <-capturedChan:
+		if capturedRequest.ResponseFormat == nil {
+			t.Fatal("expected ResponseFormat to be set, got nil")
+		}
+		if capturedRequest.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONObject {
+			t.Errorf("expected ResponseFormat type %s, got %s",
+				openai.ChatCompletionResponseFormatTypeJSONObject, capturedRequest.ResponseFormat.Type)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request to be captured")
 	}
 }
