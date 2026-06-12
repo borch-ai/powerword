@@ -23,7 +23,7 @@ Establish the Go module foundation, set up the standard directory structure, and
 - Standard Go 1.26.4 module declaration.
 - Add dependencies for Cobra and Viper.
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/powerword/main.go)
 - Entry point of the CLI application.
 - Invokes the Cobra execute command.
 

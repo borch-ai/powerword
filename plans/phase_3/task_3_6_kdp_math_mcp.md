@@ -33,7 +33,7 @@ Created the new directory `internal/plugins/kdpmath/` containing the book geomet
 - Programmatic mock PDF generation to verify layout validations, page dimensions, inherited fields, and the `safeReaderAt` EOF virtual correction.
 
 ### Standalone MCP Server Binary
-#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-kdp-math/main.go)
 - Standard stdio Model Context Protocol (MCP) server launching the three book geometry tools.
 #### [NEW] [main_test.go](file:///Users/human/code/powerword/cmd/pw-mcp-kdp-math/main_test.go)
 - End-to-end integration tests using in-memory transports and clients.

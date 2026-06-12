@@ -18,7 +18,7 @@ Establish continuous integration gates to ensure all documentation files (.md) f
 - **Formatting and Linting Tools Configured**:
   - A Go-native markdown linter implemented under [linter.go](file:///Users/human/code/powerword/internal/linter/linter.go) and unit-tested in [linter_test.go](file:///Users/human/code/powerword/internal/linter/linter_test.go).
   - A plan template validator implemented under [linter.go](file:///Users/human/code/powerword/internal/linter/linter.go).
-  - Multi-file scripts runner organized under [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go) and [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go).
+  - Multi-file scripts runner organized under [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go) and [main.go](file:///Users/human/code/powerword/scripts/lint_plans/main.go).
   - Makefile targets integrated into the default validation pipeline (`make all` and `make markdown-lint`).
   - GitHub Actions CI workflow updated to run `make markdown-lint` as part of `ci.yml`.
 
@@ -40,7 +40,7 @@ Establish continuous integration gates to ensure all documentation files (.md) f
 #### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go) <!-- markdown -->
 - Walks the project directory and checks all markdown files with `linter.LintMarkdown`.
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go) <!-- plans -->
+#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_plans/main.go)
 - Scans `plans/*.md` (excluding `TEMPLATE.md`) and validates headings with `linter.LintPlan`.
 
 #### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)

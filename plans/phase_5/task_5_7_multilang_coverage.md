@@ -19,7 +19,7 @@ Extend Powerword's coverage checking capabilities to support SvelteKit/TypeScrip
 
 ### MCP Coverage Plugin
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-coverage/main.go)
 - Create the standard CLI wrapper to initialize and run the stdio-based MCP server.
 
 #### [NEW] [server.go](file:///Users/human/code/powerword/internal/mcp/critic/server.go)

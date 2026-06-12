@@ -42,7 +42,7 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 #### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
 - Decouples loop execution and Cobra CLI parsing via `config.Runner` to avoid import cycles.
 
-#### [MODIFY] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
+#### [MODIFY] [main.go](file:///Users/human/code/powerword/cmd/powerword/main.go)
 - Registers `loop.RunLoop` to `config.Runner` on startup.
 
 ---

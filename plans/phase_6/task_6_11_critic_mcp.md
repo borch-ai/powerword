@@ -25,7 +25,7 @@ Refactor the existing Powerword Local Critic subsystem into a standalone, genera
 
 ### MCP Server Entrypoint
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-critic/main.go)
 - Create the standard CLI scaffolding to initialize and serve the MCP protocol over `stdio`.
 - Initialize `pkg/config` and `pkg/llm` specifically for the critic provider.
 
