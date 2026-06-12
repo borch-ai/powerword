@@ -21,7 +21,7 @@ None required.
 
 ### GitHub Actions Workflow Updates
 
-#### [MODIFY] [release.yml](file:///Users/human/code/powerword/.github/workflows/release.yml)
+#### [MODIFY] [release.yml](../../.github/workflows/release.yml)
 - Verify the behavior of `go-semantic-release/action@v1`. By default, this action generates tags, but we should explicitly configure it with a `.semrel` file or additional flags if it isn't pushing git tags to the remote.
 - If `go-semantic-release` does not reliably push tags, add an explicit step to push the tag using the GitHub CLI:
   ```yaml

@@ -18,13 +18,15 @@ go env -w GOPRIVATE="github.com/borch-ai/*"
 
 Since Go uses Git under the hood to fetch private repositories, Git needs to know how to authenticate with GitHub.
 
-Generate a GitHub Personal Access Token (classic or fine-grained) with read access to the repository (`repo` scope). Then, configure Git to automatically inject this token when fetching from `borch-ai`:
+Generate a GitHub Personal Access Token with read access to the repository:
+- **Classic Token**: Select the `repo` scope.
+- **Fine-grained Token**: Under **Repository permissions**, grant read-only access to **Contents** (which automatically grants read-only access to **Metadata**).
+
+Then, configure Git to automatically inject this token when fetching from `borch-ai`. Replace `<YOUR_GITHUB_TOKEN>` with your actual token:
 
 ```bash
-git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/borch-ai/".insteadOf "https://github.com/borch-ai/"
+git config --global url."https://<YOUR_GITHUB_TOKEN>:x-oauth-basic@github.com/borch-ai/".insteadOf "https://github.com/borch-ai/"
 ```
-
-*Important:* Replace `${GITHUB_TOKEN}` with your actual token, or ensure the environment variable is set in your CI/CD pipelines when this command is run.
 
 ### Summary for CI/CD Pipelines
 
