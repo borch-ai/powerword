@@ -90,7 +90,7 @@ Gemini's Go SDK accepts a `*genai.Schema` structure for response schema constrai
 
 ### LLM Client Package
 
-#### [MODIFY] [client.go](file:///Users/human/code/powerword/pkg/llm/client.go)
+#### [MODIFY] [client.go](file://../../pkg/llm/client.go)
 - Add `ResponseSchema` to `generateOptions`:
   ```go
   type generateOptions struct {
@@ -109,10 +109,10 @@ Gemini's Go SDK accepts a `*genai.Schema` structure for response schema constrai
   ```
 - Implement `generateJSONSchema` helper.
 
-#### [MODIFY] [openai.go](file:///Users/human/code/powerword/pkg/llm/openai.go)
+#### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
 - Update `Generate` to compile and assign `ResponseFormat` with `JSONSchema` if `cfg.ResponseSchema` is configured.
 
-#### [MODIFY] [gemini.go](file:///Users/human/code/powerword/pkg/llm/gemini.go)
+#### [MODIFY] [gemini.go](file://../../pkg/llm/gemini.go)
 - Update `Generate` to translate `ResponseSchema` via `convertSchema` and assign `ResponseSchema` on the underlying `genai.GenerativeModel`.
 
 ## Verification Plan
