@@ -43,6 +43,23 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Push Git Tag
+        if: steps.semrel.outputs.version != ''
+        run: |
+          VERSION="${{ steps.semrel.outputs.version }}"
+          VERSION_TAG="v${VERSION#v}"
+          echo "Normalizing tag to: ${VERSION_TAG}"
+          if git rev-parse "${VERSION_TAG}" >/dev/null 2>&1; then
+            echo "Tag ${VERSION_TAG} already exists locally."
+          else
+            git tag "${VERSION_TAG}"
+          fi
+          if git ls-remote --tags origin | grep -q "refs/tags/${VERSION_TAG}"; then
+            echo "Tag ${VERSION_TAG} already exists on remote origin."
+          else
+            git push origin "${VERSION_TAG}"
+          fi
+
       - name: Build powerword Binaries
         if: steps.semrel.outputs.version != ''
         env:
