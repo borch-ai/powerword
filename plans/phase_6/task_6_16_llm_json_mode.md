@@ -17,7 +17,7 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
 
 ### pkg/llm
 
-#### [MODIFY] [client.go](file:///Users/human/code/powerword/pkg/llm/client.go)
+#### [MODIFY] [client.go](file://../../pkg/llm/client.go)
 - Add a `GenerateOption` functional options pattern to `Generate`:
   ```go
   type GenerateOption func(*generateOptions)
@@ -37,7 +37,7 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
   Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error)
   ```
 
-#### [MODIFY] [gemini.go](file:///Users/human/code/powerword/pkg/llm/gemini.go)
+#### [MODIFY] [gemini.go](file://../../pkg/llm/gemini.go)
 - Update `Generate` to accept `opts ...GenerateOption`.
 - In `prepareModel` (or inside `Generate`), apply the functional options:
   ```go
@@ -51,7 +51,7 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
   ```
 - Add support for custom base URLs in `GeminiClient` if needed by checking for custom endpoints.
 
-#### [MODIFY] [openai.go](file:///Users/human/code/powerword/pkg/llm/openai.go)
+#### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
 - Update `Generate` to accept `opts ...GenerateOption`.
 - In `prepareRequest`, parse the options. If `ResponseMIMEType` is set to `"application/json"`, set the response format parameter:
   ```go
@@ -66,7 +66,7 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
   }
   ```
 
-#### [MODIFY] [anthropic.go](file:///Users/human/code/powerword/pkg/llm/anthropic.go)
+#### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
 - Update `Generate` to accept `opts ...GenerateOption` (accept but ignore or handle as supported).
 
 ---

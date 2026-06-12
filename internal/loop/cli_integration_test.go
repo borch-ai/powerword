@@ -701,4 +701,3 @@ func TestCLI_SessionPauseAndReject(t *testing.T) {
 		t.Errorf("expected final message to be 'All done!', got %s", session.Messages[3].Content)
 	}
 }
-

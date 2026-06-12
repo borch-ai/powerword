@@ -13,10 +13,10 @@ This task creates structured JSON envelopes for headless runner outputs and impl
 
 ### Headless Engine
 
-#### [MODIFY] [main.go](file:///Users/human/code/powerword/cmd/powerword/main.go)
+#### [MODIFY] [main.go](file://../../cmd/powerword/main.go)
 - [ ] Add CLI option flags for `--json-envelope` and `--pr-review-mode`.
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - [ ] Implement wrapper schemas to structure all pipeline outputs in JSON formats.
 - [ ] Integrate GitHub API clients to post comment streams matching linter rules back to corresponding commits.
 

@@ -13,7 +13,7 @@ This task implements native terminal graphic protocols (iTerm2, Kitty graphics, 
 
 ### Output Engine
 
-#### [MODIFY] [terminal.go](file:///Users/human/code/powerword/internal/loop/terminal.go)
+#### [MODIFY] [terminal.go](file://../../internal/loop/terminal.go)
 - [ ] Add terminal feature detection (querying environment variables and terminal response codes for image protocol support).
 - [ ] Implement encoder sequences to format PNG/JPEG bytes into iTerm2, Kitty, and Sixel escape strings.
 - [ ] Intercept image markdown links in text streams and render them inline.

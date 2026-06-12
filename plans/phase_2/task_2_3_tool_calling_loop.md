@@ -11,13 +11,13 @@ Evolve the single-turn core loop into an iterative reasoning loop (ReAct loop). 
 
 ### ReAct Reasoning Loop
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - Extends the `RunLoop` execution logic.
 - Loops sequentially up to a configurable max limit (e.g. 10 turns) to prevent infinite tooling loops.
 - Manages LLM context window by accumulating both assistant prompt turns, tool invocations, and tool results.
 - Prompts the user before executing tools marked as "unsafe" (if custom configuration mandates user approval).
 
-#### [NEW] [translator.go](file:///Users/human/code/powerword/internal/mcp/translator.go)
+#### [NEW] [translator.go](file://../../internal/mcp/translator.go)
 - Converts provider-specific function-call arguments (e.g. Gemini tool calls, OpenAI tool calls) into standard JSON schemas required by MCP servers.
 - Translates the MCP tool execution response back into the format expected by the respective LLM API.
 

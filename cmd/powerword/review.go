@@ -15,6 +15,7 @@ func newReviewCmd() *cobra.Command {
 	var localOnly bool
 	var listen bool
 	var port int
+	var fixPlans bool
 
 	cmd := &cobra.Command{
 		Use:   "review",
@@ -44,6 +45,15 @@ func newReviewCmd() *cobra.Command {
 				return fmt.Errorf("cannot provide both --local and --issue flags")
 			}
 
+			if fixPlans {
+				cmd.Printf("Checking and auto-fixing absolute paths, labels, and metadata in plan files...\n")
+				fixedCount, err := review.FixAbsolutePathsInPlans(".", cfg)
+				if err != nil {
+					return err
+				}
+				cmd.Printf("Auto-fix complete. Modified %d plan file(s).\n", fixedCount)
+			}
+
 			var plan *review.Plan
 			if localOnly {
 				plan = &review.Plan{
@@ -68,6 +78,7 @@ func newReviewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&localOnly, "local", false, "Run local validation and ruleset verification only (without fetching a remote issue)")
 	cmd.Flags().BoolVar(&listen, "listen", false, "Start the webhook listener daemon")
 	cmd.Flags().IntVar(&port, "port", 0, "Port to bind the listener to (defaults to config webhook_port or 8080)")
+	cmd.Flags().BoolVar(&fixPlans, "fix", false, "Automatically convert absolute file path links in plan files to relative paths")
 
 	return cmd
 }

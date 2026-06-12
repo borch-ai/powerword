@@ -14,18 +14,18 @@ This task implements a lightweight native Go-based MCP server (`pw-mcp-cloud`) t
 ### Cloud Plugin Component
 Create a new directory `internal/plugins/cloud/` to contain the cloud orchestrator clients.
 
-#### [NEW] [cloud.go](file:///Users/human/code/powerword/internal/plugins/cloud/cloud.go)
+#### [NEW] [cloud.go](file://../../internal/plugins/cloud/cloud.go)
 - [ ] Initialize AWS/GCP clients using standard SDK credential configuration.
 - [ ] Expose the following MCP tools:
   - `cloud_list_instances`: Retrieves the state of VM instances (EC2/GCE) filtered by tags or status.
   - `cloud_get_logs`: Retrieves container or infrastructure log streams (CloudWatch/Stackdriver).
   - `cloud_check_bucket`: Verifies bucket configuration and checks basic object metadata.
 
-#### [NEW] [cloud_test.go](file:///Users/human/code/powerword/internal/plugins/cloud/cloud_test.go)
+#### [NEW] [cloud_test.go](file://../../internal/plugins/cloud/cloud_test.go)
 - [ ] Mock AWS/GCP service client interfaces to verify parameter routing and metadata serialization without live cloud calls.
 
 ### CLI Manifest Integration
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [ ] Register the `pw-mcp-cloud` server within the native plugin registry under the config key `[plugins.cloud]`.
 
 ---

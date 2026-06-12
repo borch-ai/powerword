@@ -137,11 +137,10 @@ func (b *OpenAIBackend) GenerateImage(ctx context.Context, prompt string, size s
 		size = "1024x1024"
 	}
 	req := openai.ImageRequest{
-		Prompt:         prompt,
-		Size:           size,
-		ResponseFormat: openai.CreateImageResponseFormatURL,
-		N:              1,
-		Model:          openai.CreateImageModelDallE3,
+		Prompt: prompt,
+		Size:   size,
+		N:      1,
+		Model:  openai.CreateImageModelDallE3,
 	}
 
 	resp, err := b.client.CreateImage(ctx, req)

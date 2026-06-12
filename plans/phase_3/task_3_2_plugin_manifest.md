@@ -17,7 +17,7 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
 
 ### Configuration Mapping & Startup Logic
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - *Already Implemented*: Extends Config structures to support a map of Server definitions keyed by server name via the `servers` TOML block.
   ```toml
   [servers.filesystem]
@@ -30,7 +30,7 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
      args = ["-y", "@modelcontextprotocol/server-memory"]
   ```
 
-#### [MODIFY] [process.go](file:///Users/human/code/powerword/internal/mcp/process.go) & [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [process.go](file://../../internal/mcp/process.go) & [loop.go](file://../../internal/loop/loop.go)
 - *Already Implemented*: Parses the configuration definitions during boot in the `RunLoop`.
 - *Already Implemented*: Locates executables in system `$PATH` or uses absolute paths to start server sub-processes.
 - *Already Implemented*: Gracefully logs failures to initialize individual servers, keeping the rest of the working plugins operational.

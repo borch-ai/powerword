@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/borch-ai/powerword/pkg/config"
 )
@@ -17,10 +18,10 @@ var defaultTemplate string
 
 var (
 	linkRegex             = regexp.MustCompile(`\[([^\]]*)\]\(([^)]*)\)`)
-	statusRegex           = regexp.MustCompile(`(?i)Status\b[^:]*:\s*(?:\*\*|\*|)?\s*([a-zA-Z]+)`)
-	goVersionRegex        = regexp.MustCompile(`(?i)Go Version\b[^:]*:\s*(?:\*\*|\*|)?\s*(.*)`)
-	dateCompletedRegex    = regexp.MustCompile(`(?i)Date Completed\b[^:]*:\s*(?:\*\*|\*|)?\s*(.*)`)
-	unitTestCoverageRegex = regexp.MustCompile(`(?i)Unit Test Coverage\b[^:]*:\s*(?:\*\*|\*|)?\s*(.*)`)
+	statusRegex           = regexp.MustCompile(`(?i)^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Status\b[^:]*:\s*(?:\*\*|\*|)?\s*([a-zA-Z]+)`)
+	goVersionRegex        = regexp.MustCompile(`(?i)^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Go Version\b[^:]*:\s*(?:\*\*|\*|)?\s*(.*)`)
+	dateCompletedRegex    = regexp.MustCompile(`(?i)^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Date Completed\b[^:]*:\s*(?:\*\*|\*|)?\s*(.*)`)
+	unitTestCoverageRegex = regexp.MustCompile(`(?i)^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Unit Test Coverage\b[^:]*:\s*(?:\*\*|\*|)?\s*(.*)`)
 )
 
 // PlanValidationError represents one or more plan conformance errors.
@@ -298,6 +299,10 @@ func validateSinglePlan(workspaceRoot string, planFile string, titleRegex *regex
 func validateLink(workspaceRoot, planFile string, lineNum int, line string, label string, pathStr string, status *string) []string {
 	var errs []string
 
+	if isPathAbsolute(pathStr) {
+		errs = append(errs, fmt.Sprintf("%s:%d: path %q must be relative, not absolute", planFile, lineNum, pathStr))
+	}
+
 	absPath, err := getAbsolutePath(workspaceRoot, planFile, pathStr)
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("%s:%d: failed to resolve path %q: %v", planFile, lineNum, pathStr, err))
@@ -346,16 +351,18 @@ func getAbsolutePath(workspaceRoot, planFile, pathStr string) (string, error) {
 	pathStr = strings.TrimPrefix(pathStr, "file://")
 
 	// Compatibility normalization for historical absolute /Users/human/code/powerword/ paths
-	for _, marker := range []string{"/code/powerword/", "/powerword/"} {
-		if idx := strings.Index(pathStr, marker); idx != -1 {
-			suffix := pathStr[idx+len(marker):]
-			absPath := filepath.Clean(filepath.Join(workspaceRoot, suffix))
-			return filepath.Abs(absPath)
+	if isPathAbsolute(pathStr) {
+		for _, marker := range []string{"/code/powerword/", "/powerword/"} {
+			if idx := strings.Index(pathStr, marker); idx != -1 {
+				suffix := pathStr[idx+len(marker):]
+				absPath := filepath.Clean(filepath.Join(workspaceRoot, suffix))
+				return filepath.Abs(absPath)
+			}
 		}
 	}
 
 	var absPath string
-	if filepath.IsAbs(pathStr) || strings.HasPrefix(pathStr, "/") {
+	if isPathAbsolute(pathStr) {
 		absPath = filepath.Clean(pathStr)
 	} else {
 		absPath = filepath.Clean(filepath.Join(filepath.Dir(planFile), pathStr))
@@ -381,4 +388,174 @@ func isPlaceholder(val string) bool {
 		return true
 	}
 	return false
+}
+
+func isPathAbsolute(pathStr string) bool {
+	p := strings.TrimPrefix(pathStr, "file://")
+	// Standard Unix absolute or runtime-environment absolute
+	if filepath.IsAbs(p) || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") {
+		return true
+	}
+	// Windows drive letter absolute (e.g. C:/ or C:\)
+	if len(p) >= 3 && p[1] == ':' && (p[2] == '/' || p[2] == '\\') && ((p[0] >= 'a' && p[0] <= 'z') || (p[0] >= 'A' && p[0] <= 'Z')) {
+		return true
+	}
+	// Windows UNC paths (e.g. \\server\share or //server/share)
+	if strings.HasPrefix(p, "\\\\") || strings.HasPrefix(p, "//") {
+		return true
+	}
+	return false
+}
+
+// FixAbsolutePathsInPlans recursively scans the plans/ directory and fixes absolute paths,
+// mismatched labels, missing URI schemes, and auto-populates metadata on completed plans.
+//
+//nolint:gocognit,funlen,nestif
+func FixAbsolutePathsInPlans(workspaceRoot string, cfg *config.Config) (int, error) {
+	plansDir := filepath.Join(workspaceRoot, "plans")
+	planFiles, err := scanPlanFiles(plansDir)
+	if err != nil {
+		return 0, fmt.Errorf("failed to scan plan files: %w", err)
+	}
+
+	var goVersionLineRegex = regexp.MustCompile(`(?i)(^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Go Version\b[^:]*:\s*(?:\*\*|\*|)?\s*)(.*)`)
+	var dateCompletedLineRegex = regexp.MustCompile(`(?i)(^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Date Completed\b[^:]*:\s*(?:\*\*|\*|)?\s*)(.*)`)
+
+	goVersion := getGoVersionFromMod(workspaceRoot)
+	todayStr := time.Now().Format("2006-01-02")
+
+	modifiedCount := 0
+
+	for _, planFile := range planFiles {
+		if filepath.Base(planFile) == "TEMPLATE.md" {
+			continue
+		}
+
+		//nolint:gosec
+		content, err := os.ReadFile(planFile)
+		if err != nil {
+			return modifiedCount, fmt.Errorf("failed to read plan file %s: %w", planFile, err)
+		}
+
+		lines := strings.Split(string(content), "\n")
+		fileModified := false
+
+		// 1. Pass: check status
+		isCompleted := false
+		for _, line := range lines {
+			if statusMatch := statusRegex.FindStringSubmatch(line); len(statusMatch) > 1 {
+				if strings.ToLower(statusMatch[1]) == "completed" {
+					isCompleted = true
+					break
+				}
+			}
+		}
+
+		// 2. Pass: edit lines
+		for i, line := range lines {
+			newLine := line
+
+			// Handle links
+			links := linkRegex.FindAllStringSubmatch(newLine, -1)
+			for _, match := range links {
+				label := match[1]
+				linkPath := match[2]
+
+				// Determine if it looks like a local codebase path (e.g. not a website, mailto, etc.)
+				isLocal := strings.HasPrefix(linkPath, "file://") ||
+					(!strings.HasPrefix(linkPath, "http://") &&
+						!strings.HasPrefix(linkPath, "https://") &&
+						!strings.Contains(linkPath, "://") &&
+						linkPath != "")
+
+				if !isLocal {
+					continue
+				}
+
+				absPath, absPathErr := getAbsolutePath(workspaceRoot, planFile, linkPath)
+				if absPathErr != nil {
+					continue
+				}
+
+				cleanRoot, absRootErr := filepath.Abs(workspaceRoot)
+				if absRootErr != nil {
+					continue
+				}
+
+				isInside := absPath == cleanRoot || strings.HasPrefix(absPath, cleanRoot+string(filepath.Separator))
+				if !isInside {
+					continue
+				}
+
+				planDir, planDirErr := filepath.Abs(filepath.Dir(planFile))
+				if planDirErr != nil {
+					continue
+				}
+
+				relPath, relPathErr := filepath.Rel(planDir, absPath)
+				if relPathErr != nil {
+					continue
+				}
+
+				relPathSlash := filepath.ToSlash(relPath)
+				expectedLinkPath := "file://" + relPathSlash
+				expectedLabel := filepath.Base(absPath)
+
+				// If it differs, replace it on the line
+				if linkPath != expectedLinkPath || strings.TrimSpace(label) != expectedLabel {
+					oldLink := fmt.Sprintf("[%s](%s)", label, linkPath)
+					newLink := fmt.Sprintf("[%s](%s)", expectedLabel, expectedLinkPath)
+					newLine = strings.Replace(newLine, oldLink, newLink, 1)
+				}
+			}
+
+			// Handle metadata if status is completed
+			if isCompleted {
+				if gvMatch := goVersionLineRegex.FindStringSubmatch(newLine); len(gvMatch) > 1 {
+					cleanVal := strings.Trim(gvMatch[2], "*_` ")
+					if isPlaceholder(cleanVal) {
+						newLine = gvMatch[1] + goVersion
+					}
+				}
+				if dcMatch := dateCompletedLineRegex.FindStringSubmatch(newLine); len(dcMatch) > 1 {
+					cleanVal := strings.Trim(dcMatch[2], "*_` ")
+					if isPlaceholder(cleanVal) {
+						newLine = dcMatch[1] + todayStr
+					}
+				}
+			}
+
+			if newLine != line {
+				lines[i] = newLine
+				fileModified = true
+			}
+		}
+
+		if fileModified {
+			//nolint:gosec
+			err = os.WriteFile(planFile, []byte(strings.Join(lines, "\n")), 0600)
+			if err != nil {
+				return modifiedCount, fmt.Errorf("failed to write plan file %s: %w", planFile, err)
+			}
+			modifiedCount++
+		}
+	}
+
+	return modifiedCount, nil
+}
+
+func getGoVersionFromMod(workspaceRoot string) string {
+	goModPath := filepath.Join(workspaceRoot, "go.mod")
+	//nolint:gosec
+	content, err := os.ReadFile(goModPath)
+	if err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(content)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "go ") {
+				return strings.TrimSpace(line[3:])
+			}
+		}
+	}
+	return "1.26"
 }

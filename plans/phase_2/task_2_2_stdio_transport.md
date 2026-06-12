@@ -15,13 +15,13 @@ Implement the process control logic to launch, supervise, communicate with, and 
 
 ### Stdio Transport & Process Management
 
-#### [NEW] [process.go](file:///Users/human/code/powerword/internal/mcp/process.go)
+#### [NEW] [process.go](file://../../internal/mcp/process.go)
 - Defines a process supervisor `ServerProcess` that wraps an `os/exec.Cmd`.
 - Sets up pipes for `stdin`, `stdout`, and `stderr`.
 - Connects the pipes to the `go-sdk`'s stdio transport adapter.
 - Configures background workers to log server `stderr` outputs for diagnostic purposes.
 
-#### [NEW] [lifecycle.go](file:///Users/human/code/powerword/internal/mcp/lifecycle.go)
+#### [NEW] [lifecycle.go](file://../../internal/mcp/lifecycle.go)
 - Implements process registry cleanup methods.
 - Hooks into application exit signals (e.g. `SIGINT`, `SIGTERM`, `SIGHUP`) to execute graceful shutdown commands (MCP exit notifications) and kill unresponsive subprocesses.
 

@@ -13,11 +13,11 @@ This task replaces standard command-line prompts with a Bubbletea-based Terminal
 
 ### TUI Consent Manager
 
-#### [NEW] [consent.go](file:///Users/human/code/powerword/internal/loop/consent.go)
+#### [NEW] [consent.go](file://../../internal/loop/consent.go)
 - [ ] Build a Bubbletea model displaying tool details, risk level badges, and execution options (e.g. Always Allow, Allow Once, Deny).
 - [ ] Support rendering file differences if the tool requests write permissions.
 
-#### [MODIFY] [terminal.go](file:///Users/human/code/powerword/internal/loop/terminal.go)
+#### [MODIFY] [terminal.go](file://../../internal/loop/terminal.go)
 - [ ] Hook the consent views into the command-line interaction loop.
 
 ---

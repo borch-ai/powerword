@@ -18,7 +18,7 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
 
 ### Plugin Command
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-gdoc/main.go)
+#### [NEW] [main.go](file://../../cmd/pw-mcp-gdoc/main.go)
 - Entry point for the `pw-mcp-gdoc` binary.
 - Set up MCP Server session using `modelcontextprotocol/go-sdk`.
 - Register the following tools:
@@ -29,7 +29,7 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
 
 ### Configuration Layer
 
-#### [MODIFY] [powerword.example.toml](file:///Users/human/code/powerword/powerword.example.toml)
+#### [MODIFY] [powerword.example.toml](file://../../powerword.example.toml)
 - Document configuration settings for the new `gdoc` plugin:
   ```toml
   [plugins.gdoc]

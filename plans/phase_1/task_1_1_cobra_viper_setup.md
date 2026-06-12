@@ -19,21 +19,21 @@ Establish the Go module foundation, set up the standard directory structure, and
 
 ### Go Module & CLI Scaffolding
 
-#### [NEW] [go.mod](file:///Users/human/code/powerword/go.mod)
+#### [NEW] [go.mod](file://../../go.mod)
 - Standard Go 1.26.4 module declaration.
 - Add dependencies for Cobra and Viper.
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/powerword/main.go)
+#### [NEW] [main.go](file://../../cmd/powerword/main.go)
 - Entry point of the CLI application.
 - Invokes the Cobra execute command.
 
-#### [NEW] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [NEW] [root.go](file://../../pkg/config/root.go)
 - Defines command structure via a fresh command constructor `NewRootCmd()` to avoid static global state issues in tests.
 - Handles flags (e.g., `--config`, `--model`, `--verbose`).
 - Skips configuration setup on empty arguments to print help directly.
 - Directs outputs to `cmd.Printf` instead of `fmt.Printf`.
 
-#### [NEW] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [NEW] [config.go](file://../../pkg/config/config.go)
 - Holds config structures (`Config` struct mapping API keys, default models, and plugin setups).
 - Dynamically loads `.env` files using Viper's properties parser.
 - Explicitly handles `BindEnv` errors.

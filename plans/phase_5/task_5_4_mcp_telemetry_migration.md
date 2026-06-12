@@ -16,7 +16,7 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 
 ### Standalone Server Development
 
-#### [NEW] [powerword](file:///Users/human/code/powerword)
+#### [NEW] [powerword](file://../..)
 - Set up a new Go codebase compiling to the binary executable `pw-mcp-telemetry`.
 - Implement standard Model Context Protocol Go SDK integration.
 - Relocate pricing database arrays and prefix-matching logic from `powerword`'s package.
@@ -26,11 +26,11 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 
 ### Powerword Client Refactoring
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - Remove the local `Pricing` map structure from the global configuration struct.
 - Add configuration settings to register and mount `pw-mcp-telemetry` under standard plugins.
 
-#### [MODIFY] [telemetry.go](file:///Users/human/code/powerword/pkg/telemetry/telemetry.go)
+#### [MODIFY] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
 - Refactor the cost calculation methods to query the mounted `pw-mcp-telemetry` MCP client connection instead of executing native pricing lookups.
 
 ---

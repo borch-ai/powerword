@@ -91,7 +91,7 @@ func parseIssueBody(body string) (*Plan, error) {
 	return plan, nil
 }
 
-//nolint:gocognit,nestif
+//nolint:gocognit,funlen,nestif
 func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error {
 	if plan == nil || cfg == nil {
 		return errors.New("VerifyWorkspace requires non-nil plan and cfg")
@@ -104,9 +104,33 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 	validationCmd := ""
 	if checkMakefileExists() {
 		validationCmd = "make all"
-		fmt.Println("Running local validation (make all) via MCP pw-mcp-critic...")
+		if cfg.DisableCritic {
+			fmt.Println("Running local validation (make all) directly...")
+		} else {
+			fmt.Println("Running local validation (make all) via MCP pw-mcp-critic...")
+		}
 	} else {
 		fmt.Println("No Makefile found, skipping local validation")
+	}
+
+	if cfg.DisableCritic {
+		fmt.Println("Critic LLM review is disabled in config. Skipping LLM review.")
+		if validationCmd != "" {
+			fields := strings.Fields(validationCmd)
+			if len(fields) > 0 {
+				valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
+				defer valCancel()
+				//nolint:gosec // execution is explicitly requested by the CLI configuration
+				cmd := execCommand(valCtx, fields[0], fields[1:]...)
+				cmd.Dir = "."
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("local validation command failed: %w\nOutput:\n%s", err, string(out))
+				}
+				fmt.Println(string(out))
+			}
+		}
+		return nil
 	}
 
 	srvCfg, ok := cfg.Servers["critic"]

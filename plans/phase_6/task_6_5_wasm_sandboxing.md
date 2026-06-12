@@ -13,11 +13,11 @@ This task integrates WebAssembly (WASM) execution transport for MCP plugins, all
 
 ### MCP Client and Transport
 
-#### [NEW] [wasm.go](file:///Users/human/code/powerword/internal/mcp/wasm.go)
+#### [NEW] [wasm.go](file://../../internal/mcp/wasm.go)
 - [ ] Implement a WASM host transport wrapper parsing `.wasm` plugins using Wazero.
 - [ ] Implement standard stdio message mapping from the WASM guest to the host MCP framework.
 
-#### [MODIFY] [registry.go](file:///Users/human/code/powerword/internal/mcp/registry.go)
+#### [MODIFY] [registry.go](file://../../internal/mcp/registry.go)
 - [ ] Support loading `.wasm` plugins in addition to native executable configurations.
 
 ---

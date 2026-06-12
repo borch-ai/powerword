@@ -21,7 +21,7 @@ Add a project-agnostic `powerword check-coverage` subcommand to the Powerword CL
 
 ### Command Line Interface
 
-#### [NEW] [check_coverage.go](file:///Users/human/code/powerword/cmd/powerword/check_coverage.go)
+#### [NEW] [check_coverage.go](file://../../cmd/powerword/check_coverage.go)
 - Define and register the `check-coverage` Cobra subcommand under the root command.
 - Set arguments constraints (requires minimum 1 arg representing threshold, optionally accepts profile path).
 - Handler logic:
@@ -31,7 +31,7 @@ Add a project-agnostic `powerword check-coverage` subcommand to the Powerword CL
 
 ### Review Subsystem
 
-#### [NEW] [coverage.go](file:///Users/human/code/powerword/internal/review/coverage.go)
+#### [NEW] [coverage.go](file://../../internal/review/coverage.go)
 - Implement `VerifyCoverage(threshold float64, profilePath string) error`:
   1. **Clean NULL bytes:** Read and sanitize the target coverage profile file, stripping any null bytes or incomplete lines to prevent parser syntax errors.
   2. **Run go tool cover:** Execute `go tool cover -func=<profilePath>` inside the workspace context.

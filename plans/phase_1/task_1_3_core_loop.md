@@ -27,22 +27,22 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 
 ### Core Loop & Output Formatter
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - Updated `RunLoop` to set up client streaming, instantiate `TerminalFormatter`, and write text chunks.
 
-#### [NEW] [terminal.go](file:///Users/human/code/powerword/internal/loop/terminal.go)
+#### [NEW] [terminal.go](file://../../internal/loop/terminal.go)
 - Stateful stream formatting state machine tracking markdown token boundaries and layout/style transitions.
 
-#### [NEW] [terminal_width.go](file:///Users/human/code/powerword/internal/loop/terminal_width.go)
+#### [NEW] [terminal_width.go](file://../../internal/loop/terminal_width.go)
 - Unix ioctl window size check.
 
-#### [NEW] [terminal_width_windows.go](file:///Users/human/code/powerword/internal/loop/terminal_width_windows.go)
+#### [NEW] [terminal_width_windows.go](file://../../internal/loop/terminal_width_windows.go)
 - Windows terminal size fallback.
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 - Decouples loop execution and Cobra CLI parsing via `config.Runner` to avoid import cycles.
 
-#### [MODIFY] [main.go](file:///Users/human/code/powerword/cmd/powerword/main.go)
+#### [MODIFY] [main.go](file://../../cmd/powerword/main.go)
 - Registers `loop.RunLoop` to `config.Runner` on startup.
 
 ---

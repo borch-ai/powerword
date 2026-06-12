@@ -16,7 +16,7 @@ Implement an interactive security barrier in the CLI core routing loop. Intercep
 
 ### Interceptors & Terminal Guards
 
-#### [NEW] [guard.go](file:///Users/human/code/powerword/internal/loop/guard.go)
+#### [NEW] [guard.go](file://../../internal/loop/guard.go)
 - Defines security profiles:
   - `ReadOnly` (allow reads, block modifications/scripts).
   - `Interactive` (default; prompt for modifying actions).
@@ -25,7 +25,7 @@ Implement an interactive security barrier in the CLI core routing loop. Intercep
   - `Authorize(toolName string, args map[string]interface{}) (bool, error)`
   - Renders styled interactive terminal prompts (using color prompts and raw stdin reads).
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - Intercepts tool execution requests within the reasoning loop.
 - Calls `guard.Authorize(...)`. If declined, returns a permission error message back to the LLM (so the LLM can try an alternative approach).
 

@@ -41,6 +41,7 @@ type Config struct {
 	CriticProvider    string                            `mapstructure:"critic_provider"`
 	CriticModel       string                            `mapstructure:"critic_model"`
 	CriticEndpoint    string                            `mapstructure:"critic_endpoint"`
+	DisableCritic     bool                              `mapstructure:"disable_critic"`
 	PlanTemplate      string                            `mapstructure:"plan_template"`
 	Autonomous        bool                              `mapstructure:"autonomous"`
 	Issue             string                            `mapstructure:"issue"`
@@ -190,6 +191,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("auto_confirm", false)
 	v.SetDefault("webhook_port", 8080)
 	v.SetDefault("git_rollback", false)
+	v.SetDefault("disable_critic", false)
+	v.SetDefault("critic_provider", "gemini")
+	v.SetDefault("critic_model", "gemini-2.5-flash")
 	v.SetDefault("max_cost", 2.0)
 	v.SetDefault("max_tokens", 1000000)
 	v.SetDefault("max_input_tokens", 1000000)
@@ -252,6 +256,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "critic_provider", "POWERWORD_CRITIC_PROVIDER")
 	bindEnv(v, "critic_model", "POWERWORD_CRITIC_MODEL")
 	bindEnv(v, "critic_endpoint", "POWERWORD_CRITIC_ENDPOINT")
+	bindEnv(v, "disable_critic", "POWERWORD_DISABLE_CRITIC")
 	bindEnv(v, "plan_template", "POWERWORD_PLAN_TEMPLATE")
 	bindEnv(v, "autonomous", "POWERWORD_AUTONOMOUS")
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
