@@ -117,17 +117,41 @@ func initializeSessionAndClient(ctx context.Context, cfg *config.Config, prompt 
 	return session, activeClient, targetModel, prompt, messages, nil
 }
 
-func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
-	if cfg.ListSessions {
-		return handleListSessions()
-	}
-
+func validateAndResolvePrompt(cfg *config.Config, prompt string) (string, error) {
 	if prompt == "" && cfg.Resume == "" {
 		p, _ := readStdinPrompt()
 		prompt = p
 	}
 	if prompt == "" && !cfg.ListSessions && cfg.Resume == "" {
-		return fmt.Errorf("no prompt provided and stdin is empty")
+		return "", fmt.Errorf("no prompt provided and stdin is empty")
+	}
+	return prompt, nil
+}
+
+func handleSaveSession(session *Session, targetModel string, updatedMessages []llm.Message, isPaused bool, loopFailed *bool) error {
+	session.Model = targetModel
+	session.Messages = updatedMessages
+	if saveErr := SaveSession(session); saveErr != nil {
+		if !isPaused {
+			*loopFailed = true
+		}
+		return fmt.Errorf("failed to save session: %w", saveErr)
+	}
+	if isPaused {
+		fmt.Printf("\nSession paused. To resume, run:\n  powerword --resume %s\n", session.ID)
+	}
+	return nil
+}
+
+func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
+	if cfg.ListSessions {
+		return handleListSessions()
+	}
+
+	var promptErr error
+	prompt, promptErr = validateAndResolvePrompt(cfg, prompt)
+	if promptErr != nil {
+		return promptErr
 	}
 
 	var loopFailed bool
@@ -184,15 +208,9 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	}
 
 	if session != nil && (loopErr == nil || isPaused) {
-		session.Model = targetModel
-		session.Messages = updatedMessages
-		if saveErr := SaveSession(session); saveErr != nil {
-			loopErr = fmt.Errorf("failed to save session: %w", saveErr)
-			if !isPaused {
-				loopFailed = true
-			}
+		if saveErr := handleSaveSession(session, targetModel, updatedMessages, isPaused, &loopFailed); saveErr != nil {
+			loopErr = saveErr
 		} else if isPaused {
-			fmt.Printf("\nSession paused. To resume, run:\n  powerword --resume %s\n", session.ID)
 			loopErr = nil
 		}
 	}
@@ -390,6 +408,64 @@ func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LL
 	return messages, false, nil
 }
 
+func executeSingleTool(ctx context.Context, cfg *config.Config, registry *mcp.Registry, guard *Guard, tc llm.ToolCall) (llm.Message, error) {
+	args := make(map[string]interface{})
+	if tc.Arguments != "" {
+		if unmarshalErr := json.Unmarshal([]byte(tc.Arguments), &args); unmarshalErr != nil {
+			return llm.Message{
+				Role:       llm.RoleTool,
+				Content:    fmt.Sprintf("Error parsing arguments: %v", unmarshalErr),
+				ToolCallID: tc.ID,
+			}, nil
+		}
+	}
+
+	allowed, err := guard.Authorize(tc.Name, args)
+	if err != nil {
+		if errors.Is(err, ErrSessionPaused) {
+			return llm.Message{}, err
+		}
+		return llm.Message{
+			Role:       llm.RoleTool,
+			Content:    err.Error(),
+			ToolCallID: tc.ID,
+		}, nil
+	}
+
+	if !allowed {
+		return llm.Message{
+			Role:       llm.RoleTool,
+			Content:    "Error: user denied tool execution",
+			ToolCallID: tc.ID,
+		}, nil
+	}
+
+	if cfg.Verbose {
+		fmt.Fprintf(os.Stderr, "\n=> Executing tool: %s\n", tc.Name)
+	}
+	var result *mcpsdk.CallToolResult
+	var callErr error
+	if registry != nil {
+		result, callErr = registry.CallTool(ctx, tc.Name, args)
+	} else {
+		callErr = errors.New("MCP registry not initialized")
+	}
+	if callErr != nil {
+		return llm.Message{
+			Role:       llm.RoleTool,
+			Content:    fmt.Sprintf("Error calling tool: %v", callErr),
+			ToolCallID: tc.ID,
+		}, nil
+	}
+
+	formattedRes, _ := mcp.FormatToolResult(result)
+	return llm.Message{
+		Role:       llm.RoleTool,
+		Content:    formattedRes,
+		ToolCallID: tc.ID,
+	}, nil
+}
+
 func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) ([]llm.Message, error) {
 	profile := Interactive
 	if cfg.AutoConfirm {
@@ -400,65 +476,15 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 	guard := NewGuard(profile, nil, nil)
 
 	for _, tc := range toolCalls {
-		args := make(map[string]interface{})
-		if tc.Arguments != "" {
-			if unmarshalErr := json.Unmarshal([]byte(tc.Arguments), &args); unmarshalErr != nil {
-				messages = append(messages, llm.Message{
-					Role:       llm.RoleTool,
-					Content:    fmt.Sprintf("Error parsing arguments: %v", unmarshalErr),
-					ToolCallID: tc.ID,
-				})
-				continue
-			}
-		}
-
-		allowed, err := guard.Authorize(tc.Name, args)
+		msg, err := executeSingleTool(ctx, cfg, registry, guard, tc)
 		if err != nil {
 			if errors.Is(err, ErrSessionPaused) {
 				return messages, err
 			}
-			messages = append(messages, llm.Message{
-				Role:       llm.RoleTool,
-				Content:    err.Error(),
-				ToolCallID: tc.ID,
-			})
-			continue
 		}
-
-		if !allowed {
-			messages = append(messages, llm.Message{
-				Role:       llm.RoleTool,
-				Content:    "Error: user denied tool execution",
-				ToolCallID: tc.ID,
-			})
-			continue
+		if msg.Role != "" {
+			messages = append(messages, msg)
 		}
-
-		if cfg.Verbose {
-			fmt.Fprintf(os.Stderr, "\n=> Executing tool: %s\n", tc.Name)
-		}
-		var result *mcpsdk.CallToolResult
-		var callErr error
-		if registry != nil {
-			result, callErr = registry.CallTool(ctx, tc.Name, args)
-		} else {
-			callErr = errors.New("MCP registry not initialized")
-		}
-		if callErr != nil {
-			messages = append(messages, llm.Message{
-				Role:       llm.RoleTool,
-				Content:    fmt.Sprintf("Error calling tool: %v", callErr),
-				ToolCallID: tc.ID,
-			})
-			continue
-		}
-
-		formattedRes, _ := mcp.FormatToolResult(result)
-		messages = append(messages, llm.Message{
-			Role:       llm.RoleTool,
-			Content:    formattedRes,
-			ToolCallID: tc.ID,
-		})
 	}
 	return messages, nil
 }
