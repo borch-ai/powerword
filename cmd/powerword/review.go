@@ -38,6 +38,13 @@ func newReviewCmd() *cobra.Command {
 				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
 			}
 
+			if !localOnly && issueID == "" {
+				return fmt.Errorf("either --issue or --local must be provided")
+			}
+			if localOnly && issueID != "" {
+				return fmt.Errorf("cannot provide both --local and --issue flags")
+			}
+
 			if fixPlans {
 				cmd.Printf("Checking and auto-fixing absolute paths, labels, and metadata in plan files...\n")
 				fixedCount, err := review.FixAbsolutePathsInPlans(".", cfg)
@@ -45,13 +52,6 @@ func newReviewCmd() *cobra.Command {
 					return err
 				}
 				cmd.Printf("Auto-fix complete. Modified %d plan file(s).\n", fixedCount)
-			}
-
-			if !localOnly && issueID == "" {
-				return fmt.Errorf("either --issue or --local must be provided")
-			}
-			if localOnly && issueID != "" {
-				return fmt.Errorf("cannot provide both --local and --issue flags")
 			}
 
 			var plan *review.Plan

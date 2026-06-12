@@ -502,13 +502,13 @@ func FixAbsolutePathsInPlans(workspaceRoot string, cfg *config.Config) (int, err
 				if gvMatch := goVersionLineRegex.FindStringSubmatch(newLine); len(gvMatch) > 1 {
 					cleanVal := strings.Trim(gvMatch[2], "*_` ")
 					if isPlaceholder(cleanVal) {
-						newLine = strings.Replace(newLine, cleanVal, goVersion, 1)
+						newLine = gvMatch[1] + goVersion
 					}
 				}
 				if dcMatch := dateCompletedLineRegex.FindStringSubmatch(newLine); len(dcMatch) > 1 {
 					cleanVal := strings.Trim(dcMatch[2], "*_` ")
 					if isPlaceholder(cleanVal) {
-						newLine = strings.Replace(newLine, cleanVal, todayStr, 1)
+						newLine = dcMatch[1] + todayStr
 					}
 				}
 			}
