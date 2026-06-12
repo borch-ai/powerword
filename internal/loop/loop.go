@@ -207,7 +207,6 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 			Timestamp: time.Now(),
 			Messages:  make([]llm.Message, 0),
 		}
-		fmt.Fprintf(os.Stderr, "Generating session ID for pause: %s\n", pausedID)
 	}
 
 	if session != nil && (loopErr == nil || isPaused) {
