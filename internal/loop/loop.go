@@ -118,6 +118,9 @@ func initializeSessionAndClient(ctx context.Context, cfg *config.Config, prompt 
 }
 
 func validateAndResolvePrompt(cfg *config.Config, prompt string) (string, error) {
+	if cfg.Resume != "" && prompt != "" {
+		return "", fmt.Errorf("cannot provide a prompt when resuming a session; use --session instead to continue with a new prompt")
+	}
 	if prompt == "" && cfg.Resume == "" {
 		p, _ := readStdinPrompt()
 		prompt = p
@@ -138,7 +141,7 @@ func handleSaveSession(session *Session, targetModel string, updatedMessages []l
 		return fmt.Errorf("failed to save session: %w", saveErr)
 	}
 	if isPaused {
-		fmt.Printf("\nSession paused. To resume, run:\n  powerword --resume %s\n", session.ID)
+		fmt.Fprintf(os.Stderr, "\nSession paused. To resume, run:\n  powerword --resume %s\n", session.ID)
 	}
 	return nil
 }

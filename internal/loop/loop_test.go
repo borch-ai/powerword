@@ -702,3 +702,20 @@ func TestRunLoop_ResumeSession_EmptyOrNonExistent(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestRunLoop_ResumeSession_WithPromptError(t *testing.T) {
+	setupTestSessions(t)
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Resume: "some-session",
+	}
+
+	err := RunLoop(ctx, cfg, "some prompt")
+	if err == nil {
+		t.Fatal("expected error when prompt is provided to resume, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot provide a prompt when resuming a session") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

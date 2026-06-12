@@ -58,7 +58,7 @@ using the Model Context Protocol (MCP).`,
 
 func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	// Skip config loading/validation if just running the root command without args (shows help) unless listing sessions.
-	if cmd.Name() == "powerword" && len(args) == 0 && !listSessions && resumeID == "" {
+	if cmd.Name() == "powerword" && len(args) == 0 && !listSessions && resumeID == "" && os.Getenv("POWERWORD_RESUME") == "" {
 		return nil
 	}
 
