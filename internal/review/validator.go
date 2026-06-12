@@ -351,7 +351,7 @@ func getAbsolutePath(workspaceRoot, planFile, pathStr string) (string, error) {
 	pathStr = strings.TrimPrefix(pathStr, "file://")
 
 	// Compatibility normalization for historical absolute /Users/human/code/powerword/ paths
-	if filepath.IsAbs(pathStr) || strings.HasPrefix(pathStr, "/") {
+	if isPathAbsolute(pathStr) {
 		for _, marker := range []string{"/code/powerword/", "/powerword/"} {
 			if idx := strings.Index(pathStr, marker); idx != -1 {
 				suffix := pathStr[idx+len(marker):]
@@ -362,7 +362,7 @@ func getAbsolutePath(workspaceRoot, planFile, pathStr string) (string, error) {
 	}
 
 	var absPath string
-	if filepath.IsAbs(pathStr) || strings.HasPrefix(pathStr, "/") {
+	if isPathAbsolute(pathStr) {
 		absPath = filepath.Clean(pathStr)
 	} else {
 		absPath = filepath.Clean(filepath.Join(filepath.Dir(planFile), pathStr))
@@ -392,7 +392,19 @@ func isPlaceholder(val string) bool {
 
 func isPathAbsolute(pathStr string) bool {
 	p := strings.TrimPrefix(pathStr, "file://")
-	return filepath.IsAbs(p) || strings.HasPrefix(p, "/")
+	// Standard Unix absolute or runtime-environment absolute
+	if filepath.IsAbs(p) || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") {
+		return true
+	}
+	// Windows drive letter absolute (e.g. C:/ or C:\)
+	if len(p) >= 3 && p[1] == ':' && (p[2] == '/' || p[2] == '\\') && ((p[0] >= 'a' && p[0] <= 'z') || (p[0] >= 'A' && p[0] <= 'Z')) {
+		return true
+	}
+	// Windows UNC paths (e.g. \\server\share or //server/share)
+	if strings.HasPrefix(p, "\\\\") || strings.HasPrefix(p, "//") {
+		return true
+	}
+	return false
 }
 
 // FixAbsolutePathsInPlans recursively scans the plans/ directory and fixes absolute paths,

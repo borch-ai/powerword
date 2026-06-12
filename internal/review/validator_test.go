@@ -653,3 +653,32 @@ go 1.25.3
 		t.Errorf("expected naked relative link to be normalized with file://, got:\n%s", fixedContent)
 	}
 }
+
+func TestIsPathAbsolute_Windows(t *testing.T) {
+	tests := []struct {
+		path   string
+		isAbs  bool
+	}{
+		{"C:\\Users\\human\\code", true},
+		{"c:/Users/human/code", true},
+		{"file://C:/Users/human/code", true},
+		{"\\\\server\\share", true},
+		{"//server/share", true},
+		{"file:////server/share", true},
+		{"/usr/local/bin", true},
+		{"file:///usr/local/bin", true},
+		{"../relative/path", false},
+		{"file://../relative/path", false},
+		{"my_file.go", false},
+		{"", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.path, func(t *testing.T) {
+			got := isPathAbsolute(tc.path)
+			if got != tc.isAbs {
+				t.Errorf("isPathAbsolute(%q) = %v, expected %v", tc.path, got, tc.isAbs)
+			}
+		})
+	}
+}

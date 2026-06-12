@@ -125,9 +125,15 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [ ] **Task 5.7: Multi-Language Coverage Plugin (LCOV & Cobertura)**
     *   Implement a standalone `pw-mcp-coverage` MCP server to support parsing LCOV (`lcov.info`) and Cobertura (`coverage.xml`) formats. Extend the `powerword check-coverage` command to call this server, enabling automated coverage gates for TypeScript/Vitest (such as in Knurl) and Python codebases.
     *   [Implementation Plan](plans/phase_5/task_5_7_multilang_coverage.md)
-*   [ ] **Task 5.8: Absolute Link Verification & Auto-Fixing**
+*   [x] **Task 5.8: Absolute Link Verification & Auto-Fixing**
     *   Enhance the plan validator to catch absolute filepaths and add an auto-fixing option to convert absolute path links into relative workspace links automatically.
     *   [Implementation Plan](plans/phase_5/task_5_8_absolute_link_validation.md)
+*   [ ] **Task 5.9: Disable Critic LLM Reviews**
+    *   Introduce a configuration setting to disable the LLM-powered review step in the workspace critic, while preserving local plan validations and local build/test checks.
+    *   [Implementation Plan](plans/phase_5/task_5_9_disable_critic.md)
+*   [ ] **Task 5.10: Re-enable Local Critic (Ollama)**
+    *   Re-enable the local critic LLM reviews configured with a local model run offline via Ollama, once the hardware is prepared.
+    *   [Implementation Plan](plans/phase_5/task_5_10_reenable_local_critic.md)
 
 ---
 
