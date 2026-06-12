@@ -17,13 +17,13 @@ Develop routing mechanisms to dispatch prompts to different models dynamically. 
 
 ### Model Router
 
-#### [NEW] [router.go](file:///Users/human/code/powerword/pkg/llm/router.go)
+#### [NEW] [router.go](file://../../pkg/llm/router.go)
 - Implements `ModelRouter` containing routing policy rules (e.g. mapping tasks like code linting, git logs, or database lookups to specific models).
 - Implements classification logic:
   - Direct prompt-based classification (asking a very fast local model to categorize task complexity).
   - Rule-based routing based on CLI flags or explicit user prefixes.
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - Integrates `ModelRouter` inside the execution loop.
 - Supports hot-swapping the active LLM client mid-session when the nature of the conversation shifts from planning/exploring to execution.
 

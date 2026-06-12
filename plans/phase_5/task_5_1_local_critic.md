@@ -24,7 +24,7 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
 
 ### GitHub Issue Templates
 
-#### [NEW] [implementation-plan.yml](file:///Users/human/code/powerword/.github/ISSUE_TEMPLATE/implementation-plan.yml)
+#### [NEW] [implementation-plan.yml](file://../../.github/ISSUE_TEMPLATE/implementation-plan.yml)
 - Define a structured YAML-based GitHub Issue Form. This ensures that when a new plan is created as an issue, it has distinct, parseable sections:
   ```yaml
   name: Implementation Plan
@@ -46,7 +46,7 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
 
 ### Review & Verification Component
 
-#### [NEW] [critic.go](file:///Users/human/code/powerword/internal/review/critic.go)
+#### [NEW] [critic.go](file://../../internal/review/critic.go)
 - Implement `LoadIssuePlan(issueID int)` to execute `gh issue view <id> --json body,comments` and parse the YAML/Markdown sections into a structured Go struct.
 - Implement `VerifyWorkspace(ctx context.Context, plan *Plan)`:
   - ## Phase 1: Local Validations
@@ -65,19 +65,19 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
 
 ### Git Hooks
 
-#### [NEW] [pre-push](file:///Users/human/code/powerword/scripts/git-hooks/pre-push)
+#### [NEW] [pre-push](file://../../scripts/git-hooks/pre-push)
 - Shell script acting as a Git hook. It automatically executes `make all` and/or `powerword review --local` prior to any `git push`.
 - Aborts the push if any checks fail.
 
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+#### [MODIFY] [Makefile](file://../../Makefile)
 - Add an `install-hooks` target to copy `scripts/git-hooks/pre-push` into `.git/hooks/pre-push` and set executable permissions.
 
 ### Command Configuration
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - Add configuration parameters for local critic (e.g. local LLM endpoint, model name, and path to local rules).
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 - Create and register `powerword review` command with flags:
   - `--issue`: GitHub issue ID containing the active plan.
   - `--local`: Run local validation and ruleset verification only (without fetching a remote issue).

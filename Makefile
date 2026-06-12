@@ -1,4 +1,4 @@
-.PHONY: all build install test test-integration test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks
+.PHONY: all build install test test-integration test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans
 
 # Go parameters
 GOCMD=go
@@ -72,6 +72,10 @@ check-coverage: test
 
 markdown-lint:
 	$(GOCMD) run scripts/lint_markdown/main.go
+
+fix-plans:
+	$(GOCMD) run ./cmd/powerword review --local --fix
+
 
 lint:
 	@if command -v golangci-lint >/dev/null; then \

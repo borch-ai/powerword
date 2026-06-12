@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/borch-ai/powerword/pkg/config"
 )
@@ -77,7 +78,7 @@ func TestValidatePlans_Success(t *testing.T) {
 None.
 
 ## Proposed Changes
-#### [MODIFY] [some_file.go](file:///` + strings.ReplaceAll(dummyFile, "\\", "/") + `)
+#### [MODIFY] [some_file.go](file://../some_file.go)
 - Edit it.
 
 ## Verification Plan
@@ -197,7 +198,7 @@ func TestValidatePlans_Failures(t *testing.T) {
 **Status:** Open
 ## User Review Required
 ## Proposed Changes
-#### [MODIFY] [wrong_label.go](file:///` + strings.ReplaceAll(filepath.Join(tmpDir, "correct_name.go"), "\\", "/") + `)
+#### [MODIFY] [wrong_label.go](file://../correct_name.go)
 ## Verification Plan`,
 			expectError: "link label \"wrong_label.go\" does not match actual file basename \"correct_name.go\"",
 		},
@@ -208,7 +209,7 @@ func TestValidatePlans_Failures(t *testing.T) {
 **Status:** Open
 ## User Review Required
 ## Proposed Changes
-#### [MODIFY] [non_existent.go](file:///` + strings.ReplaceAll(filepath.Join(tmpDir, "non_existent.go"), "\\", "/") + `)
+#### [MODIFY] [non_existent.go](file://../non_existent.go)
 ## Verification Plan`,
 			expectError: "modified file",
 		},
@@ -222,7 +223,7 @@ func TestValidatePlans_Failures(t *testing.T) {
 **Unit Test Coverage:** 92%
 ## User Review Required
 ## Proposed Changes
-#### [NEW] [non_existent_new.go](file:///` + strings.ReplaceAll(filepath.Join(tmpDir, "non_existent_new.go"), "\\", "/") + `)
+#### [NEW] [non_existent_new.go](file://../non_existent_new.go)
 ## Verification Plan`,
 			expectError: "completed new file",
 		},
@@ -233,7 +234,7 @@ func TestValidatePlans_Failures(t *testing.T) {
 **Status:** Open
 ## User Review Required
 ## Proposed Changes
-#### [MODIFY] [outside.go](file:///etc/hosts)
+#### [MODIFY] [hosts](file://../../../../../../../../../../../../../../../../etc/hosts)
 ## Verification Plan`,
 			expectError: "outside workspace root",
 		},
@@ -392,7 +393,7 @@ func TestValidatePlans_AdditionalFailures(t *testing.T) {
 **Status:** Open
 ## User Review Required
 ## Proposed Changes
-#### [MODIFY] [plans](file:///` + strings.ReplaceAll(plansDir, "\\", "/") + `)
+#### [MODIFY] [plans](file://../plans)
 ## Verification Plan`,
 			expectError: "is a directory, not a file",
 		},
@@ -406,7 +407,7 @@ func TestValidatePlans_AdditionalFailures(t *testing.T) {
 **Unit Test Coverage:** 92%
 ## User Review Required
 ## Proposed Changes
-#### [NEW] [plans](file:///` + strings.ReplaceAll(plansDir, "\\", "/") + `)
+#### [NEW] [plans](file://../plans)
 ## Verification Plan`,
 			expectError: "is a directory, not a file",
 		},
@@ -491,8 +492,25 @@ None
 	}
 
 	errValidate := ValidatePlans(tmpDir, cfg)
-	if errValidate != nil {
-		t.Errorf("expected compatibility normalization to resolve absolute path, got error: %v", errValidate)
+	if errValidate == nil {
+		t.Error("expected validation to fail for absolute path link")
+	} else if !strings.Contains(errValidate.Error(), "must be relative, not absolute") {
+		t.Errorf("expected error to mention absolute path, got: %v", errValidate)
+	}
+
+	// Now fix it
+	fixedCount, errFix := FixAbsolutePathsInPlans(tmpDir, cfg)
+	if errFix != nil {
+		t.Fatalf("expected FixAbsolutePathsInPlans to succeed, got %v", errFix)
+	}
+	if fixedCount != 1 {
+		t.Errorf("expected 1 file to be modified, got %d", fixedCount)
+	}
+
+	// Verify that it now passes validation
+	errValidatePost := ValidatePlans(tmpDir, cfg)
+	if errValidatePost != nil {
+		t.Errorf("expected validation to succeed after auto-fix, got error: %v", errValidatePost)
 	}
 	_ = os.Remove(planPath)
 
@@ -504,7 +522,7 @@ None
 None
 
 ## Proposed Changes
-#### [MODIFY] [non_existent.go](file:///etc/hosts)
+#### [MODIFY] [hosts](file://../../../../../../../../etc/hosts)
 - Edit it.
 
 ## Verification Plan
@@ -551,5 +569,87 @@ func TestValidatePlans_CoverageBoosters(t *testing.T) {
 	}
 	if len(files) != 0 {
 		t.Errorf("expected 0 files, got: %d", len(files))
+	}
+}
+
+func TestFixAbsolutePathsInPlans(t *testing.T) {
+	tmpDir := t.TempDir()
+	plansDir := filepath.Join(tmpDir, "plans")
+	if err := os.Mkdir(plansDir, 0750); err != nil {
+		t.Fatalf("failed to create plans dir: %v", err)
+	}
+
+	// 1. Create a dummy file that actually exists
+	dummyFile := filepath.Join(tmpDir, "my_file.go")
+	if err := os.WriteFile(dummyFile, []byte("package main"), 0600); err != nil {
+		t.Fatalf("failed to write dummy file: %v", err)
+	}
+
+	// 2. Create a go.mod file to test Go Version parsing
+	goModContent := `module github.com/borch-ai/powerword
+go 1.25.3
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0600); err != nil {
+		t.Fatalf("failed to write go.mod: %v", err)
+	}
+
+	// 3. Write a plan file with absolute paths, mismatched labels, missing file://, and completed status placeholders
+	planContent := `# plan: Task 1.1: Fix Me Plan
+**Status:** Completed
+**Go Version:** [Go Version]
+**Date Completed:** TBD
+**Unit Test Coverage:** 92%
+
+## Proposed Changes
+#### [MODIFY] [wrong_label.go](file:///` + strings.ReplaceAll(dummyFile, "\\", "/") + `)
+- Edit it.
+#### [NEW] [my_file.go](../my_file.go)
+- Edit it.
+
+## Verification Plan
+`
+	planPath := filepath.Join(plansDir, "task_1_1.md")
+	if err := os.WriteFile(planPath, []byte(planContent), 0600); err != nil {
+		t.Fatalf("failed to write plan file: %v", err)
+	}
+
+	cfg := &config.Config{}
+	fixed, err := FixAbsolutePathsInPlans(tmpDir, cfg)
+	if err != nil {
+		t.Fatalf("FixAbsolutePathsInPlans failed: %v", err)
+	}
+	if fixed != 1 {
+		t.Errorf("expected 1 file to be modified, got %d", fixed)
+	}
+
+	// Read modified file content
+	//nolint:gosec
+	fixedContentBytes, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatalf("failed to read plan: %v", err)
+	}
+	fixedContent := string(fixedContentBytes)
+
+	// Verify Go Version is updated from go.mod
+	if !strings.Contains(fixedContent, "**Go Version:** 1.25.3") {
+		t.Errorf("expected Go Version to be populated with 1.25.3, got:\n%s", fixedContent)
+	}
+
+	// Verify Date Completed is populated with today's date
+	todayStr := time.Now().Format("2006-01-02")
+	if !strings.Contains(fixedContent, "**Date Completed:** "+todayStr) {
+		t.Errorf("expected Date Completed to be populated with %s, got:\n%s", todayStr, fixedContent)
+	}
+
+	// Verify links:
+	// - wrong_label.go -> my_file.go
+	// - file:///absolute_path -> file://../my_file.go
+	if !strings.Contains(fixedContent, "#### [MODIFY] [my_file.go](file://../my_file.go)") {
+		t.Errorf("expected absolute link with mismatched label to be fixed, got:\n%s", fixedContent)
+	}
+
+	// - naked relative link -> prepended file://
+	if !strings.Contains(fixedContent, "#### [NEW] [my_file.go](file://../my_file.go)") {
+		t.Errorf("expected naked relative link to be normalized with file://, got:\n%s", fixedContent)
 	}
 }

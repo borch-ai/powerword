@@ -14,7 +14,7 @@ This task implements a native Go-based MCP server (`pw-mcp-k8s`) that integrates
 ### K8s Plugin Component
 Create a new directory `internal/plugins/k8s/` to contain the native Go plugin implementation.
 
-#### [NEW] [k8s.go](file:///Users/human/code/powerword/internal/plugins/k8s/k8s.go)
+#### [NEW] [k8s.go](file://../../internal/plugins/k8s/k8s.go)
 - [ ] Initialize Kubernetes in-cluster config or load local default kubeconfig from `~/.kube/config`.
 - [ ] Register the following MCP tools:
   - `k8s_list_pods`: list all pods in a namespace (or all namespaces).
@@ -22,11 +22,11 @@ Create a new directory `internal/plugins/k8s/` to contain the native Go plugin i
   - `k8s_get_logs`: stream or fetch tail logs from a pod container.
   - `k8s_list_events`: check cluster events to diagnose crashloops or provisioning errors.
 
-#### [NEW] [k8s_test.go](file:///Users/human/code/powerword/internal/plugins/k8s/k8s_test.go)
+#### [NEW] [k8s_test.go](file://../../internal/plugins/k8s/k8s_test.go)
 - [ ] Mock the Kubernetes clientset interfaces using `k8s.io/client-go/kubernetes/fake` to verify tool registrations and log parsing functions without a live cluster.
 
 ### CLI Manifest Integration
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [ ] Mount the native K8s plugin directly as a built-in server option when a configuration key `[plugins.k8s]` is set in `powerword.toml`.
 
 ---

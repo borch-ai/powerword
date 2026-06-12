@@ -18,7 +18,7 @@ This task implements a native Go-based MCP server (`pw-mcp-imagegen`) that integ
 ### ImageGen Plugin Component
 Create a new directory `internal/plugins/imagegen/` to contain the image generator implementation.
 
-#### [NEW] [imagegen.go](file:///Users/human/code/powerword/internal/plugins/imagegen/imagegen.go)
+#### [NEW] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
 - [x] Define standard interfaces for image generation backends.
 - [x] Implement OpenAI client integration for DALL-E 3.
 - [x] Implement Google predict client integration for Imagen 3 (`imagen-3.0-generate-002`).
@@ -29,17 +29,17 @@ Create a new directory `internal/plugins/imagegen/` to contain the image generat
   - `imagegen_register_style`: Saves a visual style definition (prompt seeds or `--sref` URLs) under a semantic ID.
   - `imagegen_list_styles`: Lists currently registered style profiles.
 
-#### [NEW] [imagegen_test.go](file:///Users/human/code/powerword/internal/plugins/imagegen/imagegen_test.go)
+#### [NEW] [imagegen_test.go](file://../../internal/plugins/imagegen/imagegen_test.go)
 - [x] Unit tests mocking API endpoints using `httptest.NewServer` to verify parameter formatting, style parsing, and file download flows.
 
 ### CLI Manifest Integration
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [x] Register the `pw-mcp-imagegen` server within the global native plugin registry under the config key `[plugins.imagegen]`.
 
 ### Verification and Test Scripts
-#### [MODIFY] [check_coverage.go](file:///Users/human/code/powerword/cmd/powerword/check_coverage.go)
+#### [MODIFY] [check_coverage.go](file://../../cmd/powerword/check_coverage.go)
 - [x] Clean the coverage profile of concurrency-generated null bytes and execute the `go tool cover` tool internally.
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+#### [MODIFY] [Makefile](file://../../Makefile)
 - [x] Pass `coverage.out` directly to the updated `check_coverage.go` validator script.
 
 ---

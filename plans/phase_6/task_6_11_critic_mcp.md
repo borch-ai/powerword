@@ -25,13 +25,13 @@ Refactor the existing Powerword Local Critic subsystem into a standalone, genera
 
 ### MCP Server Entrypoint
 
-#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-critic/main.go)
+#### [NEW] [main.go](file://../../cmd/pw-mcp-critic/main.go)
 - Create the standard CLI scaffolding to initialize and serve the MCP protocol over `stdio`.
 - Initialize `pkg/config` and `pkg/llm` specifically for the critic provider.
 
 ### MCP Server Implementation
 
-#### [NEW] [server.go](file:///Users/human/code/powerword/internal/mcp/critic/server.go)
+#### [NEW] [server.go](file://../../internal/mcp/critic/server.go)
 - Implement the MCP server utilizing `github.com/modelcontextprotocol/go-sdk/mcp`.
 - Register the `review_workspace` tool with the following JSON schema parameters:
   - `plan_content`: The markdown text of the implementation plan (passed by the orchestrator).
@@ -46,14 +46,14 @@ Refactor the existing Powerword Local Critic subsystem into a standalone, genera
 
 ### Dogfooding the Plugin
 
-#### [MODIFY] [critic.go](file:///Users/human/code/powerword/internal/review/critic.go)
+#### [MODIFY] [critic.go](file://../../internal/review/critic.go)
 - Refactor `VerifyWorkspace` to launch `pw-mcp-critic` via `internal/mcp.NewServerProcess`.
 - Call the `review_workspace` tool via the MCP client, passing the loaded GitHub Issue content and `"make all"`.
 - This removes the hardcoded LLM prompt logic from the CLI and delegates it entirely to the MCP server.
 
 ### Build and Makefile Updates
 
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+#### [MODIFY] [Makefile](file://../../Makefile)
 - Add `cmd/pw-mcp-critic/main.go` to the `build` target so `bin/pw-mcp-critic` is compiled alongside other plugins.
 
 ---

@@ -30,13 +30,13 @@ Add a post-merge "release" GitHub Action workflow to automate semantic versionin
 
 We need to define the version inside the application and register it with Cobra so that `--version` prints the release version correctly.
 
-#### [NEW] [version.go](file:///Users/human/code/powerword/pkg/config/version.go)
+#### [NEW] [version.go](file://../../pkg/config/version.go)
 - Create `internal/config/version.go` to define the package-level `Version` variable.
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 - Set the `Version` attribute of the Cobra root command using `Version: Version`.
 
-#### [MODIFY] [root_test.go](file:///Users/human/code/powerword/pkg/config/root_test.go)
+#### [MODIFY] [root_test.go](file://../../pkg/config/root_test.go)
 - Add a unit test to verify that `--version` correctly executes and outputs the version of the command, ensuring code coverage remains above the 91% threshold.
 
 ---
@@ -45,7 +45,7 @@ We need to define the version inside the application and register it with Cobra 
 
 We need to pass the version variable during compilation dynamically using linker flags (`-ldflags`).
 
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+#### [MODIFY] [Makefile](file://../../Makefile)
 - Define a `VERSION` variable defaulting to `dev`.
 - Update the `build` target to pass `-ldflags "-X powerword/internal/config.Version=$(VERSION)"`.
 
@@ -55,7 +55,7 @@ We need to pass the version variable during compilation dynamically using linker
 
 We need to add the release logic as a separate workflow.
 
-#### [NEW] [release.yml](file:///Users/human/code/powerword/.github/workflows/release.yml)
+#### [NEW] [release.yml](file://../../.github/workflows/release.yml)
 - Create a new workflow file `release.yml` that triggers on pushes (merges) to the `main` branch.
 - Run all validation gates (linting, testing, and security checks) to ensure release stability.
 - Use `go-semantic-release/action` to determine the next version, create the Git tag, and publish the GitHub release with release notes.

@@ -13,10 +13,10 @@ This task implements fine-grained security profiles to control tool execution sc
 
 ### Security Controls
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [ ] Add config structure for tool execution profiles, allowing configuration of path whitelist patterns.
 
-#### [MODIFY] [guard.go](file:///Users/human/code/powerword/internal/loop/guard.go)
+#### [MODIFY] [guard.go](file://../../internal/loop/guard.go)
 - [ ] Implement path resolution and security matching functions to validate directory boundaries.
 - [ ] Implement shell command token validators to match whitelist regexes.
 

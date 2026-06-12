@@ -16,13 +16,13 @@ Implement non-interactive input/output mechanisms for running Powerword inside C
 
 ### Headless Execution Modes
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 - Adds CLI flags:
   - `--headless` (disables interactive confirmations, defaults to strict safety rejection of unsafe commands).
   - `--json` (encapsulates stdout inside a structured JSON payload: response text, list of executed tools, execution status). *Note: Token usage stats will be added to this payload later in Task 4.3.*
   - `--accept-all` (allows bypass of interactive prompts for scripting convenience - to be used with extreme caution).
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - Detects the headless flag.
 - Reading standard input: if no prompt is passed as arguments, reads input directly from `os.Stdin`. If a prompt argument is passed, it takes precedence.
 - Output routing: When `--json` is enabled, all normal CLI logs, warnings, and stream outputs are forced to `stderr`. The final `JSONPayload` is the only text printed to `stdout` to ensure pipeline compatibility.

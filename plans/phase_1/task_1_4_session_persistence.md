@@ -15,7 +15,7 @@ Implement local session management and persistence schemas to store chat transcr
 
 ### Local Storage & Context Serializers
 
-#### [NEW] [session.go](file:///Users/human/code/powerword/internal/loop/session.go)
+#### [NEW] [session.go](file://../../internal/loop/session.go)
 - Defines structures:
   - `Session` mapping session ID, timestamp, model config, and history.
   - `HistoryStore` managing session lookup, save, and listing.
@@ -24,7 +24,7 @@ Implement local session management and persistence schemas to store chat transcr
   - `LoadSession(id string) ([]llm.Message, error)`
   - `ListSessions() ([]Session, error)`
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 - Adds CLI flags:
   - `--session <id>` (creates or resumes a conversation with the specified ID).
   - `--list-sessions` (lists recent conversations, dates, and token sizing).

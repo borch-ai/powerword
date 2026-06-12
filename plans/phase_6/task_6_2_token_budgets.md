@@ -16,16 +16,16 @@ This task adds user-defined token and cost budgeting guardrails to prevent infin
 
 ### Config and Telemetry
 
-#### [MODIFY] [config.go](../../pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [x] Add config options `max_cost` and `max_tokens` (input/output/cached).
 
-#### [MODIFY] [root.go](../../pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 - [x] Declare and register persistent CLI flags for `--max-cost`, `--max-tokens`, `--max-input-tokens`, `--max-output-tokens`, and `--max-cached-tokens` with default values matching the config defaults.
 
-#### [MODIFY] [telemetry.go](../../pkg/telemetry/telemetry.go)
+#### [MODIFY] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
 - [x] Add checks within the telemetry tracking logic to verify if the current session costs have crossed the defined budget threshold.
 
-#### [MODIFY] [loop.go](../../internal/loop/loop.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 - [x] Integrate budget check into the loop step validator and return a distinct budget exhaustion error.
 
 ---

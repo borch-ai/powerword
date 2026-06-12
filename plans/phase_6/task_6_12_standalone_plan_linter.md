@@ -16,7 +16,7 @@ Expose the local plan template validation and relative link conformance checks a
 
 ### Command Subsystem
 
-#### [NEW] [lint_plans.go](file:///Users/human/code/powerword/cmd/powerword/lint_plans.go)
+#### [NEW] [lint_plans.go](file://../../cmd/powerword/lint_plans.go)
 - Create a new Cobra command `lint-plans` under the root CLI.
 - Flag support:
   - `--path`: Specify target path to validate (defaults to plans/ directory).
@@ -28,7 +28,7 @@ Expose the local plan template validation and relative link conformance checks a
 
 ### MCP Plugin Integration
 
-#### [NEW] [server.go](file:///Users/human/code/powerword/internal/mcp/critic/server.go)
+#### [NEW] [server.go](file://../../internal/mcp/critic/server.go)
 - Define a standard MCP server structure utilizing `github.com/modelcontextprotocol/go-sdk/mcp`.
 - Register the `validate_plans` tool:
   - Parameters:

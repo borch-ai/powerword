@@ -19,7 +19,7 @@ Refactor the telemetry and cost accounting structures from internal packages int
 
 ### Module Setup
 
-#### [MODIFY] [go.mod](../../go.mod)
+#### [MODIFY] [go.mod](file://../../go.mod)
 - Update the module declaration from `module powerword` to `module github.com/borch-ai/powerword`. (Already complete in base codebase)
 
 #### [MODIFY] [All Go files in powerword]
@@ -27,14 +27,14 @@ Refactor the telemetry and cost accounting structures from internal packages int
 
 ### Telemetry Component
 
-#### [NEW] [telemetry.go](../../pkg/telemetry/telemetry.go)
+#### [NEW] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
 - Create a new, dependency-free subpackage `pkg/telemetry` containing:
   * `ModelUsage` struct (token counts).
   * `UsageTracker` struct.
   * `ModelPricing` configuration mapping (relocated from config files).
   * Prefix matching and cost calculation logic.
 
-#### [NEW] [telemetry_test.go](../../pkg/telemetry/telemetry_test.go)
+#### [NEW] [telemetry_test.go](file://../../pkg/telemetry/telemetry_test.go)
 - Create unit tests to test the new package under the `telemetry` namespace.
 
 ---
