@@ -3,7 +3,7 @@
 **Status:** Completed
 **Go Version:** 1.26
 **Date Completed:** 2026-06-12
-**Unit Test Coverage:** 91.0% (statements)
+**Unit Test Coverage:** 91.2% (statements)
 
 This task adds user-defined token and cost budgeting guardrails to prevent infinite loops and runaway API expenditures during long-running agent execution runs.
 
@@ -18,6 +18,9 @@ This task adds user-defined token and cost budgeting guardrails to prevent infin
 
 #### [MODIFY] [config.go](../../pkg/config/config.go)
 - [x] Add config options `max_cost` and `max_tokens` (input/output/cached).
+
+#### [MODIFY] [root.go](../../pkg/config/root.go)
+- [x] Declare and register persistent CLI flags for `--max-cost`, `--max-tokens`, `--max-input-tokens`, `--max-output-tokens`, and `--max-cached-tokens` with default values matching the config defaults.
 
 #### [MODIFY] [telemetry.go](../../pkg/telemetry/telemetry.go)
 - [x] Add checks within the telemetry tracking logic to verify if the current session costs have crossed the defined budget threshold.
