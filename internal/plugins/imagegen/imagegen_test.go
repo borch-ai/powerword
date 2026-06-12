@@ -138,7 +138,7 @@ func TestOpenAIBackend(t *testing.T) {
 	t.Setenv("OPENAI_BASE_URL", server.URL)
 	backend := NewOpenAIBackend("mock-api-key")
 
-	url, err := backend.GenerateImage(context.Background(), "a beautiful landscape", "1024x1024")
+	url, _, err := backend.GenerateImage(context.Background(), "a beautiful landscape", "1024x1024")
 	if err != nil {
 		t.Fatalf("GenerateImage failed: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestOpenAIBackend_Errors(t *testing.T) {
 
 	t.Setenv("OPENAI_BASE_URL", errServer.URL)
 	backend := NewOpenAIBackend("mock-key")
-	_, err := backend.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err := backend.GenerateImage(context.Background(), "prompt", "1024x1024")
 	if err == nil {
 		t.Error("expected error from API failure, got nil")
 	}
@@ -332,7 +332,7 @@ func TestOpenAIBackend_Errors(t *testing.T) {
 
 	t.Setenv("OPENAI_BASE_URL", emptyServer.URL)
 	backendEmpty := NewOpenAIBackend("mock-key")
-	_, err = backendEmpty.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendEmpty.GenerateImage(context.Background(), "prompt", "1024x1024")
 	if err == nil {
 		t.Error("expected error from empty response, got nil")
 	}

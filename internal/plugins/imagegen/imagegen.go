@@ -118,6 +118,7 @@ func (s *StyleStore) List() ([]StyleProfile, error) {
 // OpenAIBackend implements DALL-E 3 image generation.
 type OpenAIBackend struct {
 	client *openai.Client
+	model  string
 }
 
 // NewOpenAIBackend creates a new OpenAI image generator wrapper.
@@ -126,13 +127,18 @@ func NewOpenAIBackend(apiKey string) *OpenAIBackend {
 	if baseURL := os.Getenv("OPENAI_BASE_URL"); baseURL != "" {
 		cfg.BaseURL = baseURL
 	}
+	model := os.Getenv("POWERWORD_IMAGEGEN_OPENAI_MODEL")
+	if model == "" {
+		model = openai.CreateImageModelDallE3
+	}
 	return &OpenAIBackend{
 		client: openai.NewClientWithConfig(cfg),
+		model:  model,
 	}
 }
 
 // GenerateImage requests image URL from DALL-E 3.
-func (b *OpenAIBackend) GenerateImage(ctx context.Context, prompt string, size string) (string, error) {
+func (b *OpenAIBackend) GenerateImage(ctx context.Context, prompt string, size string) (string, string, error) {
 	if size == "" {
 		size = "1024x1024"
 	}
@@ -140,17 +146,17 @@ func (b *OpenAIBackend) GenerateImage(ctx context.Context, prompt string, size s
 		Prompt: prompt,
 		Size:   size,
 		N:      1,
-		Model:  openai.CreateImageModelDallE3,
+		Model:  b.model,
 	}
 
 	resp, err := b.client.CreateImage(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("openai error: %w", err)
+		return "", "", fmt.Errorf("openai error: %w", err)
 	}
 	if len(resp.Data) == 0 {
-		return "", fmt.Errorf("openai returned no image URL data")
+		return "", "", fmt.Errorf("openai returned no image data")
 	}
-	return resp.Data[0].URL, nil
+	return resp.Data[0].URL, resp.Data[0].B64JSON, nil
 }
 
 // GoogleBackend implements Imagen 3 image generation using Google AI Studio predict REST API.
@@ -772,16 +778,27 @@ func (s *ImageGenService) resolvePrompt(prompt, styleID string) (string, string,
 	return finalPrompt, srefURL, nil
 }
 
-func (s *ImageGenService) runOpenAI(ctx context.Context, finalPrompt, size string) (string, error) {
+func (s *ImageGenService) runOpenAI(ctx context.Context, finalPrompt, size string) ([]byte, string, string, error) {
 	apiKey := s.cfg.Plugins.ImageGen.OpenAIAPIKey
 	if apiKey == "" {
 		apiKey = s.cfg.APIKeys.OpenAI
 	}
 	if apiKey == "" {
-		return "", fmt.Errorf("openai API key is not configured (set plugins.imagegen.openai_api_key or api_keys.openai)")
+		return nil, "", "", fmt.Errorf("openai API key is not configured (set plugins.imagegen.openai_api_key or api_keys.openai)")
 	}
 	client := NewOpenAIBackend(apiKey)
-	return client.GenerateImage(ctx, finalPrompt, size)
+	urlStr, b64Str, err := client.GenerateImage(ctx, finalPrompt, size)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if b64Str != "" {
+		data, decodeErr := base64.StdEncoding.DecodeString(b64Str)
+		if decodeErr != nil {
+			return nil, "", "", fmt.Errorf("failed to decode base64 image data: %w", decodeErr)
+		}
+		return data, "image/png", "", nil
+	}
+	return nil, "", urlStr, nil
 }
 
 func (s *ImageGenService) runMidjourney(ctx context.Context, finalPrompt, size, srefURL string) (string, error) {
@@ -858,7 +875,7 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 
 	switch backend {
 	case "openai":
-		imageURL, err = s.runOpenAI(ctx, finalPrompt, size)
+		imageBytes, mimeType, imageURL, err = s.runOpenAI(ctx, finalPrompt, size)
 		if err != nil {
 			return "", err
 		}

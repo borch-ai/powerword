@@ -343,3 +343,79 @@ func TestOpenAIClient_Generate_JSONMode(t *testing.T) {
 		t.Fatal("timeout waiting for request to be captured")
 	}
 }
+
+func TestOpenAIClient_Generate_WithResponseSchema(t *testing.T) {
+	capturedChan := make(chan openai.ChatCompletionRequest, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read body: %v", err)
+		}
+		var capturedRequest openai.ChatCompletionRequest
+		_ = json.Unmarshal(bodyBytes, &capturedRequest)
+		capturedChan <- capturedRequest
+
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: `{"field": "test"}`,
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+
+	type SchemaType struct {
+		Field string `json:"field"`
+	}
+
+	_, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hello!"}}, nil, WithResponseSchema(&SchemaType{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case capturedRequest := <-capturedChan:
+		if capturedRequest.ResponseFormat == nil {
+			t.Fatal("expected ResponseFormat to be set, got nil")
+		}
+		if capturedRequest.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONSchema {
+			t.Errorf("expected ResponseFormat type %s, got %s",
+				openai.ChatCompletionResponseFormatTypeJSONSchema, capturedRequest.ResponseFormat.Type)
+		}
+		js := capturedRequest.ResponseFormat.JSONSchema
+		if js == nil {
+			t.Fatal("expected JSONSchema to be set, got nil")
+		}
+		if js.Name != "structured_output" || !js.Strict {
+			t.Errorf("unexpected JSONSchema parameters: Name=%s, Strict=%t", js.Name, js.Strict)
+		}
+		// Verify schema compiles and is valid
+		schemaBytes, _ := js.Schema.MarshalJSON()
+		var schemaMap map[string]any
+		_ = json.Unmarshal(schemaBytes, &schemaMap)
+		if schemaMap["type"] != "object" {
+			t.Errorf("expected reflected schema type 'object', got %v", schemaMap["type"])
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request to be captured")
+	}
+}
+
+func TestOpenAIClient_Generate_WithResponseSchema_Error(t *testing.T) {
+	client := &OpenAIClient{}
+	ch := make(chan int)
+	_, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hello!"}}, nil, WithResponseSchema(ch))
+	if err == nil {
+		t.Fatal("expected schema generation error, got nil")
+	}
+}

@@ -65,12 +65,20 @@ type GenerateOption func(*generateOptions)
 
 type generateOptions struct {
 	ResponseMIMEType string
+	ResponseSchema   any
 }
 
 // WithResponseMIMEType sets the expected MIME type of the generated response (e.g. "application/json").
 func WithResponseMIMEType(mimeType string) GenerateOption {
 	return func(o *generateOptions) {
 		o.ResponseMIMEType = mimeType
+	}
+}
+
+// WithResponseSchema configures the model to strictly adhere to the provided schema definition.
+func WithResponseSchema(schema any) GenerateOption {
+	return func(o *generateOptions) {
+		o.ResponseSchema = schema
 	}
 }
 
