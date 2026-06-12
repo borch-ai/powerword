@@ -19,6 +19,9 @@
 /powerword
 /pw-mcp-*
 /bin/
+cmd/powerword/powerword
+cmd/pw-mcp-*/pw-mcp-*
+
 
 # IDEs/Editors configuration
 .idea/
