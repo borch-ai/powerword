@@ -376,10 +376,9 @@ func TestPrintJSONPayload(t *testing.T) {
 	_ = w.Close()
 	os.Stdout = oldStdout
 
-	buf := make([]byte, 4096)
-	n, _ := r.Read(buf)
+	outBytes, _ := io.ReadAll(r)
 	_ = r.Close()
-	output := string(buf[:n])
+	output := string(outBytes)
 
 	if !strings.Contains(output, "Hello") {
 		t.Errorf("expected payload to contain 'Hello', got: %s", output)
@@ -423,10 +422,9 @@ func TestRunLoop_JSONOutput(t *testing.T) {
 	_ = w.Close()
 	os.Stdout = oldStdout
 
-	buf := make([]byte, 4096)
-	n, _ := r.Read(buf)
+	outBytes, _ := io.ReadAll(r)
 	_ = r.Close()
-	output := string(buf[:n])
+	output := string(outBytes)
 
 	if !strings.Contains(output, "JSON response") {
 		t.Errorf("expected JSON payload to contain generated response, got: %s", output)
@@ -532,10 +530,9 @@ func TestRunLoop_TelemetrySummary(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	buf := make([]byte, 4096)
-	n, _ := r.Read(buf)
+	outBytes, _ := io.ReadAll(r)
 	_ = r.Close()
-	output := string(buf[:n])
+	output := string(outBytes)
 
 	// Estimated cost: 100k * 1 / 1M + 200k * 2 / 1M = 0.1 + 0.4 = $0.50
 	if !strings.Contains(output, "Estimated Cost: $0.50000") {

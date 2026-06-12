@@ -17,14 +17,14 @@ Implement a dedicated suite of integration tests (utilizing the `//go:build inte
 
 ### LLM Client Component
 
-#### [MODIFY] [openai.go](file:///Users/human/code/powerword/pkg/llm/openai.go)
+#### [MODIFY] [openai.go](../../pkg/llm/openai.go)
 - Update `NewOpenAIClient(apiKey string, modelName string)` to check if the `OPENAI_BASE_URL` environment variable is defined and use it as a custom base URL.
 
 ---
 
 ### Integration Testing Component
 
-#### [NEW] [cli_integration_test.go](file:///Users/human/code/powerword/internal/loop/cli_integration_test.go)
+#### [NEW] [cli_integration_test.go](../../internal/loop/cli_integration_test.go)
 - Create a test file utilizing the `//go:build integration` tag to verify the compiled `powerword` binary.
 - Build the binary dynamically to a temporary path during `TestMain`.
 - Verify the following CLI flows:
@@ -33,7 +33,7 @@ Implement a dedicated suite of integration tests (utilizing the `//go:build inte
   * Correct CLI exit codes for success, configuration parsing error, and connection timeouts.
   * Resuming past session state files from a temporary directory using `--session`.
 
-#### [NEW] [mcp_integration_test.go](file:///Users/human/code/powerword/internal/mcp/mcp_integration_test.go)
+#### [NEW] [mcp_integration_test.go](../../internal/mcp/mcp_integration_test.go)
 - Create a test file utilizing the `//go:build integration` tag to test native Go MCP plugin execution.
 - Compile one of the native plugins (e.g. `pw-mcp-fs`) dynamically.
 - Spawn the plugin subprocess and establish a real `stdio` MCP transport connection.
@@ -46,7 +46,7 @@ Implement a dedicated suite of integration tests (utilizing the `//go:build inte
 
 ### Makefile
 
-#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
+#### [MODIFY] [Makefile](../../Makefile)
 - Add a new `test-integration` target:
   ```makefile
   test-integration:

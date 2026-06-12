@@ -19,6 +19,9 @@ type ServerConfig struct {
 	Env     []string `mapstructure:"env"`
 }
 
+// ModelPricing is a type alias to preserve backward compatibility.
+type ModelPricing = telemetry.ModelPricing
+
 // Config holds the application configuration.
 type Config struct {
 	Verbose           bool                              `mapstructure:"verbose"`
