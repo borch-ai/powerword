@@ -427,3 +427,46 @@ func TestVerifyWorkspace_CriticServerConfigFallback(t *testing.T) {
 	// This will cover the fallback config check
 	_ = VerifyWorkspace(context.Background(), plan, cfg)
 }
+
+func TestVerifyWorkspace_DisableCritic(t *testing.T) {
+	origExec := execCommand
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "make" {
+			return mockExecCommandContext(ctx, "make", args...) // mock make success
+		}
+		return mockExecCommandContext(ctx, command, args...)
+	}
+	defer func() { execCommand = origExec }()
+
+	plan := &Plan{Goal: "test"}
+	cfg := &config.Config{
+		DisableCritic: true,
+	}
+
+	err := VerifyWorkspace(context.Background(), plan, cfg)
+	if err != nil {
+		t.Errorf("expected success for disabled critic, got: %v", err)
+	}
+}
+
+func TestVerifyWorkspace_DisableCritic_ValidationFails(t *testing.T) {
+	origExec := execCommand
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "make" {
+			cmd := mockExecCommandContext(ctx, "fail") // mock make failure
+			return cmd
+		}
+		return mockExecCommandContext(ctx, command, args...)
+	}
+	defer func() { execCommand = origExec }()
+
+	plan := &Plan{Goal: "test"}
+	cfg := &config.Config{
+		DisableCritic: true,
+	}
+
+	err := VerifyWorkspace(context.Background(), plan, cfg)
+	if err == nil {
+		t.Error("expected validation command failure error, got nil")
+	}
+}
