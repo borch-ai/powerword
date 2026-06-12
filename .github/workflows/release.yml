@@ -43,6 +43,12 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Push Git Tag
+        if: steps.semrel.outputs.version != ''
+        run: |
+          git tag ${{ steps.semrel.outputs.version }}
+          git push origin ${{ steps.semrel.outputs.version }}
+
       - name: Build powerword Binaries
         if: steps.semrel.outputs.version != ''
         env:
