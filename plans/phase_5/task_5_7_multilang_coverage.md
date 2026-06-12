@@ -19,10 +19,10 @@ Extend Powerword's coverage checking capabilities to support SvelteKit/TypeScrip
 
 ### MCP Coverage Plugin
 
-#### [NEW] [cmd/pw-mcp-coverage/main.go](file://../cmd/pw-mcp-coverage/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/scripts/lint_markdown/main.go)
 - Create the standard CLI wrapper to initialize and run the stdio-based MCP server.
 
-#### [NEW] [server.go](file://../internal/mcp/coverage/server.go)
+#### [NEW] [server.go](file:///Users/human/code/powerword/internal/mcp/critic/server.go)
 - Implement the MCP server utilizing the `modelcontextprotocol/go-sdk`.
 - Register the `check_coverage` tool.
 - Implement parsing drivers for:
@@ -33,11 +33,11 @@ Extend Powerword's coverage checking capabilities to support SvelteKit/TypeScrip
 
 ### Powerword CLI Integration
 
-#### [MODIFY] [check_coverage.go](file://../cmd/powerword/check_coverage.go)
+#### [MODIFY] [check_coverage.go](file:///Users/human/code/powerword/cmd/powerword/check_coverage.go)
 - Update the subcommand to auto-detect file formats (e.g., if target file is `lcov.info` or XML).
 - If format is non-Go, instantiate and call the `pw-mcp-coverage` tool via standard MCP process spawning.
 
-#### [MODIFY] [Makefile](file://../Makefile)
+#### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
 - Add the `cmd/pw-mcp-coverage/main.go` target to the compilation list to build `bin/pw-mcp-coverage` as a compiled plugin.
 
 ---

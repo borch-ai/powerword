@@ -1,6 +1,9 @@
 # plan: Task 3.1: Standard Native Plugins (FS, Git, Shell)
 
 **Status:** Completed (Issue #51)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 
 Author a suite of native Go MCP servers to expose filesystem manipulation, Git introspection, and secure shell execution capabilities to the Powerword core process.
@@ -25,7 +28,7 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
 
 ### Native Go MCP Servers
 
-#### [NEW] [pw-mcp-fs](../cmd/pw-mcp-fs/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-fs/main.go) <!-- fs -->
 - Separate executable (or internal command mode).
 - Implements MCP schema for:
   - `read_file(path)`
@@ -35,7 +38,7 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
 - Sandbox check: prevents reading/writing outside of configured workspace root.
 - Implementation: Uses `github.com/modelcontextprotocol/go-sdk/mcp`. `search_grep` uses `filepath.WalkDir` and `regexp`.
 
-#### [NEW] [pw-mcp-git](../cmd/pw-mcp-git/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-git/main.go) <!-- git -->
 - Implements MCP schema for git repository operations:
   - `git_status()`
   - `git_diff()`
@@ -43,7 +46,7 @@ Author a suite of native Go MCP servers to expose filesystem manipulation, Git i
   - `git_commit(message)`
 - Interacts with git repositories using the pure Go library `github.com/go-git/go-git/v5`.
 
-#### [NEW] [pw-mcp-shell](../cmd/pw-mcp-shell/main.go)
+#### [NEW] [main.go](file:///Users/human/code/powerword/cmd/pw-mcp-shell/main.go) <!-- shell -->
 - Implements safe shell commands running:
   - `run_command(command, args[])`
 - Checks commands against a hardcoded deny-list (`rm, mkfs, dd, sudo, su, shutdown, reboot, poweroff, halt, format, chmod, chown`) and blocks them. Validates workspace directory matching.

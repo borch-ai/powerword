@@ -1,6 +1,9 @@
 # plan: Task 3.2: Plugin Manifest Configuration & Registration
 
 **Status:** Completed (Issue #52)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 
 Establish a configuration-driven mechanism to discover, configure, and mount third-party or local MCP servers. Define a clean TOML configuration schema within `powerword.toml` to register these servers and their runtime parameters.
@@ -14,7 +17,7 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
 
 ### Configuration Mapping & Startup Logic
 
-#### [MODIFY] [config.go](../internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - *Already Implemented*: Extends Config structures to support a map of Server definitions keyed by server name via the `servers` TOML block.
   ```toml
   [servers.filesystem]
@@ -27,7 +30,7 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
      args = ["-y", "@modelcontextprotocol/server-memory"]
   ```
 
-#### [MODIFY] [process.go](../internal/mcp/process.go) & [loop.go](../internal/loop/loop.go)
+#### [MODIFY] [process.go](file:///Users/human/code/powerword/internal/mcp/process.go) & [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
 - *Already Implemented*: Parses the configuration definitions during boot in the `RunLoop`.
 - *Already Implemented*: Locates executables in system `$PATH` or uses absolute paths to start server sub-processes.
 - *Already Implemented*: Gracefully logs failures to initialize individual servers, keeping the rest of the working plugins operational.

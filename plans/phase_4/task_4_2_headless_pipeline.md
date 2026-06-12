@@ -1,6 +1,8 @@
 # plan: Task 4.2: Headless Pipelines & Automation
 
 **Status:** Completed (Issue #54)
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 
 Implement non-interactive input/output mechanisms for running Powerword inside CI/CD pipelines, automated cron-jobs, or unix piping chains. Enable structured formatting options (JSON output) and disable all interactive terminal prompts.
@@ -14,7 +16,7 @@ Implement non-interactive input/output mechanisms for running Powerword inside C
 
 ### Headless Execution Modes
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/internal/config/root.go)
+#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
 - Adds CLI flags:
   - `--headless` (disables interactive confirmations, defaults to strict safety rejection of unsafe commands).
   - `--json` (encapsulates stdout inside a structured JSON payload: response text, list of executed tools, execution status). *Note: Token usage stats will be added to this payload later in Task 4.3.*

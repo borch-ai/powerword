@@ -1,6 +1,9 @@
 # plan: Task 5.2: GitHub Webhook Listener & Active Session Event Broker
 
 **Status:** Completed (Issue #25)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 
 Extend the HTTP listener daemon to handle webhook notifications for issue edits, state transitions, and PR comments, routing them dynamically as reactive MCP events.
@@ -19,23 +22,23 @@ Extend the HTTP listener daemon to handle webhook notifications for issue edits,
 
 ### Webhook Component
 
-#### [NEW] [listener.go](../internal/review/listener.go)
+#### [NEW] [listener.go](file:///Users/human/code/powerword/internal/review/listener.go)
 - Create HTTP handler to parse and validate GitHub webhook payloads for:
   - `issues` (triggered when plans are edited or closed).
   - `issue_comment` (triggered when users approve plans or comment on progress).
   - `pull_request_review_comment` (triggered when reviewer bots leave reviews).
 - Trigger local event broker handlers upon validation.
 
-#### [NEW] [mcp.go](../internal/review/mcp.go)
+#### [NEW] [mcp.go](file:///Users/human/code/powerword/internal/review/mcp.go)
 - Integrate with MCP server interface to expose webhook events as standard MCP notifications.
 - Expose resource schemas representing the active issues and PR reviews to the model context.
 
 ### CLI Bindings
 
-#### [MODIFY] [config.go](../internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - Add webhook secret (`WebhookSecret`) and port (`WebhookPort`) configurations to Viper bindings, mapping to `POWERWORD_WEBHOOK_SECRET` and `POWERWORD_WEBHOOK_PORT`.
 
-#### [MODIFY] [review.go](../cmd/powerword/review.go)
+#### [MODIFY] [review.go](file:///Users/human/code/powerword/cmd/powerword/review.go)
 - Add `--listen` and `--port` flags to the `review` command. If `--listen` is provided, start the HTTP webhook listener.
 
 ---

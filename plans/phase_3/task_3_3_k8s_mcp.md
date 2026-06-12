@@ -26,7 +26,7 @@ Create a new directory `internal/plugins/k8s/` to contain the native Go plugin i
 - [ ] Mock the Kubernetes clientset interfaces using `k8s.io/client-go/kubernetes/fake` to verify tool registrations and log parsing functions without a live cluster.
 
 ### CLI Manifest Integration
-#### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - [ ] Mount the native K8s plugin directly as a built-in server option when a configuration key `[plugins.k8s]` is set in `powerword.toml`.
 
 ---

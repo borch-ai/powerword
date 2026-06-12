@@ -1,6 +1,8 @@
 # plan: Task 3.5: Creative Asset Generation Plugin (pw-mcp-imagegen)
 
 **Status:** Completed
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 **Completed At:** 2026-06-11T02:23:00Z
 **Go Version:** 1.26.4
 
@@ -31,11 +33,11 @@ Create a new directory `internal/plugins/imagegen/` to contain the image generat
 - [x] Unit tests mocking API endpoints using `httptest.NewServer` to verify parameter formatting, style parsing, and file download flows.
 
 ### CLI Manifest Integration
-#### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - [x] Register the `pw-mcp-imagegen` server within the global native plugin registry under the config key `[plugins.imagegen]`.
 
 ### Verification and Test Scripts
-#### [MODIFY] [scripts/check_coverage.go](file:///Users/human/code/powerword/scripts/check_coverage.go)
+#### [MODIFY] [check_coverage.go](file:///Users/human/code/powerword/cmd/powerword/check_coverage.go)
 - [x] Clean the coverage profile of concurrency-generated null bytes and execute the `go tool cover` tool internally.
 #### [MODIFY] [Makefile](file:///Users/human/code/powerword/Makefile)
 - [x] Pass `coverage.out` directly to the updated `check_coverage.go` validator script.

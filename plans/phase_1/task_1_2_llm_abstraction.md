@@ -1,6 +1,9 @@
 # plan: Task 1.2: LLM Abstraction Layer
 
 **Status:** Completed (Issue #37)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 Define a uniform abstraction interface to interact with multiple LLM providers (Gemini, OpenAI, and Anthropic). Implement provider wrappers using their Go SDKs (the official SDKs for Gemini and Anthropic, and the popular community SDK for OpenAI).
 
@@ -35,7 +38,7 @@ No review required as this task is completed.
 
 ### LLM Interface & Provider Integrations
 
-#### [MODIFY] [client.go](file:///Users/human/code/powerword/internal/llm/client.go)
+#### [MODIFY] [client.go](file:///Users/human/code/powerword/pkg/llm/client.go)
 - Defines structures:
   - `Role` (`system`, `user`, `assistant`, `tool`).
   - `Message` representing role, text content, tool calls, and tool response associations.
@@ -45,16 +48,16 @@ No review required as this task is completed.
 - Defines the `LLMClient` interface.
 - Implements `NewClient` resolver logic.
 
-#### [NEW] [gemini.go](file:///Users/human/code/powerword/internal/llm/gemini.go)
+#### [NEW] [gemini.go](file:///Users/human/code/powerword/pkg/llm/gemini.go)
 - Implements `LLMClient` using the official Google GenAI Go SDK.
 - Recursively converts standard JSON Schemas to `*genai.Schema`.
 - Maps conversation history, handles tool calls/responses, and streams responses via `SendMessageStream`.
 
-#### [NEW] [openai.go](file:///Users/human/code/powerword/internal/llm/openai.go)
+#### [NEW] [openai.go](file:///Users/human/code/powerword/pkg/llm/openai.go)
 - Implements `LLMClient` using `github.com/sashabaranov/go-openai`.
 - Maps messages, tool definitions, tool calls, and streams chat completions.
 
-#### [NEW] [anthropic.go](file:///Users/human/code/powerword/internal/llm/anthropic.go)
+#### [NEW] [anthropic.go](file:///Users/human/code/powerword/pkg/llm/anthropic.go)
 - Implements `LLMClient` using the official `github.com/anthropics/anthropic-sdk-go` client.
 - Maps messages, system prompts, tool schemas, and handles streaming/message deltas.
 
@@ -64,10 +67,10 @@ No review required as this task is completed.
 
 ### Automated Tests
 We implemented extensive table-driven unit tests with simulated HTTP mock servers using `httptest.NewServer` to mock API responses and verify correct request formats/streaming:
-- [client_test.go](file:///Users/human/code/powerword/internal/llm/client_test.go): Tests the client resolver factory.
-- [gemini_test.go](file:///Users/human/code/powerword/internal/llm/gemini_test.go): Mocks Gemini REST responses for generate content, function calling, schema parsing, and event stream.
-- [openai_test.go](file:///Users/human/code/powerword/internal/llm/openai_test.go): Mocks OpenAI completions, streaming, and tool calls.
-- [anthropic_test.go](file:///Users/human/code/powerword/internal/llm/anthropic_test.go): Mocks Anthropic SSE streaming, messages creation, and tool results.
+- [client_test.go](file:///Users/human/code/powerword/pkg/llm/client_test.go): Tests the client resolver factory.
+- [gemini_test.go](file:///Users/human/code/powerword/pkg/llm/gemini_test.go): Mocks Gemini REST responses for generate content, function calling, schema parsing, and event stream.
+- [openai_test.go](file:///Users/human/code/powerword/pkg/llm/openai_test.go): Mocks OpenAI completions, streaming, and tool calls.
+- [anthropic_test.go](file:///Users/human/code/powerword/pkg/llm/anthropic_test.go): Mocks Anthropic SSE streaming, messages creation, and tool results.
 
 - **Verification Command**: Run `make check-coverage`
 - **Result**: Statement coverage is **91.4%**, meeting the strict coverage threshold requirement of **91.0%**.

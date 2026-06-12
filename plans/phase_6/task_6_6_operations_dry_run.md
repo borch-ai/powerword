@@ -13,10 +13,10 @@ This task implements a dry-run policy for modifying commands inside database, cl
 
 ### Operations Plugins
 
-#### [MODIFY] [k8s.go](file:///Users/human/code/powerword/internal/plugins/k8s/k8s.go)
+#### [NEW] [k8s.go](file:///Users/human/code/powerword/internal/plugins/k8s/k8s.go)
 - [ ] If dry-run mode is enabled, intercept cluster-modifying calls and mock the response metadata.
 
-#### [MODIFY] [db.go](file:///Users/human/code/powerword/internal/plugins/db/db.go)
+#### [NEW] [db.go](file:///Users/human/code/powerword/internal/plugins/db/db.go)
 - [ ] Parse query syntax to block statements containing updates, deletions, or schema alterations if dry-run mode is toggled on.
 
 ---

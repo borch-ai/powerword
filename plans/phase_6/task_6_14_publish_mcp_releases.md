@@ -13,7 +13,7 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
 ### GitHub Actions Workflow
 
-#### [MODIFY] [.github/workflows/release.yml](file:///Users/human/code/powerword/.github/workflows/release.yml)
+#### [MODIFY] [release.yml](file:///Users/human/code/powerword/.github/workflows/release.yml)
 - Update the build step to loop over all plugins under `cmd/` and cross-compile them.
 - Output compiled binaries to the `dist` folder:
   - `${plugin}-darwin-amd64`

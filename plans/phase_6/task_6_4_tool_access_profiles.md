@@ -13,7 +13,7 @@ This task implements fine-grained security profiles to control tool execution sc
 
 ### Security Controls
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - [ ] Add config structure for tool execution profiles, allowing configuration of path whitelist patterns.
 
 #### [MODIFY] [guard.go](file:///Users/human/code/powerword/internal/loop/guard.go)
