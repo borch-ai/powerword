@@ -60,9 +60,23 @@ type StreamChunk struct {
 	Usage *TokenUsage
 }
 
+// GenerateOption is a functional option for configuring a generation request.
+type GenerateOption func(*generateOptions)
+
+type generateOptions struct {
+	ResponseMIMEType string
+}
+
+// WithResponseMIMEType sets the expected MIME type of the generated response (e.g. "application/json").
+func WithResponseMIMEType(mimeType string) GenerateOption {
+	return func(o *generateOptions) {
+		o.ResponseMIMEType = mimeType
+	}
+}
+
 // LLMClient is the uniform interface for LLM providers.
 type LLMClient interface {
-	Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error)
+	Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error)
 	Stream(ctx context.Context, messages []Message, tools []ToolDefinition) (<-chan StreamChunk, error)
 	ListModels(ctx context.Context) ([]string, error)
 }

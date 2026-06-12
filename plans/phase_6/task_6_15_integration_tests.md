@@ -1,6 +1,9 @@
 # plan: Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite
 
-**Status:** Open (Issue #[TBD])
+**Status:** Completed
+**Go Version:** 1.26.4
+**Date Completed:** 2026-06-12
+**Unit Test Coverage:** 91.0%
 
 Implement a dedicated suite of integration tests (utilizing the `//go:build integration` tag) to verify the compiled binary (`powerword`) execution flows and real Model Context Protocol (MCP) transport connectivity.
 
@@ -11,6 +14,13 @@ Implement a dedicated suite of integration tests (utilizing the `//go:build inte
 > These integration tests will be excluded from the default `go test ./...` command to maintain the speed of local unit test cycles and prevent test coverage verification issues under `make check-coverage`. They will be executed via a dedicated target (e.g. `make test-integration` or `go test -tags=integration ./...`).
 
 ## Proposed Changes
+
+### LLM Client Component
+
+#### [MODIFY] [openai.go](file:///Users/human/code/powerword/pkg/llm/openai.go)
+- Update `NewOpenAIClient(apiKey string, modelName string)` to check if the `OPENAI_BASE_URL` environment variable is defined and use it as a custom base URL.
+
+---
 
 ### Integration Testing Component
 

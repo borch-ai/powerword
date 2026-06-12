@@ -1,4 +1,4 @@
-.PHONY: all build install test test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks
+.PHONY: all build install test test-integration test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks
 
 # Go parameters
 GOCMD=go
@@ -63,6 +63,9 @@ install-hooks:
 
 test:
 	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
+
+test-integration:
+	$(GOTEST) -v -tags=integration ./...
 
 check-coverage: test
 	$(GOCMD) run ./cmd/powerword check-coverage $(MIN_COVERAGE) coverage.out

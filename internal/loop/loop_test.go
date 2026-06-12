@@ -20,7 +20,7 @@ type mockLLMClient struct {
 	calls    int
 }
 
-func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, tools []llm.ToolDefinition) (*llm.Message, error) {
+func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, tools []llm.ToolDefinition, opts ...llm.GenerateOption) (*llm.Message, error) {
 	if m.genErr != nil {
 		return nil, m.genErr
 	}

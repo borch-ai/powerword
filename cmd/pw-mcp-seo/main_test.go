@@ -28,7 +28,7 @@ type mockLLM struct {
 	err      error
 }
 
-func (m *mockLLM) Generate(ctx context.Context, messages []llm.Message, tools []llm.ToolDefinition) (*llm.Message, error) {
+func (m *mockLLM) Generate(ctx context.Context, messages []llm.Message, tools []llm.ToolDefinition, opts ...llm.GenerateOption) (*llm.Message, error) {
 	return m.response, m.err
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -286,5 +287,54 @@ func TestOpenAIClient_ListModels_Error(t *testing.T) {
 	_, err := client.ListModels(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestOpenAIClient_Generate_JSONMode(t *testing.T) {
+	var capturedRequest openai.ChatCompletionRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Read raw request body to capture serialization
+		var raw map[string]interface{}
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read body: %v", err)
+		}
+		_ = json.Unmarshal(bodyBytes, &raw)
+		_ = json.Unmarshal(bodyBytes, &capturedRequest)
+
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: `{"status": "ok"}`,
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+
+	messages := []Message{
+		{Role: RoleUser, Content: "Hello!"},
+	}
+
+	_, err := client.Generate(context.Background(), messages, nil, WithResponseMIMEType("application/json"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedRequest.ResponseFormat == nil {
+		t.Fatal("expected ResponseFormat to be set, got nil")
+	}
+	if capturedRequest.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONObject {
+		t.Errorf("expected ResponseFormat type %s, got %s",
+			openai.ChatCompletionResponseFormatTypeJSONObject, capturedRequest.ResponseFormat.Type)
 	}
 }
