@@ -19,7 +19,7 @@ Introduce a configuration option `disable_critic` to bypass the LLM-powered revi
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [x] Add the `DisableCritic bool` field to the `Config` struct.
-- [x] In `LoadConfig`, define a default value of `false` for `disable_critic` (so it defaults to active unless explicitly disabled, or we can default to `true` if preferred—we will default to `false` for backward compatibility but disable it in `powerword.toml`).
+- [x] In `LoadConfig`, define a default value of `false` for `disable_critic` (so it defaults to active unless explicitly disabled, or we can default to `true` if preferred—we will default to `false` for backward compatibility but disable it in `powerword.example.toml`).
 - [x] Bind `disable_critic` to the environment variable `POWERWORD_DISABLE_CRITIC`.
 
 ### Review Subsystem
@@ -50,7 +50,7 @@ Introduce a configuration option `disable_critic` to bypass the LLM-powered revi
 - Run `make check-coverage` and verify tests pass with statement coverage at or above **91%**.
 
 ### Manual Verification
-- Run `powerword review --local` with `disable_critic = true` in `powerword.toml`. Verify that:
+- Run `powerword review --local` with `disable_critic = true` in `powerword.example.toml` (or by copying it to local `powerword.toml`). Verify that:
   - `make all` runs.
   - No MCP processes are spawned and no LLM API calls are made.
   - It exits with success (`0`).
