@@ -47,6 +47,11 @@ type Config struct {
 	WebhookPort       int                               `mapstructure:"webhook_port"`
 	Plugins           PluginsConfig                     `mapstructure:"plugins"`
 	GitRollback       bool                              `mapstructure:"git_rollback"`
+	MaxCost           float64                           `mapstructure:"max_cost"`
+	MaxTokens         int                               `mapstructure:"max_tokens"`
+	MaxInputTokens    int                               `mapstructure:"max_input_tokens"`
+	MaxOutputTokens   int                               `mapstructure:"max_output_tokens"`
+	MaxCachedTokens   int                               `mapstructure:"max_cached_tokens"`
 	OutputWriter      io.Writer                         `mapstructure:"-"`
 }
 
@@ -184,6 +189,11 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("auto_confirm", false)
 	v.SetDefault("webhook_port", 8080)
 	v.SetDefault("git_rollback", false)
+	v.SetDefault("max_cost", 2.0)
+	v.SetDefault("max_tokens", 1000000)
+	v.SetDefault("max_input_tokens", 1000000)
+	v.SetDefault("max_output_tokens", 100000)
+	v.SetDefault("max_cached_tokens", 0)
 	v.SetDefault("plugins.imagegen.backend", "openai")
 	v.SetDefault("plugins.imagegen.midjourney_polling_interval", "5s")
 	v.SetDefault("plugins.imagegen.midjourney_polling_timeout", "5m")
@@ -246,6 +256,11 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "webhook_secret", "POWERWORD_WEBHOOK_SECRET")
 	bindEnv(v, "webhook_port", "POWERWORD_WEBHOOK_PORT")
 	bindEnv(v, "git_rollback", "POWERWORD_GIT_ROLLBACK")
+	bindEnv(v, "max_cost", "POWERWORD_MAX_COST")
+	bindEnv(v, "max_tokens", "POWERWORD_MAX_TOKENS")
+	bindEnv(v, "max_input_tokens", "POWERWORD_MAX_INPUT_TOKENS")
+	bindEnv(v, "max_output_tokens", "POWERWORD_MAX_OUTPUT_TOKENS")
+	bindEnv(v, "max_cached_tokens", "POWERWORD_MAX_CACHED_TOKENS")
 	bindEnv(v, "plugins.imagegen.backend", "POWERWORD_IMAGEGEN_BACKEND")
 	bindEnv(v, "plugins.imagegen.openai_api_key", "POWERWORD_IMAGEGEN_OPENAI_API_KEY")
 	bindEnv(v, "plugins.imagegen.midjourney_api_url", "POWERWORD_IMAGEGEN_MIDJOURNEY_API_URL")

@@ -164,3 +164,30 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		t.Errorf("Summary should not contain estimated cost: %s", summary3)
 	}
 }
+
+func TestUsageTracker_Totals(t *testing.T) {
+	tracker := NewUsageTracker()
+	tracker.RecordUsage("model1", TokenUsage{
+		InputTokens:  100,
+		OutputTokens: 50,
+		CachedTokens: 20,
+	})
+	tracker.RecordUsage("model2", TokenUsage{
+		InputTokens:  200,
+		OutputTokens: 150,
+		CachedTokens: 30,
+	})
+
+	if got := tracker.TotalTokens(); got != 500 {
+		t.Errorf("TotalTokens() = %d; want 500", got)
+	}
+	if got := tracker.TotalInputTokens(); got != 300 {
+		t.Errorf("TotalInputTokens() = %d; want 300", got)
+	}
+	if got := tracker.TotalOutputTokens(); got != 200 {
+		t.Errorf("TotalOutputTokens() = %d; want 200", got)
+	}
+	if got := tracker.TotalCachedTokens(); got != 50 {
+		t.Errorf("TotalCachedTokens() = %d; want 50", got)
+	}
+}

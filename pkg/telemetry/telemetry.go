@@ -124,3 +124,39 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 
 	return sb.String()
 }
+
+// TotalTokens returns the total input and output tokens.
+func (u *UsageTracker) TotalTokens() int {
+	var total int
+	for _, usage := range u.ModelUsages {
+		total += usage.InputTokens + usage.OutputTokens
+	}
+	return total
+}
+
+// TotalInputTokens returns the sum of input tokens across all models.
+func (u *UsageTracker) TotalInputTokens() int {
+	var total int
+	for _, usage := range u.ModelUsages {
+		total += usage.InputTokens
+	}
+	return total
+}
+
+// TotalOutputTokens returns the sum of output tokens across all models.
+func (u *UsageTracker) TotalOutputTokens() int {
+	var total int
+	for _, usage := range u.ModelUsages {
+		total += usage.OutputTokens
+	}
+	return total
+}
+
+// TotalCachedTokens returns the sum of cached tokens across all models.
+func (u *UsageTracker) TotalCachedTokens() int {
+	var total int
+	for _, usage := range u.ModelUsages {
+		total += usage.CachedTokens
+	}
+	return total
+}

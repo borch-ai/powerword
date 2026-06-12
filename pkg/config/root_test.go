@@ -94,6 +94,11 @@ gemini = "gemini-key"
 		"--issue", "456",
 		"--classifier-model", "classifier",
 		"--route", "foo=bar",
+		"--max-cost", "5.0",
+		"--max-tokens", "2000000",
+		"--max-input-tokens", "1500000",
+		"--max-output-tokens", "250000",
+		"--max-cached-tokens", "100000",
 		"test prompt",
 	})
 
@@ -106,44 +111,68 @@ gemini = "gemini-key"
 		t.Fatalf("expected Active config to be loaded, got nil")
 	}
 
-	if Active.Model != "flag-model" {
-		t.Errorf("expected Active.Model to be overridden to 'flag-model', got '%s'", Active.Model)
+	verifyFlagOverrides(t, Active)
+}
+
+func verifyFlagOverrides(t *testing.T, active *Config) {
+	if active.Model != "flag-model" {
+		t.Errorf("expected Active.Model to be overridden to 'flag-model', got '%s'", active.Model)
 	}
 
-	if !Active.Verbose {
+	if !active.Verbose {
 		t.Errorf("expected Active.Verbose to be overridden to true, got false")
 	}
 
-	if !Active.AutoConfirm {
+	if !active.AutoConfirm {
 		t.Errorf("expected Active.AutoConfirm to be overridden to true, got false")
 	}
 
-	if !Active.Headless {
+	if !active.Headless {
 		t.Errorf("expected Active.Headless to be overridden to true, got false")
 	}
 
-	if !Active.JSONOutput {
+	if !active.JSONOutput {
 		t.Errorf("expected Active.JSONOutput to be overridden to true, got false")
 	}
 
-	if !Active.GitRollback {
+	if !active.GitRollback {
 		t.Errorf("expected Active.GitRollback to be overridden to true, got false")
 	}
 
-	if !Active.Autonomous {
+	if !active.Autonomous {
 		t.Errorf("expected Active.Autonomous to be overridden to true, got false")
 	}
 
-	if Active.Issue != "456" {
-		t.Errorf("expected Active.Issue to be overridden to '456', got '%s'", Active.Issue)
+	if active.Issue != "456" {
+		t.Errorf("expected Active.Issue to be overridden to '456', got '%s'", active.Issue)
 	}
 
-	if Active.ClassifierModel != "classifier" {
-		t.Errorf("expected Active.ClassifierModel to be overridden to 'classifier', got '%s'", Active.ClassifierModel)
+	if active.ClassifierModel != "classifier" {
+		t.Errorf("expected Active.ClassifierModel to be overridden to 'classifier', got '%s'", active.ClassifierModel)
 	}
 
-	if Active.Route == nil || Active.Route["foo"] != "bar" {
-		t.Errorf("expected Active.Route to be overridden, got %v", Active.Route)
+	if active.Route == nil || active.Route["foo"] != "bar" {
+		t.Errorf("expected Active.Route to be overridden, got %v", active.Route)
+	}
+
+	if active.MaxCost != 5.0 {
+		t.Errorf("expected Active.MaxCost to be overridden to 5.0, got %f", active.MaxCost)
+	}
+
+	if active.MaxTokens != 2000000 {
+		t.Errorf("expected Active.MaxTokens to be overridden to 2000000, got %d", active.MaxTokens)
+	}
+
+	if active.MaxInputTokens != 1500000 {
+		t.Errorf("expected Active.MaxInputTokens to be overridden to 1500000, got %d", active.MaxInputTokens)
+	}
+
+	if active.MaxOutputTokens != 250000 {
+		t.Errorf("expected Active.MaxOutputTokens to be overridden to 250000, got %d", active.MaxOutputTokens)
+	}
+
+	if active.MaxCachedTokens != 100000 {
+		t.Errorf("expected Active.MaxCachedTokens to be overridden to 100000, got %d", active.MaxCachedTokens)
 	}
 }
 

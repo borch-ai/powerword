@@ -128,10 +128,10 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 ## Phase 6: Enterprise Security, Safety & Developer Experience
 Focus: Advancing agent safety guardrails, remote transport protocols, robust sandboxing, and terminal graphics.
 
-*   [ ] **Task 6.1: Git-Backed Workspace Rollbacks**
+*   [x] **Task 6.1: Git-Backed Workspace Rollbacks**
     *   Implement workspace snapshots and rollback mechanics to restore clean working states if an autonomous agent fails run/compile steps.
     *   [Implementation Plan](plans/phase_6/task_6_1_workspace_rollbacks.md)
-*   [ ] **Task 6.2: Token & Cost Budgeting Guardrails**
+*   [x] **Task 6.2: Token & Cost Budgeting Guardrails**
     *   Add user-defined dollar and token budget safety valves per session or loop to prevent runaway API spend.
     *   [Implementation Plan](plans/phase_6/task_6_2_token_budgets.md)
 *   [ ] **Task 6.3: Pause & Resume Session States**

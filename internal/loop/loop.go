@@ -3,6 +3,7 @@ package loop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/borch-ai/powerword/pkg/config"
 	"github.com/borch-ai/powerword/pkg/llm"
 	"github.com/borch-ai/powerword/pkg/telemetry"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // newClient is a package-level variable that defaults to llm.NewClient.
@@ -281,43 +283,68 @@ func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt strin
 
 func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string) ([]llm.Message, error) {
 	for i := 0; i < cfg.MaxLoopIterations; i++ {
+		var done bool
+		var err error
+		messages, done, err = executeLoopIteration(ctx, cfg, client, registry, formatter, messages, tracker, modelName, i)
+		if err != nil {
+			return messages, err
+		}
+		if done {
+			break
+		}
+	}
+	return messages, nil
+}
+
+func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string, i int) ([]llm.Message, bool, error) {
+	if err := checkBudget(cfg, tracker); err != nil {
+		return messages, false, err
+	}
+
+	var tools []llm.ToolDefinition
+	if registry != nil {
 		mcpTools, listErr := registry.ListAllTools(ctx)
 		if listErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to list tools: %v\n", listErr)
 		}
-		tools, _ := mcp.TranslateTools(mcpTools)
-
-		assistantMsg, genErr := client.Generate(ctx, messages, tools)
-		if genErr != nil {
-			return nil, fmt.Errorf("failed to generate response: %w", genErr)
-		}
-
-		var usage llm.TokenUsage
-		if assistantMsg.Usage != nil {
-			usage = *assistantMsg.Usage
-		}
-		tracker.RecordUsage(modelName, usage)
-
-		if assistantMsg.Content != "" {
-			if _, wErr := formatter.Write([]byte(assistantMsg.Content)); wErr != nil {
-				return nil, fmt.Errorf("failed to write output: %w", wErr)
-			}
-			_ = formatter.Flush()
-		}
-
-		messages = append(messages, *assistantMsg)
-
-		if len(assistantMsg.ToolCalls) == 0 {
-			break
-		}
-
-		messages = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
-
-		if i == cfg.MaxLoopIterations-1 && len(assistantMsg.ToolCalls) > 0 {
-			fmt.Fprintf(os.Stderr, "\nWarning: reached maximum loop iterations (%d)\n", cfg.MaxLoopIterations)
-		}
+		tools, _ = mcp.TranslateTools(mcpTools)
 	}
-	return messages, nil
+
+	assistantMsg, genErr := client.Generate(ctx, messages, tools)
+	if genErr != nil {
+		return messages, false, fmt.Errorf("failed to generate response: %w", genErr)
+	}
+
+	var usage llm.TokenUsage
+	if assistantMsg.Usage != nil {
+		usage = *assistantMsg.Usage
+	}
+	tracker.RecordUsage(modelName, usage)
+
+	if assistantMsg.Content != "" {
+		if _, wErr := formatter.Write([]byte(assistantMsg.Content)); wErr != nil {
+			return messages, false, fmt.Errorf("failed to write output: %w", wErr)
+		}
+		_ = formatter.Flush()
+	}
+
+	messages = append(messages, *assistantMsg)
+
+	if err := checkBudget(cfg, tracker); err != nil {
+		return messages, false, err
+	}
+
+	if len(assistantMsg.ToolCalls) == 0 {
+		return messages, true, nil
+	}
+
+	messages = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
+
+	if i == cfg.MaxLoopIterations-1 && len(assistantMsg.ToolCalls) > 0 {
+		fmt.Fprintf(os.Stderr, "\nWarning: reached maximum loop iterations (%d)\n", cfg.MaxLoopIterations)
+	}
+
+	return messages, false, nil
 }
 
 func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) []llm.Message {
@@ -364,7 +391,13 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 		if cfg.Verbose {
 			fmt.Fprintf(os.Stderr, "\n=> Executing tool: %s\n", tc.Name)
 		}
-		result, callErr := registry.CallTool(ctx, tc.Name, args)
+		var result *mcpsdk.CallToolResult
+		var callErr error
+		if registry != nil {
+			result, callErr = registry.CallTool(ctx, tc.Name, args)
+		} else {
+			callErr = errors.New("MCP registry not initialized")
+		}
 		if callErr != nil {
 			messages = append(messages, llm.Message{
 				Role:       llm.RoleTool,
@@ -392,4 +425,63 @@ func getOutputWriter(cfg *config.Config) io.Writer {
 		return io.Discard
 	}
 	return os.Stdout
+}
+
+// BudgetExceededError indicates that a configured token or cost budget has been exceeded.
+type BudgetExceededError struct {
+	Reason string
+}
+
+func (e *BudgetExceededError) Error() string {
+	return "budget exceeded: " + e.Reason
+}
+
+// checkBudget checks if the accumulated usage has exceeded any configured budgets.
+func checkBudget(cfg *config.Config, tracker *telemetry.UsageTracker) error {
+	if cfg.MaxCost > 0 {
+		currentCost := tracker.EstimatedCost(cfg.Pricing)
+		if currentCost >= cfg.MaxCost {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("estimated cost $%.5f exceeded maximum budget of $%.5f", currentCost, cfg.MaxCost),
+			}
+		}
+	}
+
+	if cfg.MaxTokens > 0 {
+		totalTokens := tracker.TotalTokens()
+		if totalTokens >= cfg.MaxTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("total tokens %d exceeded maximum budget of %d", totalTokens, cfg.MaxTokens),
+			}
+		}
+	}
+
+	if cfg.MaxInputTokens > 0 {
+		inputTokens := tracker.TotalInputTokens()
+		if inputTokens >= cfg.MaxInputTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("input tokens %d exceeded maximum budget of %d", inputTokens, cfg.MaxInputTokens),
+			}
+		}
+	}
+
+	if cfg.MaxOutputTokens > 0 {
+		outputTokens := tracker.TotalOutputTokens()
+		if outputTokens >= cfg.MaxOutputTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("output tokens %d exceeded maximum budget of %d", outputTokens, cfg.MaxOutputTokens),
+			}
+		}
+	}
+
+	if cfg.MaxCachedTokens > 0 {
+		cachedTokens := tracker.TotalCachedTokens()
+		if cachedTokens >= cfg.MaxCachedTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("cached tokens %d exceeded maximum budget of %d", cachedTokens, cfg.MaxCachedTokens),
+			}
+		}
+	}
+
+	return nil
 }
