@@ -191,7 +191,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("webhook_port", 8080)
 	v.SetDefault("git_rollback", false)
 	v.SetDefault("critic_provider", "gemini")
-	v.SetDefault("critic_model", "gemini-1.5-flash")
+	v.SetDefault("critic_model", "gemini-2.5-flash")
 	v.SetDefault("max_cost", 2.0)
 	v.SetDefault("max_tokens", 1000000)
 	v.SetDefault("max_input_tokens", 1000000)

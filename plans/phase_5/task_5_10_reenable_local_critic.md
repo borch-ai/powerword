@@ -7,6 +7,10 @@
 
 This plan outlines the steps to re-enable the local critic LLM reviews by configuring and running a local offline LLM (such as Llama 3 or Mistral) via Ollama, once the hardware is prepared.
 
+## User Review Required
+
+None.
+
 ## Proposed Changes
 
 ### Configuration

@@ -656,8 +656,8 @@ go 1.25.3
 
 func TestIsPathAbsolute_Windows(t *testing.T) {
 	tests := []struct {
-		path   string
-		isAbs  bool
+		path  string
+		isAbs bool
 	}{
 		{"C:\\Users\\human\\code", true},
 		{"c:/Users/human/code", true},
