@@ -13,6 +13,7 @@ var (
 	model           string
 	verbose         bool
 	sessionID       string
+	resumeID        string
 	listSessions    bool
 	acceptAll       bool
 	headless        bool
@@ -57,7 +58,7 @@ using the Model Context Protocol (MCP).`,
 
 func persistentPreRunE(cmd *cobra.Command, args []string) error {
 	// Skip config loading/validation if just running the root command without args (shows help) unless listing sessions.
-	if cmd.Name() == "powerword" && len(args) == 0 && !listSessions {
+	if cmd.Name() == "powerword" && len(args) == 0 && !listSessions && resumeID == "" && os.Getenv("POWERWORD_RESUME") == "" {
 		return nil
 	}
 
@@ -79,7 +80,7 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 }
 
 func runE(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && (Active == nil || !Active.ListSessions) {
+	if len(args) == 0 && (Active == nil || (!Active.ListSessions && Active.Resume == "")) {
 		return cmd.Help()
 	}
 	prompt := ""
@@ -118,6 +119,9 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	}
 	if cmd.Flags().Changed("session") {
 		cfg.Session = sessionID
+	}
+	if cmd.Flags().Changed("resume") {
+		cfg.Resume = resumeID
 	}
 	if cmd.Flags().Changed("list-sessions") {
 		cfg.ListSessions = listSessions
@@ -169,6 +173,7 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	model = ""
 	verbose = false
 	sessionID = ""
+	resumeID = ""
 	listSessions = false
 	acceptAll = false
 	headless = false
@@ -188,6 +193,7 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
 	cmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 	cmd.PersistentFlags().StringVar(&sessionID, "session", "", "creates or resumes a conversation with the specified ID")
+	cmd.PersistentFlags().StringVar(&resumeID, "resume", "", "resumes a paused conversation with the specified ID")
 	cmd.PersistentFlags().BoolVar(&listSessions, "list-sessions", false, "lists recent conversations")
 	cmd.PersistentFlags().BoolVar(&acceptAll, "accept-all", false, "bypass interactive confirmation prompts for tool executions")
 	cmd.PersistentFlags().BoolVar(&headless, "headless", false, "run in headless mode, disabling interactive prompts and failing on unsafe commands")

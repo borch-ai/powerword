@@ -28,6 +28,7 @@ type Config struct {
 	Model             string                            `mapstructure:"model"`
 	APIKeys           APIKeys                           `mapstructure:"api_keys"`
 	Session           string                            `mapstructure:"session"`
+	Resume            string                            `mapstructure:"resume"`
 	ListSessions      bool                              `mapstructure:"list-sessions"`
 	MaxLoopIterations int                               `mapstructure:"max_loop_iterations"`
 	AutoConfirm       bool                              `mapstructure:"auto_confirm"`
@@ -243,6 +244,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "verbose", "POWERWORD_VERBOSE")
 	bindEnv(v, "max_loop_iterations", "POWERWORD_MAX_LOOP_ITERATIONS")
 	bindEnv(v, "auto_confirm", "POWERWORD_AUTO_CONFIRM")
+	bindEnv(v, "resume", "POWERWORD_RESUME")
 	bindEnv(v, "headless", "POWERWORD_HEADLESS")
 	bindEnv(v, "json", "POWERWORD_JSON")
 	bindEnv(v, "route", "POWERWORD_ROUTE")

@@ -542,3 +542,180 @@ func TestRunLoop_TelemetrySummary(t *testing.T) {
 		t.Errorf("expected telemetry summary to contain correct token counts, got output: %s", output)
 	}
 }
+
+func TestRunLoop_PauseSession_Interactive(t *testing.T) {
+	setupTestSessions(t)
+
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Role:    llm.RoleAssistant,
+				Content: "Let me delete a file",
+				ToolCalls: []llm.ToolCall{
+					{
+						ID:        "call_pause_1",
+						Name:      "delete_tool",
+						Arguments: `{"path":"somefile"}`,
+					},
+				},
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	// Mock stdin to input 'p' to pause
+	r, w, _ := os.Pipe()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+	_, _ = w.WriteString("p\n")
+	_ = w.Close()
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Session:           "paused-session",
+		MaxLoopIterations: 3,
+		AutoConfirm:       false,
+	}
+
+	err := RunLoop(ctx, cfg, "run delete and pause")
+	if err != nil {
+		t.Fatalf("expected no error (graceful pause), got: %v", err)
+	}
+
+	// Load session and verify state
+	session, err := LoadSession("paused-session")
+	if err != nil {
+		t.Fatalf("expected session to exist, got: %v", err)
+	}
+	// The messages should contain the user prompt and the assistant tool call message,
+	// but no tool response because it was paused.
+	if len(session.Messages) != 2 {
+		t.Fatalf("expected 2 messages in paused session, got %d", len(session.Messages))
+	}
+	if session.Messages[1].Role != llm.RoleAssistant || len(session.Messages[1].ToolCalls) != 1 {
+		t.Errorf("expected last message to be assistant with tool calls, got: %+v", session.Messages[1])
+	}
+}
+
+func TestRunLoop_ResumeSession_Success(t *testing.T) {
+	setupTestSessions(t)
+
+	// Pre-create a paused session
+	pausedSession := &Session{
+		ID:    "resumable-session",
+		Model: "test-model",
+		Messages: []llm.Message{
+			{Role: llm.RoleUser, Content: "run delete and pause"},
+			{
+				Role: llm.RoleAssistant,
+				ToolCalls: []llm.ToolCall{
+					{
+						ID:        "call_pause_1",
+						Name:      "delete_tool",
+						Arguments: `{"path":"somefile"}`,
+					},
+				},
+			},
+		},
+	}
+	if err := SaveSession(pausedSession); err != nil {
+		t.Fatalf("failed to save paused session: %v", err)
+	}
+
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Role:    llm.RoleAssistant,
+				Content: "Deletion completed successfully!",
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	// Mock stdin to input 'y' to allow the tool execution on resume
+	r, w, _ := os.Pipe()
+	oldStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = oldStdin }()
+	_, _ = w.WriteString("y\n")
+	_ = w.Close()
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Resume:            "resumable-session",
+		Model:             "test-model",
+		MaxLoopIterations: 3,
+		AutoConfirm:       false,
+	}
+
+	err := RunLoop(ctx, cfg, "") // No prompt
+	if err != nil {
+		t.Fatalf("expected no error on resume, got: %v", err)
+	}
+
+	// Load session and verify it completed
+	session, err := LoadSession("resumable-session")
+	if err != nil {
+		t.Fatalf("failed to load session: %v", err)
+	}
+
+	// Expected messages:
+	// 0: User: run delete and pause
+	// 1: Assistant: delete_tool (ToolCalls)
+	// 2: Tool: (result of delete_tool)
+	// 3: Assistant: Deletion completed successfully!
+	if len(session.Messages) != 4 {
+		t.Fatalf("expected 4 messages in resumed session, got %d", len(session.Messages))
+	}
+	if session.Messages[2].Role != llm.RoleTool || session.Messages[2].ToolCallID != "call_pause_1" {
+		t.Errorf("expected third message to be tool response for call_pause_1, got: %+v", session.Messages[2])
+	}
+	if session.Messages[3].Content != "Deletion completed successfully!" {
+		t.Errorf("expected final message to be completion message, got: %q", session.Messages[3].Content)
+	}
+}
+
+func TestRunLoop_ResumeSession_EmptyOrNonExistent(t *testing.T) {
+	setupTestSessions(t)
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Resume: "non-existent-session",
+	}
+
+	err := RunLoop(ctx, cfg, "")
+	if err == nil {
+		t.Fatal("expected error resuming non-existent session, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot resume empty or non-existent session") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRunLoop_ResumeSession_WithPromptError(t *testing.T) {
+	setupTestSessions(t)
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Resume: "some-session",
+	}
+
+	err := RunLoop(ctx, cfg, "some prompt")
+	if err == nil {
+		t.Fatal("expected error when prompt is provided to resume, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot provide a prompt when resuming a session") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}

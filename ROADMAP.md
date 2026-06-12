@@ -73,6 +73,9 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.8: Amazon KDP SEO & Metadata Agent Plugin (SEO)**
     *   Implement a native Go MCP server querying keyword volumes and product search suggestions to formulate listing titles, descriptions, and tag payloads.
     *   [Implementation Plan](plans/phase_3/task_3_8_seo_mcp.md)
+*   [ ] **Task 3.9: Google Doc MCP Plugin (GDoc)**
+    *   Implement a native Go MCP server to create, read, and update Google Docs to export manuscripts for editing and import them back.
+    *   [Implementation Plan](plans/phase_3/task_3_9_gdoc_mcp.md)
 
 ---
 
