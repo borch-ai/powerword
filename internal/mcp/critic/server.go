@@ -116,6 +116,12 @@ func handleReviewWorkspace(workspaceRoot string, cfg *config.Config) func(contex
 			}, nil
 		}
 
+		// Prevent 413 Payload Too Large errors by truncating extremely large diffs
+		const maxDiffLen = 100000 // roughly 25k tokens
+		if len(diffStr) > maxDiffLen {
+			diffStr = diffStr[:maxDiffLen] + "\n\n... [diff truncated due to size limits]"
+		}
+
 		// 3. Construct prompt
 		prompt := fmt.Sprintf(`You are a strict code reviewer. Review the following workspace diff against the implementation plan.
 

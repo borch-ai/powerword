@@ -13,10 +13,10 @@ This task adds user-defined token and cost budgeting guardrails to prevent infin
 
 ### Config and Telemetry
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - [ ] Add config options `max_cost` and `max_tokens` (input/output/cached).
 
-#### [MODIFY] [telemetry.go](file:///Users/human/code/powerword/internal/llm/telemetry.go)
+#### [MODIFY] [telemetry.go](file:///Users/human/code/powerword/pkg/telemetry/telemetry.go)
 - [ ] Add checks within the telemetry tracking logic to verify if the current session costs have crossed the defined budget threshold.
 
 #### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)

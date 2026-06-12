@@ -1,11 +1,9 @@
-package llm
+package telemetry
 
 import (
 	"math"
 	"strings"
 	"testing"
-
-	"github.com/borch-ai/powerword/pkg/config"
 )
 
 func almostEqual(a, b float64) bool {
@@ -54,20 +52,18 @@ func TestUsageTracker_RecordUsage(t *testing.T) {
 func TestUsageTracker_EstimatedCost(t *testing.T) {
 	tracker := NewUsageTracker()
 
-	// Test nil config
+	// Test nil/empty pricing config
 	if cost := tracker.EstimatedCost(nil); cost != 0 {
-		t.Errorf("Expected cost 0 for nil config, got %f", cost)
+		t.Errorf("Expected cost 0 for nil pricing, got %f", cost)
 	}
 
-	cfg := &config.Config{
-		Pricing: map[string]config.ModelPricing{
-			"test-model": {Input: 1.0, Output: 2.0, Cached: 0.5},
-			"prefix-":    {Input: 10.0, Output: 20.0, Cached: 5.0},
-		},
+	pricing := map[string]ModelPricing{
+		"test-model": {Input: 1.0, Output: 2.0, Cached: 0.5},
+		"prefix-":    {Input: 10.0, Output: 20.0, Cached: 5.0},
 	}
 
 	// Empty tracker
-	if cost := tracker.EstimatedCost(cfg); cost != 0 {
+	if cost := tracker.EstimatedCost(pricing); cost != 0 {
 		t.Errorf("Expected cost 0 for empty tracker, got %f", cost)
 	}
 
@@ -78,7 +74,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		CachedTokens: 1_000_000,
 	})
 	// Expected cost: 0.0 + 2.0 + 0.5 = 2.5
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 2.5) {
+	if cost := tracker.EstimatedCost(pricing); !almostEqual(cost, 2.5) {
 		t.Errorf("Expected cost 2.5, got %f", cost)
 	}
 
@@ -89,7 +85,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		CachedTokens: 0,
 	})
 	// Expected cost: 2.5 + (5.0 + 10.0) = 17.5
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 17.5) {
+	if cost := tracker.EstimatedCost(pricing); !almostEqual(cost, 17.5) {
 		t.Errorf("Expected cost 17.5, got %f", cost)
 	}
 
@@ -98,7 +94,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		InputTokens: 1_000_000,
 	})
 	// Expected cost: 17.5
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 17.5) {
+	if cost := tracker.EstimatedCost(pricing); !almostEqual(cost, 17.5) {
 		t.Errorf("Expected cost 17.5, got %f", cost)
 	}
 }
@@ -106,11 +102,9 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 func TestUsageTracker_EstimatedCostPrefixLength(t *testing.T) {
 	tracker := NewUsageTracker()
 
-	cfg := &config.Config{
-		Pricing: map[string]config.ModelPricing{
-			"gpt":   {Input: 1.0, Output: 2.0},
-			"gpt-4": {Input: 10.0, Output: 20.0},
-		},
+	pricing := map[string]ModelPricing{
+		"gpt":   {Input: 1.0, Output: 2.0},
+		"gpt-4": {Input: 10.0, Output: 20.0},
 	}
 
 	// Should match gpt-4 because it's longer
@@ -118,7 +112,7 @@ func TestUsageTracker_EstimatedCostPrefixLength(t *testing.T) {
 		InputTokens: 1_000_000,
 	})
 
-	if cost := tracker.EstimatedCost(cfg); !almostEqual(cost, 10.0) {
+	if cost := tracker.EstimatedCost(pricing); !almostEqual(cost, 10.0) {
 		t.Errorf("Expected cost 10.0, got %f", cost)
 	}
 }
@@ -126,10 +120,8 @@ func TestUsageTracker_EstimatedCostPrefixLength(t *testing.T) {
 func TestUsageTracker_FormatSummary(t *testing.T) {
 	tracker := NewUsageTracker()
 
-	cfg := &config.Config{
-		Pricing: map[string]config.ModelPricing{
-			"test-model": {Input: 1.0, Output: 2.0, Cached: 0.5},
-		},
+	pricing := map[string]ModelPricing{
+		"test-model": {Input: 1.0, Output: 2.0, Cached: 0.5},
 	}
 
 	tracker.RecordUsage("test-model", TokenUsage{
@@ -138,7 +130,7 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		CachedTokens: 5,
 	})
 
-	summary := tracker.FormatSummary(cfg)
+	summary := tracker.FormatSummary(pricing)
 	if !strings.Contains(summary, "Total Tokens: 30 (10 In, 20 Out)") {
 		t.Errorf("Summary missing total tokens: %s", summary)
 	}
@@ -157,7 +149,7 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 	tracker2.RecordUsage("unknown-model", TokenUsage{
 		InputTokens: 10,
 	})
-	summary2 := tracker2.FormatSummary(cfg)
+	summary2 := tracker2.FormatSummary(pricing)
 	if !strings.Contains(summary2, "$0.00000") {
 		t.Errorf("Summary missing 0 cost format: %s", summary2)
 	}
@@ -167,7 +159,7 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 	tracker3.RecordUsage("test-model", TokenUsage{
 		InputTokens: 10,
 	})
-	summary3 := tracker3.FormatSummary(&config.Config{})
+	summary3 := tracker3.FormatSummary(nil)
 	if strings.Contains(summary3, "Estimated Cost") {
 		t.Errorf("Summary should not contain estimated cost: %s", summary3)
 	}

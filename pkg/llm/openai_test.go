@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -286,5 +288,58 @@ func TestOpenAIClient_ListModels_Error(t *testing.T) {
 	_, err := client.ListModels(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestOpenAIClient_Generate_JSONMode(t *testing.T) {
+	capturedChan := make(chan openai.ChatCompletionRequest, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read body: %v", err)
+		}
+		var capturedRequest openai.ChatCompletionRequest
+		_ = json.Unmarshal(bodyBytes, &capturedRequest)
+		capturedChan <- capturedRequest
+
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: `{"status": "ok"}`,
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+
+	messages := []Message{
+		{Role: RoleUser, Content: "Hello!"},
+	}
+
+	_, err := client.Generate(context.Background(), messages, nil, WithResponseMIMEType("application/json"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case capturedRequest := <-capturedChan:
+		if capturedRequest.ResponseFormat == nil {
+			t.Fatal("expected ResponseFormat to be set, got nil")
+		}
+		if capturedRequest.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONObject {
+			t.Errorf("expected ResponseFormat type %s, got %s",
+				openai.ChatCompletionResponseFormatTypeJSONObject, capturedRequest.ResponseFormat.Type)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request to be captured")
 	}
 }

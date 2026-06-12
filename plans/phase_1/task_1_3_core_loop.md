@@ -1,6 +1,9 @@
 # plan: Task 1.3: Core Loop & Streaming Output Engine
 
 **Status:** Completed (Issue #38)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 Implement the primary non-interactive CLI execution pipeline. Capture prompt streams from the LLM client and render them cleanly in real-time, utilizing styled markdown formatting inside the terminal.
 
@@ -36,7 +39,7 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 #### [NEW] [terminal_width_windows.go](file:///Users/human/code/powerword/internal/loop/terminal_width_windows.go)
 - Windows terminal size fallback.
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/internal/config/root.go)
+#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
 - Decouples loop execution and Cobra CLI parsing via `config.Runner` to avoid import cycles.
 
 #### [MODIFY] [main.go](file:///Users/human/code/powerword/cmd/powerword/main.go)

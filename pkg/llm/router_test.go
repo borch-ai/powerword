@@ -11,7 +11,7 @@ type mockClassifierClient struct {
 	response string
 }
 
-func (m *mockClassifierClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
+func (m *mockClassifierClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error) {
 	return &Message{
 		Role:    RoleAssistant,
 		Content: m.response,

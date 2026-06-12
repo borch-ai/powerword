@@ -85,7 +85,7 @@ func (a *AnthropicClient) prepareParams(messages []Message, tools []ToolDefiniti
 	return params, nil
 }
 
-func (a *AnthropicClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
+func (a *AnthropicClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error) {
 	params, err := a.prepareParams(messages, tools)
 	if err != nil {
 		return nil, err

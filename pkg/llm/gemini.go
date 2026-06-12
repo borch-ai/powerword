@@ -120,10 +120,18 @@ func (g *GeminiClient) prepareModel(messages []Message, tools []ToolDefinition) 
 	return model, history, lastParts, nil
 }
 
-func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
+func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error) {
 	model, history, lastParts, err := g.prepareModel(messages, tools)
 	if err != nil {
 		return nil, err
+	}
+
+	cfg := &generateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	if cfg.ResponseMIMEType != "" {
+		model.ResponseMIMEType = cfg.ResponseMIMEType
 	}
 
 	chat := model.StartChat()

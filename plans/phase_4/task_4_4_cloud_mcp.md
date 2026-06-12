@@ -25,7 +25,7 @@ Create a new directory `internal/plugins/cloud/` to contain the cloud orchestrat
 - [ ] Mock AWS/GCP service client interfaces to verify parameter routing and metadata serialization without live cloud calls.
 
 ### CLI Manifest Integration
-#### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - [ ] Register the `pw-mcp-cloud` server within the native plugin registry under the config key `[plugins.cloud]`.
 
 ---

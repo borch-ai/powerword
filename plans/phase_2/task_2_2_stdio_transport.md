@@ -1,6 +1,8 @@
 # plan: Task 2.2: Stdio Transport Layer & Server Lifecycle
 
 **Status:** Completed (Issue #45)
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 Implement the process control logic to launch, supervise, communicate with, and terminate external MCP servers using standard input/output (stdio) streams as the primary message transport mechanism.
 

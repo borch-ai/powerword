@@ -1,6 +1,8 @@
 # plan: Task 1.4: Session Persistence & Chat History Management
 
 **Status:** Completed (Issue #39)
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 Implement local session management and persistence schemas to store chat transcript histories, model contexts, system prompts, and configuration states. Enable resuming previous CLI conversations via structured CLI flags.
 
@@ -22,7 +24,7 @@ Implement local session management and persistence schemas to store chat transcr
   - `LoadSession(id string) ([]llm.Message, error)`
   - `ListSessions() ([]Session, error)`
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/internal/config/root.go)
+#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
 - Adds CLI flags:
   - `--session <id>` (creates or resumes a conversation with the specified ID).
   - `--list-sessions` (lists recent conversations, dates, and token sizing).

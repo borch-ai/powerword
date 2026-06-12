@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/sashabaranov/go-openai"
@@ -17,7 +18,8 @@ type OpenAIClient struct {
 
 // NewOpenAIClient creates a new OpenAI client.
 func NewOpenAIClient(apiKey string, modelName string) (*OpenAIClient, error) {
-	return NewCustomOpenAIClient(apiKey, modelName, "")
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+	return NewCustomOpenAIClient(apiKey, modelName, baseURL)
 }
 
 // NewCustomOpenAIClient creates a new OpenAI client with a custom base URL.
@@ -106,10 +108,21 @@ func (o *OpenAIClient) prepareRequest(messages []Message, tools []ToolDefinition
 	return req, nil
 }
 
-func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition) (*Message, error) {
+func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error) {
 	req, err := o.prepareRequest(messages, tools)
 	if err != nil {
 		return nil, err
+	}
+
+	cfg := &generateOptions{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	if cfg.ResponseMIMEType == "application/json" {
+		req.ResponseFormat = &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		}
 	}
 
 	resp, err := o.client.CreateChatCompletion(ctx, req)

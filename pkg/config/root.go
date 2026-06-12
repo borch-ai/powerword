@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -81,13 +82,21 @@ func runE(cmd *cobra.Command, args []string) error {
 		prompt = args[0]
 	}
 	if Active.Verbose {
-		cmd.Printf("Verbose logging enabled. Model: %s\n", Active.Model)
+		printFunc := cmd.Printf
+		if Active.JSONOutput {
+			printFunc = func(format string, a ...interface{}) { fmt.Fprintf(os.Stderr, format, a...) }
+		}
+		printFunc("Verbose logging enabled. Model: %s\n", Active.Model)
 		if prompt != "" {
-			cmd.Printf("Received prompt: %s\n", prompt)
+			printFunc("Received prompt: %s\n", prompt)
 		}
 	}
 	if !Active.ListSessions {
-		cmd.Printf("Processing prompt with model %s...\n", Active.Model)
+		if Active.JSONOutput {
+			fmt.Fprintf(os.Stderr, "Processing prompt with model %s...\n", Active.Model)
+		} else {
+			cmd.Printf("Processing prompt with model %s...\n", Active.Model)
+		}
 	}
 	if Runner == nil {
 		return fmt.Errorf("no execution runner registered")

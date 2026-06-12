@@ -1,6 +1,9 @@
 # plan: Task 1.6: Automated Release Workflow
 
 **Status:** Completed (Issue #41)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 Add a post-merge "release" GitHub Action workflow to automate semantic versioning, create Git tags and GitHub releases, generate detailed release notes based on Conventional Commit messages, compile Powerword binaries for multiple platforms, and upload them as release assets.
 
@@ -27,13 +30,13 @@ Add a post-merge "release" GitHub Action workflow to automate semantic versionin
 
 We need to define the version inside the application and register it with Cobra so that `--version` prints the release version correctly.
 
-#### [NEW] [version.go](file:///Users/human/code/powerword/internal/config/version.go)
+#### [NEW] [version.go](file:///Users/human/code/powerword/pkg/config/version.go)
 - Create `internal/config/version.go` to define the package-level `Version` variable.
 
-#### [MODIFY] [root.go](file:///Users/human/code/powerword/internal/config/root.go)
+#### [MODIFY] [root.go](file:///Users/human/code/powerword/pkg/config/root.go)
 - Set the `Version` attribute of the Cobra root command using `Version: Version`.
 
-#### [MODIFY] [root_test.go](file:///Users/human/code/powerword/internal/config/root_test.go)
+#### [MODIFY] [root_test.go](file:///Users/human/code/powerword/pkg/config/root_test.go)
 - Add a unit test to verify that `--version` correctly executes and outputs the version of the command, ensuring code coverage remains above the 91% threshold.
 
 ---

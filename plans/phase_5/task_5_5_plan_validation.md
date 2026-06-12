@@ -26,33 +26,33 @@ Integrate plan template and relative link conformance checks directly into the `
 
 ### Configuration
 
-#### [MODIFY] [config.go](file://../pkg/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - Add `PlanTemplate` field to the `Config` structure (`plan_template` mapstructure tag).
 - Bind it to environment variable `POWERWORD_PLAN_TEMPLATE` and default settings.
 
 ### Review Subsystem
 
-#### [NEW] [default_template.md](file://../internal/review/default_template.md)
+#### [NEW] [default_template.md](file:///Users/human/code/powerword/internal/review/default_template.md)
 - Define a generic default implementation plan template to embed.
 
-#### [NEW] [validator.go](file://../internal/review/validator.go)
+#### [NEW] [validator.go](file:///Users/human/code/powerword/internal/review/validator.go)
 - Use `//go:embed default_template.md` to embed the generic fallback template.
 - Implement `ValidatePlans(workspaceRoot string, cfg *config.Config) error` which:
   1. Resolves the active template text using the resolution order (workspace file -> global config path -> embedded fallback).
   2. Scans for all plans matching `plans/task_*.md` in `workspaceRoot`.
   3. Validates each plan has headers: `# plan: Task ...`, `## Proposed Changes`, and `## Verification Plan`.
   4. Parses plan status. If the plan status is `Completed`, enforces presence of metadata fields:
-     * `**Go Version:**`
-     * `**Date Completed:**`
-     * `**Unit Test Coverage:**`
-  5. Extracts markdown links in the format `[label](path)`. If it is an action header (contains `[NEW]`, `[MODIFY]`, or `[DELETE]`) or starts with `file://`, validates that:
+     * `**Go-Version:**`
+     * `**Date-Completed:**`
+     * `**Unit-Test-Coverage:**`
+  5. Extracts markdown links in the format `\<label\>(\<url\>)`. If it is an action header (contains `[NEW]`, `[MODIFY]`, or `[DELETE]`) or starts with `file://`, validates that:
      * Path is inside the workspace root (resolving relative paths relative to the `plans/` folder).
      * The link label matches the actual file basename.
      * Modified files (`[MODIFY]`) exist on disk.
      * Completed new files (`[NEW]` when `Status: Completed`) exist on disk.
 - If any validation errors are found, aggregate all errors across files and return a structured validation error.
 
-#### [MODIFY] [critic.go](file://../internal/review/critic.go)
+#### [MODIFY] [critic.go](file:///Users/human/code/powerword/internal/review/critic.go)
 - At the start of `VerifyWorkspace(...)`, run `ValidatePlans(".", cfg)`.
 - Return the conformance errors immediately on failure to enforce a fail-fast quality gate.
 

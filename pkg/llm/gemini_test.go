@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -415,5 +416,70 @@ func TestGeminiClient_ListModels_Error(t *testing.T) {
 	_, err = client.ListModels(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestGeminiClient_Generate_JSONMode(t *testing.T) {
+	capturedChan := make(chan map[string]any, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		var capturedPayload map[string]any
+		if err == nil {
+			_ = json.Unmarshal(body, &capturedPayload)
+		}
+		capturedChan <- capturedPayload
+
+		resp := []any{
+			map[string]any{
+				"candidates": []any{
+					map[string]any{
+						"content": map[string]any{
+							"parts": []any{
+								map[string]any{
+									"text": `{"status": "ok"}`,
+								},
+							},
+							"role": "model",
+						},
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	messages := []Message{
+		{Role: RoleUser, Content: "Hello"},
+	}
+
+	_, err = client.Generate(context.Background(), messages, nil, WithResponseMIMEType("application/json"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case capturedPayload := <-capturedChan:
+		genCfg, ok := capturedPayload["generationConfig"].(map[string]any)
+		if !ok {
+			t.Fatalf("generationConfig not found in payload: %+v", capturedPayload)
+		}
+		mimeType, ok := genCfg["responseMimeType"].(string)
+		if !ok || mimeType != "application/json" {
+			t.Errorf("expected responseMimeType to be 'application/json', got %v", mimeType)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request to be captured")
 	}
 }

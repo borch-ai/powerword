@@ -1,6 +1,9 @@
 # plan: Task 4.1: Multi-Model Orchestration & Intelligent Routing
 
 **Status:** Completed (Issue #53)
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 
 Develop routing mechanisms to dispatch prompts to different models dynamically. For example, route lightweight validation or tool parameter analysis to fast local models (like Ollama/vLLM), and complex, multi-turn tool reasoning steps to a frontier model (like Gemini 1.5 Pro).
@@ -14,7 +17,7 @@ Develop routing mechanisms to dispatch prompts to different models dynamically. 
 
 ### Model Router
 
-#### [NEW] [router.go](file:///Users/human/code/powerword/internal/llm/router.go)
+#### [NEW] [router.go](file:///Users/human/code/powerword/pkg/llm/router.go)
 - Implements `ModelRouter` containing routing policy rules (e.g. mapping tasks like code linting, git logs, or database lookups to specific models).
 - Implements classification logic:
   - Direct prompt-based classification (asking a very fast local model to categorize task complexity).

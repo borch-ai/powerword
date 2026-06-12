@@ -1,11 +1,23 @@
-package llm
+package telemetry
 
 import (
 	"fmt"
 	"strings"
-
-	"github.com/borch-ai/powerword/pkg/config"
 )
+
+// ModelPricing specifies the cost per 1M tokens.
+type ModelPricing struct {
+	Input  float64 `mapstructure:"input"`
+	Output float64 `mapstructure:"output"`
+	Cached float64 `mapstructure:"cached"`
+}
+
+// TokenUsage represents the token usage for a single request.
+type TokenUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+	CachedTokens int `json:"cached_tokens"`
+}
 
 // ModelUsage stores token counts for a specific model.
 type ModelUsage struct {
@@ -42,15 +54,15 @@ func (u *UsageTracker) RecordUsage(model string, usage TokenUsage) {
 }
 
 // EstimatedCost calculates the total estimated cost across all used models.
-func (u *UsageTracker) EstimatedCost(cfg *config.Config) float64 {
-	if cfg == nil || len(cfg.Pricing) == 0 {
+func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
+	if len(pricing) == 0 {
 		return 0
 	}
 
 	var totalCost float64
 	for model, usage := range u.ModelUsages {
-		pricing := getPricingForModel(model, cfg)
-		if pricing == nil {
+		p := getPricingForModel(model, pricing)
+		if p == nil {
 			continue
 		}
 
@@ -58,35 +70,35 @@ func (u *UsageTracker) EstimatedCost(cfg *config.Config) float64 {
 		if billedInput < 0 {
 			billedInput = 0
 		}
-		costInput := float64(billedInput) * (pricing.Input / 1_000_000.0)
-		costOutput := float64(usage.OutputTokens) * (pricing.Output / 1_000_000.0)
-		costCached := float64(usage.CachedTokens) * (pricing.Cached / 1_000_000.0)
+		costInput := float64(billedInput) * (p.Input / 1_000_000.0)
+		costOutput := float64(usage.OutputTokens) * (p.Output / 1_000_000.0)
+		costCached := float64(usage.CachedTokens) * (p.Cached / 1_000_000.0)
 		totalCost += costInput + costOutput + costCached
 	}
 
 	return totalCost
 }
 
-func getPricingForModel(model string, cfg *config.Config) *config.ModelPricing {
-	if p, ok := cfg.Pricing[model]; ok {
+func getPricingForModel(model string, pricing map[string]ModelPricing) *ModelPricing {
+	if p, ok := pricing[model]; ok {
 		return &p
 	}
 	var bestPrefix string
-	for prefix := range cfg.Pricing {
+	for prefix := range pricing {
 		if strings.HasPrefix(model, prefix) && len(prefix) > len(bestPrefix) {
 			bestPrefix = prefix
 		}
 	}
 	if bestPrefix != "" {
-		p := cfg.Pricing[bestPrefix]
+		p := pricing[bestPrefix]
 		return &p
 	}
 	return nil
 }
 
 // FormatSummary returns a formatted string detailing token usage and estimated cost.
-func (u *UsageTracker) FormatSummary(cfg *config.Config) string {
-	cost := u.EstimatedCost(cfg)
+func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
+	cost := u.EstimatedCost(pricing)
 
 	var totalInput, totalOutput, totalCached int
 	for _, usage := range u.ModelUsages {
@@ -105,7 +117,7 @@ func (u *UsageTracker) FormatSummary(cfg *config.Config) string {
 
 	if cost > 0 {
 		fmt.Fprintf(&sb, "- Estimated Cost: $%.5f\n", cost)
-	} else if cfg != nil && len(cfg.Pricing) > 0 && total > 0 {
+	} else if len(pricing) > 0 && total > 0 {
 		sb.WriteString("- Estimated Cost: $0.00000 (Check pricing config)\n")
 	}
 	fmt.Fprintf(&sb, "- Turns: %d\n", u.Turns)

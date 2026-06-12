@@ -13,7 +13,7 @@ This task extends the MCP client capabilities by adding transport layers to conn
 
 ### MCP Transport
 
-#### [MODIFY] [client.go](file:///Users/human/code/powerword/internal/mcp/client.go)
+#### [MODIFY] [client.go](file:///Users/human/code/powerword/pkg/llm/client.go)
 - [ ] Implement SSE and HTTP/WebSocket transport mappings matching the `modelcontextprotocol/go-sdk` standards.
 - [ ] Support custom HTTP headers to pass API keys or bearer tokens.
 

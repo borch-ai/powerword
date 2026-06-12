@@ -1,6 +1,9 @@
 # plan: Task 3.7: Viral Promo Asset Builder Plugin (pw-mcp-viral)
 
 **Status:** Completed
+**Go Version:** 1.26
+**Date Completed:** 2026-06-11
+**Unit Test Coverage:** 91%
 
 This task implements a native Go-based MCP server (`pw-mcp-viral`) that coordinates audio generation, video generation, and stitching using a local `ffmpeg` wrapper to generate short ASMR trailers for book parodies.
 
@@ -27,7 +30,7 @@ Create a new directory `internal/plugins/viral/` to contain the media asset comp
 - [x] Unit tests mocking API clients and checking command arguments constructed for `ffmpeg`.
 
 ### CLI Manifest Integration
-#### [MODIFY] [internal/config/config.go](file:///Users/human/code/powerword/internal/config/config.go)
+#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
 - [x] Register the `pw-mcp-viral` server within the native plugin registry under the config key `[plugins.viral]`.
 
 ---
