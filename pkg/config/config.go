@@ -42,6 +42,7 @@ type Config struct {
 	CriticModel       string                            `mapstructure:"critic_model"`
 	CriticEndpoint    string                            `mapstructure:"critic_endpoint"`
 	EnableCritic      bool                              `mapstructure:"enable_critic"`
+	DisableCritic     bool                              `mapstructure:"disable_critic"` // Deprecated: use enable_critic instead
 	PlanTemplate      string                            `mapstructure:"plan_template"`
 	Autonomous        bool                              `mapstructure:"autonomous"`
 	Issue             string                            `mapstructure:"issue"`
@@ -191,7 +192,6 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("auto_confirm", false)
 	v.SetDefault("webhook_port", 8080)
 	v.SetDefault("git_rollback", false)
-	v.SetDefault("enable_critic", false)
 	v.SetDefault("critic_provider", "gemini")
 	v.SetDefault("critic_model", "gemini-2.5-flash")
 	v.SetDefault("max_cost", 2.0)
@@ -211,25 +211,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.viral.ffmpeg_path", "ffmpeg")
 
 	// Read config files in order
-	var readErr error
-	for _, file := range configFilesToTry {
-		v.SetConfigFile(file)
-		err := v.ReadInConfig()
-		if err == nil {
-			readErr = nil
-			break
-		}
-		if cfgFile != "" {
-			readErr = fmt.Errorf("failed to read config file %s: %w", cfgFile, err)
-			break
-		}
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(err) {
-			readErr = fmt.Errorf("failed to parse config file %s: %w", file, err)
-			break
-		}
-		readErr = err
-	}
-
+	readErr := readConfigFile(v, configFilesToTry, cfgFile)
 	if readErr != nil {
 		if cfgFile != "" {
 			return nil, readErr
@@ -257,6 +239,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "critic_model", "POWERWORD_CRITIC_MODEL")
 	bindEnv(v, "critic_endpoint", "POWERWORD_CRITIC_ENDPOINT")
 	bindEnv(v, "enable_critic", "POWERWORD_ENABLE_CRITIC")
+	bindEnv(v, "disable_critic", "POWERWORD_DISABLE_CRITIC")
 	bindEnv(v, "plan_template", "POWERWORD_PLAN_TEMPLATE")
 	bindEnv(v, "autonomous", "POWERWORD_AUTONOMOUS")
 	bindEnv(v, "issue", "POWERWORD_ISSUE")
@@ -290,6 +273,13 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Support legacy disable_critic key as a deprecated alias when enable_critic isn't explicitly set
+	if !v.IsSet("enable_critic") {
+		if v.IsSet("disable_critic") {
+			cfg.EnableCritic = !cfg.DisableCritic
+		}
+	}
+
 	return &cfg, nil
 }
 
@@ -300,4 +290,23 @@ func (c *Config) Validate() error {
 		return errors.New("no API keys found; at least one of Gemini, OpenAI, or Anthropic API keys must be provided via config or environment variables")
 	}
 	return nil
+}
+
+func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {
+	var readErr error
+	for _, file := range configFilesToTry {
+		v.SetConfigFile(file)
+		err := v.ReadInConfig()
+		if err == nil {
+			return nil
+		}
+		if cfgFile != "" {
+			return fmt.Errorf("failed to read config file %s: %w", cfgFile, err)
+		}
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to parse config file %s: %w", file, err)
+		}
+		readErr = err
+	}
+	return readErr
 }

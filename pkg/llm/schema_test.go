@@ -112,6 +112,9 @@ func TestGenerateJSONSchema_Map(t *testing.T) {
 	if len(reqs) != 1 || reqs[0] != "foo" {
 		t.Errorf("expected required properties [foo], got %v", reqs)
 	}
+	if addProps, exists := schema["additionalProperties"]; !exists || addProps != false {
+		t.Errorf("expected additionalProperties to be false, got %v", addProps)
+	}
 }
 
 func TestGenerateJSONSchema_Bytes(t *testing.T) {

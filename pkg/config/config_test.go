@@ -418,3 +418,52 @@ func TestBindEnv_Error(t *testing.T) {
 	v := viper.New()
 	bindEnv(v) // 0 arguments triggers BindEnv error/panic
 }
+
+func TestLoadConfig_LegacyDisableCritic(t *testing.T) {
+	defer clearEnv()()
+	tmpDir := t.TempDir()
+
+	// 1. disable_critic = true in TOML (enable_critic not set) -> EnableCritic should be false
+	tomlContent1 := `
+disable_critic = true
+[api_keys]
+gemini = "key"
+`
+	cfgFilePath1 := filepath.Join(tmpDir, "config1.toml")
+	_ = os.WriteFile(cfgFilePath1, []byte(tomlContent1), 0600)
+
+	cfg1, err := LoadConfig(cfgFilePath1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg1.EnableCritic {
+		t.Error("expected EnableCritic to be false when disable_critic is true")
+	}
+
+	// 2. disable_critic = false in TOML (enable_critic not set) -> EnableCritic should be true
+	tomlContent2 := `
+disable_critic = false
+[api_keys]
+gemini = "key"
+`
+	cfgFilePath2 := filepath.Join(tmpDir, "config2.toml")
+	_ = os.WriteFile(cfgFilePath2, []byte(tomlContent2), 0600)
+
+	cfg2, err := LoadConfig(cfgFilePath2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg2.EnableCritic {
+		t.Error("expected EnableCritic to be true when disable_critic is false")
+	}
+
+	// 3. POWERWORD_DISABLE_CRITIC env var set to true -> EnableCritic should be false
+	t.Setenv("POWERWORD_DISABLE_CRITIC", "true")
+	cfg3, err := LoadConfig(cfgFilePath2) // use a clean config without enable_critic set
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg3.EnableCritic {
+		t.Error("expected EnableCritic to be false when POWERWORD_DISABLE_CRITIC env is true")
+	}
+}

@@ -22,7 +22,7 @@ To support Go struct input to the JSON schema enforcer, the package will utilize
 
 ### Helper Function: `generateJSONSchema`
 
-Implement a helper in `pkg/llm/client.go`:
+Implement a helper in `pkg/llm/schema.go`:
 ```go
 import "github.com/invopop/jsonschema"
 
@@ -107,7 +107,8 @@ Gemini's Go SDK accepts a `*genai.Schema` structure for response schema constrai
       }
   }
   ```
-- Implement `generateJSONSchema` helper.
+#### [NEW] [schema.go](file://../../pkg/llm/schema.go)
+- Implement `generateJSONSchema` and its reflection/dereference/required-injection helper methods.
 
 #### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
 - Update `Generate` to compile and assign `ResponseFormat` with `JSONSchema` if `cfg.ResponseSchema` is configured.

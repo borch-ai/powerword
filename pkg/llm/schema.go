@@ -157,22 +157,14 @@ func resolveRef(m map[string]any, defs map[string]any) (any, bool) {
 	return clonedDef, true
 }
 
-// makeAllPropertiesRequired recursively marks all properties of type "object" as required.
+// makeAllPropertiesRequired recursively marks all properties of type "object" as required, and enforces additionalProperties: false.
 func makeAllPropertiesRequired(node any) {
 	m, ok := node.(map[string]any)
 	if !ok {
 		return
 	}
 
-	if props, exists := m["properties"]; exists {
-		if propsMap, isMap := props.(map[string]any); isMap {
-			var reqList []any
-			for k := range propsMap {
-				reqList = append(reqList, k)
-			}
-			m["required"] = reqList
-		}
-	}
+	processProperties(m)
 
 	for _, val := range m {
 		if valMap, isMap := val.(map[string]any); isMap {
@@ -187,9 +179,36 @@ func makeAllPropertiesRequired(node any) {
 	}
 }
 
+// processProperties extracts and formats the properties map.
+func processProperties(m map[string]any) {
+	props, exists := m["properties"]
+	if !exists {
+		return
+	}
+	propsMap, isMap := props.(map[string]any)
+	if !isMap {
+		return
+	}
+
+	var reqList []any
+	for k := range propsMap {
+		reqList = append(reqList, k)
+	}
+	m["required"] = reqList
+	// Enforce additionalProperties: false for OpenAI structured outputs
+	if _, existsAddProps := m["additionalProperties"]; !existsAddProps {
+		m["additionalProperties"] = false
+	}
+}
+
 func cloneVal(v any) any {
-	b, _ := json.Marshal(v)
+	b, err := json.Marshal(v)
+	if err != nil {
+		return v
+	}
 	var res any
-	_ = json.Unmarshal(b, &res)
+	if err := json.Unmarshal(b, &res); err != nil {
+		return v
+	}
 	return res
 }

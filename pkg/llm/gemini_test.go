@@ -577,9 +577,15 @@ func checkGeminiResponseSchemaPayload(t *testing.T, capturedPayload map[string]a
 }
 
 func TestGeminiClient_Generate_WithResponseSchema_Error(t *testing.T) {
-	client := &GeminiClient{}
+	opts := []option.ClientOption{
+		option.WithAPIKey("dummy-key"),
+	}
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ch := make(chan int)
-	_, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil, WithResponseSchema(ch))
+	_, err = client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil, WithResponseSchema(ch))
 	if err == nil {
 		t.Fatal("expected error for unsupported schema type, got nil")
 	}

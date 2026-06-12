@@ -5,7 +5,7 @@
 **Date Completed:** 2026-06-12
 **Unit Test Coverage:** 91.0%
 
-Introduce a configuration option `enable_critic` to bypass the LLM-powered review step of `powerword review` (e.g., in git pre-push hooks) unless explicitly opted in. This saves API tokens and reduces execution time by default. When disabled (the default), the CLI will still run all local static checks (such as plan relative link validation) and the validation command (e.g., `make all`), ensuring code correctness without invoking expensive LLM calls.
+Introduce a configuration option `enable_critic` to run the LLM-powered review step of `powerword review` (e.g., in git pre-push hooks) only when explicitly opted in. This saves API tokens and reduces execution time by default. When disabled (the default), the CLI will still run all local static checks (such as plan relative link validation) and the validation command (e.g., `make all`), ensuring code correctness without invoking expensive LLM calls.
 
 ## User Review Required
 
