@@ -24,30 +24,30 @@ type ModelPricing = telemetry.ModelPricing
 
 // Config holds the application configuration.
 type Config struct {
-	Verbose           bool                    `mapstructure:"verbose"`
-	Model             string                  `mapstructure:"model"`
-	APIKeys           APIKeys                 `mapstructure:"api_keys"`
-	Session           string                  `mapstructure:"session"`
-	ListSessions      bool                    `mapstructure:"list-sessions"`
-	MaxLoopIterations int                     `mapstructure:"max_loop_iterations"`
-	AutoConfirm       bool                    `mapstructure:"auto_confirm"`
-	Headless          bool                    `mapstructure:"headless"`
-	JSONOutput        bool                    `mapstructure:"json"`
-	Servers           map[string]ServerConfig `mapstructure:"servers"`
-	Route             map[string]string       `mapstructure:"route"`
-	ClassifierModel   string                  `mapstructure:"classifier_model"`
-	Pricing           map[string]ModelPricing `mapstructure:"pricing"`
-	CriticProvider    string                  `mapstructure:"critic_provider"`
-	CriticModel       string                  `mapstructure:"critic_model"`
-	CriticEndpoint    string                  `mapstructure:"critic_endpoint"`
-	PlanTemplate      string                  `mapstructure:"plan_template"`
-	Autonomous        bool                    `mapstructure:"autonomous"`
-	Issue             string                  `mapstructure:"issue"`
-	WebhookSecret     string                  `mapstructure:"webhook_secret"`
-	WebhookPort       int                     `mapstructure:"webhook_port"`
-	Plugins           PluginsConfig           `mapstructure:"plugins"`
-	GitRollback       bool                    `mapstructure:"git_rollback"`
-	OutputWriter      io.Writer               `mapstructure:"-"`
+	Verbose           bool                              `mapstructure:"verbose"`
+	Model             string                            `mapstructure:"model"`
+	APIKeys           APIKeys                           `mapstructure:"api_keys"`
+	Session           string                            `mapstructure:"session"`
+	ListSessions      bool                              `mapstructure:"list-sessions"`
+	MaxLoopIterations int                               `mapstructure:"max_loop_iterations"`
+	AutoConfirm       bool                              `mapstructure:"auto_confirm"`
+	Headless          bool                              `mapstructure:"headless"`
+	JSONOutput        bool                              `mapstructure:"json"`
+	Servers           map[string]ServerConfig           `mapstructure:"servers"`
+	Route             map[string]string                 `mapstructure:"route"`
+	ClassifierModel   string                            `mapstructure:"classifier_model"`
+	Pricing           map[string]telemetry.ModelPricing `mapstructure:"pricing"`
+	CriticProvider    string                            `mapstructure:"critic_provider"`
+	CriticModel       string                            `mapstructure:"critic_model"`
+	CriticEndpoint    string                            `mapstructure:"critic_endpoint"`
+	PlanTemplate      string                            `mapstructure:"plan_template"`
+	Autonomous        bool                              `mapstructure:"autonomous"`
+	Issue             string                            `mapstructure:"issue"`
+	WebhookSecret     string                            `mapstructure:"webhook_secret"`
+	WebhookPort       int                               `mapstructure:"webhook_port"`
+	Plugins           PluginsConfig                     `mapstructure:"plugins"`
+	GitRollback       bool                              `mapstructure:"git_rollback"`
+	OutputWriter      io.Writer                         `mapstructure:"-"`
 }
 
 // ImageGenConfig holds parameters for the image generator.
