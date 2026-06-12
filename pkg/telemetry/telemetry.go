@@ -160,4 +160,3 @@ func (u *UsageTracker) TotalCachedTokens() int {
 	}
 	return total
 }
-

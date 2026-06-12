@@ -281,51 +281,65 @@ func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt strin
 
 func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string) ([]llm.Message, error) {
 	for i := 0; i < cfg.MaxLoopIterations; i++ {
-		if err := checkBudget(cfg, tracker); err != nil {
+		var done bool
+		var err error
+		messages, done, err = executeLoopIteration(ctx, cfg, client, registry, formatter, messages, tracker, modelName, i)
+		if err != nil {
 			return messages, err
 		}
-
-		mcpTools, listErr := registry.ListAllTools(ctx)
-		if listErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to list tools: %v\n", listErr)
-		}
-		tools, _ := mcp.TranslateTools(mcpTools)
-
-		assistantMsg, genErr := client.Generate(ctx, messages, tools)
-		if genErr != nil {
-			return nil, fmt.Errorf("failed to generate response: %w", genErr)
-		}
-
-		var usage llm.TokenUsage
-		if assistantMsg.Usage != nil {
-			usage = *assistantMsg.Usage
-		}
-		tracker.RecordUsage(modelName, usage)
-
-		if assistantMsg.Content != "" {
-			if _, wErr := formatter.Write([]byte(assistantMsg.Content)); wErr != nil {
-				return nil, fmt.Errorf("failed to write output: %w", wErr)
-			}
-			_ = formatter.Flush()
-		}
-
-		messages = append(messages, *assistantMsg)
-
-		if err := checkBudget(cfg, tracker); err != nil {
-			return messages, err
-		}
-
-		if len(assistantMsg.ToolCalls) == 0 {
+		if done {
 			break
-		}
-
-		messages = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
-
-		if i == cfg.MaxLoopIterations-1 && len(assistantMsg.ToolCalls) > 0 {
-			fmt.Fprintf(os.Stderr, "\nWarning: reached maximum loop iterations (%d)\n", cfg.MaxLoopIterations)
 		}
 	}
 	return messages, nil
+}
+
+func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string, i int) ([]llm.Message, bool, error) {
+	if err := checkBudget(cfg, tracker); err != nil {
+		return messages, false, err
+	}
+
+	mcpTools, listErr := registry.ListAllTools(ctx)
+	if listErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to list tools: %v\n", listErr)
+	}
+	tools, _ := mcp.TranslateTools(mcpTools)
+
+	assistantMsg, genErr := client.Generate(ctx, messages, tools)
+	if genErr != nil {
+		return nil, false, fmt.Errorf("failed to generate response: %w", genErr)
+	}
+
+	var usage llm.TokenUsage
+	if assistantMsg.Usage != nil {
+		usage = *assistantMsg.Usage
+	}
+	tracker.RecordUsage(modelName, usage)
+
+	if assistantMsg.Content != "" {
+		if _, wErr := formatter.Write([]byte(assistantMsg.Content)); wErr != nil {
+			return nil, false, fmt.Errorf("failed to write output: %w", wErr)
+		}
+		_ = formatter.Flush()
+	}
+
+	messages = append(messages, *assistantMsg)
+
+	if err := checkBudget(cfg, tracker); err != nil {
+		return messages, false, err
+	}
+
+	if len(assistantMsg.ToolCalls) == 0 {
+		return messages, true, nil
+	}
+
+	messages = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
+
+	if i == cfg.MaxLoopIterations-1 && len(assistantMsg.ToolCalls) > 0 {
+		fmt.Fprintf(os.Stderr, "\nWarning: reached maximum loop iterations (%d)\n", cfg.MaxLoopIterations)
+	}
+
+	return messages, false, nil
 }
 
 func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) []llm.Message {
@@ -460,4 +474,3 @@ func checkBudget(cfg *config.Config, tracker *telemetry.UsageTracker) error {
 
 	return nil
 }
-

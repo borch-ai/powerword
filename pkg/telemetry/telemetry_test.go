@@ -191,4 +191,3 @@ func TestUsageTracker_Totals(t *testing.T) {
 		t.Errorf("TotalCachedTokens() = %d; want 50", got)
 	}
 }
-
