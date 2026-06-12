@@ -131,7 +131,7 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 		opt(cfg)
 	}
 	if cfg.ResponseMIMEType != "" {
-		model.GenerationConfig.ResponseMIMEType = cfg.ResponseMIMEType
+		model.ResponseMIMEType = cfg.ResponseMIMEType
 	}
 
 	chat := model.StartChat()

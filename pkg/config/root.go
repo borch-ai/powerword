@@ -82,16 +82,13 @@ func runE(cmd *cobra.Command, args []string) error {
 		prompt = args[0]
 	}
 	if Active.Verbose {
+		printFunc := cmd.Printf
 		if Active.JSONOutput {
-			fmt.Fprintf(os.Stderr, "Verbose logging enabled. Model: %s\n", Active.Model)
-			if prompt != "" {
-				fmt.Fprintf(os.Stderr, "Received prompt: %s\n", prompt)
-			}
-		} else {
-			cmd.Printf("Verbose logging enabled. Model: %s\n", Active.Model)
-			if prompt != "" {
-				cmd.Printf("Received prompt: %s\n", prompt)
-			}
+			printFunc = func(format string, a ...interface{}) { fmt.Fprintf(os.Stderr, format, a...) }
+		}
+		printFunc("Verbose logging enabled. Model: %s\n", Active.Model)
+		if prompt != "" {
+			printFunc("Received prompt: %s\n", prompt)
 		}
 	}
 	if !Active.ListSessions {
