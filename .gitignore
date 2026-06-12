@@ -17,9 +17,7 @@
 
 # Project-specific binaries
 /powerword
-/pw-mcp-fs
-/pw-mcp-git
-/pw-mcp-shell
+/pw-mcp-*
 /bin/
 
 # IDEs/Editors configuration
