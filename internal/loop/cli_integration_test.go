@@ -316,3 +316,136 @@ func TestCLI_SessionResumability(t *testing.T) {
 		t.Errorf("expected 'Response turn 2', got %s", session.Messages[3].Content)
 	}
 }
+
+func TestCLI_SessionPauseAndResume(t *testing.T) {
+	tempHomeDir, err := os.MkdirTemp("", "pw-pause-resume-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempHomeDir)
+
+	var requestCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		var resp openai.ChatCompletionResponse
+		if requestCount == 1 {
+			resp = openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{
+					{
+						Message: openai.ChatCompletionMessage{
+							Role:    openai.ChatMessageRoleAssistant,
+							Content: "Let me delete a file",
+							ToolCalls: []openai.ToolCall{
+								{
+									ID:   "call_pause_1",
+									Type: openai.ToolTypeFunction,
+									Function: openai.FunctionCall{
+										Name:      "delete_tool",
+										Arguments: `{"path":"somefile"}`,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+		} else {
+			resp = openai.ChatCompletionResponse{
+				Choices: []openai.ChatCompletionChoice{
+					{
+						Message: openai.ChatCompletionMessage{
+							Role:    openai.ChatMessageRoleAssistant,
+							Content: "All done!",
+						},
+					},
+				},
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	// 1. Run first turn and pause
+	cmd1 := exec.Command(binaryPath, "prompt 1", "--session", "pause-session", "--json")
+	cmd1.Env = append(os.Environ(),
+		"HOME="+tempHomeDir,
+		"OPENAI_BASE_URL="+server.URL,
+		"POWERWORD_OPENAI_API_KEY=dummy",
+		"POWERWORD_MODEL=gpt-4",
+	)
+	cmd1.Stdin = strings.NewReader("p\n") // pause
+	cmd1.Stderr = os.Stderr
+
+	_, err = cmd1.Output()
+	if err != nil {
+		t.Fatalf("first turn (pause) failed: %v", err)
+	}
+
+	sessionFilePath := filepath.Join(tempHomeDir, ".local", "share", "powerword", "sessions", "pause-session.json")
+	if _, err := os.Stat(sessionFilePath); os.IsNotExist(err) {
+		t.Fatalf("session file was not created at %s", sessionFilePath)
+	}
+
+	// Read and verify paused session contents
+	data, err := os.ReadFile(sessionFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var session struct {
+		ID       string `json:"id"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(data, &session); err != nil {
+		t.Fatalf("failed to parse session json: %v", err)
+	}
+
+	if len(session.Messages) != 2 {
+		t.Fatalf("expected 2 messages in paused session, got %d", len(session.Messages))
+	}
+
+	// 2. Resume the session with --resume flag and y to accept
+	cmd2 := exec.Command(binaryPath, "--resume", "pause-session", "--json")
+	cmd2.Env = append(os.Environ(),
+		"HOME="+tempHomeDir,
+		"OPENAI_BASE_URL="+server.URL,
+		"POWERWORD_OPENAI_API_KEY=dummy",
+		"POWERWORD_MODEL=gpt-4",
+	)
+	cmd2.Stdin = strings.NewReader("y\n") // accept
+	cmd2.Stderr = os.Stderr
+
+	_, err = cmd2.Output()
+	if err != nil {
+		t.Fatalf("resumed turn failed: %v", err)
+	}
+
+	// Read and verify resumed session contents
+	data2, err := os.ReadFile(sessionFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := json.Unmarshal(data2, &session); err != nil {
+		t.Fatalf("failed to parse session json: %v", err)
+	}
+
+	// Expected:
+	// 0: User prompt 1
+	// 1: Assistant call delete_tool
+	// 2: Tool error/result (since dummy registry is not initialized, returns error calling tool)
+	// 3: Assistant all done!
+	if len(session.Messages) != 4 {
+		t.Fatalf("expected 4 messages in resumed session, got %d. messages: %+v", len(session.Messages), session.Messages)
+	}
+	if session.Messages[2].Role != "tool" {
+		t.Errorf("expected third message to be tool, got role %s", session.Messages[2].Role)
+	}
+	if session.Messages[3].Content != "All done!" {
+		t.Errorf("expected final message to be 'All done!', got %s", session.Messages[3].Content)
+	}
+}

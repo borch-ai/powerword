@@ -79,12 +79,23 @@ func initializeSessionAndClient(ctx context.Context, cfg *config.Config, prompt 
 	var messages []llm.Message
 	var err error
 
-	if cfg.Session != "" {
-		session, err = LoadSession(cfg.Session)
+	sessionID := cfg.Session
+	isResume := false
+	if cfg.Resume != "" {
+		sessionID = cfg.Resume
+		isResume = true
+	}
+
+	if sessionID != "" {
+		session, err = LoadSession(sessionID)
 		if err != nil {
-			return nil, nil, "", "", nil, fmt.Errorf("failed to load session %s: %w", cfg.Session, err)
+			return nil, nil, "", "", nil, fmt.Errorf("failed to load session %s: %w", sessionID, err)
 		}
 		messages = session.Messages
+	}
+
+	if isResume && (session == nil || len(session.Messages) == 0) {
+		return nil, nil, "", "", nil, fmt.Errorf("cannot resume empty or non-existent session %q", sessionID)
 	}
 
 	activeClient, targetModel, prompt, err := resolveClientAndRoute(ctx, cfg, prompt)
@@ -96,10 +107,12 @@ func initializeSessionAndClient(ctx context.Context, cfg *config.Config, prompt 
 		fmt.Fprintf(os.Stderr, "Routed to model: %s\n", targetModel)
 	}
 
-	messages = append(messages, llm.Message{
-		Role:    llm.RoleUser,
-		Content: prompt,
-	})
+	if !isResume || prompt != "" {
+		messages = append(messages, llm.Message{
+			Role:    llm.RoleUser,
+			Content: prompt,
+		})
+	}
 
 	return session, activeClient, targetModel, prompt, messages, nil
 }
@@ -109,11 +122,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		return handleListSessions()
 	}
 
-	if prompt == "" {
+	if prompt == "" && cfg.Resume == "" {
 		p, _ := readStdinPrompt()
 		prompt = p
 	}
-	if prompt == "" && !cfg.ListSessions {
+	if prompt == "" && !cfg.ListSessions && cfg.Resume == "" {
 		return fmt.Errorf("no prompt provided and stdin is empty")
 	}
 
@@ -154,16 +167,33 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	initialLen := len(messages)
 	updatedMessages, loopErr := runReActLoop(loopCtx, cfg, activeClient, registry, formatter, messages, tracker, targetModel)
-	if loopErr != nil {
+	isPaused := errors.Is(loopErr, ErrSessionPaused)
+
+	if loopErr != nil && !isPaused {
 		loopFailed = true
 	}
 
-	if session != nil && loopErr == nil {
+	if isPaused && session == nil {
+		pausedID := fmt.Sprintf("paused-%d", time.Now().Unix())
+		session = &Session{
+			ID:        pausedID,
+			Timestamp: time.Now(),
+			Messages:  make([]llm.Message, 0),
+		}
+		fmt.Fprintf(os.Stderr, "Generating session ID for pause: %s\n", pausedID)
+	}
+
+	if session != nil && (loopErr == nil || isPaused) {
 		session.Model = targetModel
 		session.Messages = updatedMessages
 		if saveErr := SaveSession(session); saveErr != nil {
 			loopErr = fmt.Errorf("failed to save session: %w", saveErr)
-			loopFailed = true
+			if !isPaused {
+				loopFailed = true
+			}
+		} else if isPaused {
+			fmt.Printf("\nSession paused. To resume, run:\n  powerword --resume %s\n", session.ID)
+			loopErr = nil
 		}
 	}
 
@@ -282,6 +312,15 @@ func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt strin
 }
 
 func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string) ([]llm.Message, error) {
+	pending, _ := getPendingToolCalls(messages)
+	if len(pending) > 0 {
+		var execErr error
+		messages, execErr = executeTools(ctx, cfg, registry, pending, messages)
+		if execErr != nil {
+			return messages, execErr
+		}
+	}
+
 	for i := 0; i < cfg.MaxLoopIterations; i++ {
 		var done bool
 		var err error
@@ -338,7 +377,11 @@ func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LL
 		return messages, true, nil
 	}
 
-	messages = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
+	var executeErr error
+	messages, executeErr = executeTools(ctx, cfg, registry, assistantMsg.ToolCalls, messages)
+	if executeErr != nil {
+		return messages, false, executeErr
+	}
 
 	if i == cfg.MaxLoopIterations-1 && len(assistantMsg.ToolCalls) > 0 {
 		fmt.Fprintf(os.Stderr, "\nWarning: reached maximum loop iterations (%d)\n", cfg.MaxLoopIterations)
@@ -347,7 +390,7 @@ func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LL
 	return messages, false, nil
 }
 
-func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) []llm.Message {
+func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registry, toolCalls []llm.ToolCall, messages []llm.Message) ([]llm.Message, error) {
 	profile := Interactive
 	if cfg.AutoConfirm {
 		profile = Bypass
@@ -371,6 +414,9 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 
 		allowed, err := guard.Authorize(tc.Name, args)
 		if err != nil {
+			if errors.Is(err, ErrSessionPaused) {
+				return messages, err
+			}
 			messages = append(messages, llm.Message{
 				Role:       llm.RoleTool,
 				Content:    err.Error(),
@@ -414,7 +460,7 @@ func executeTools(ctx context.Context, cfg *config.Config, registry *mcp.Registr
 			ToolCallID: tc.ID,
 		})
 	}
-	return messages
+	return messages, nil
 }
 
 func getOutputWriter(cfg *config.Config) io.Writer {
@@ -484,4 +530,43 @@ func checkBudget(cfg *config.Config, tracker *telemetry.UsageTracker) error {
 	}
 
 	return nil
+}
+
+// getPendingToolCalls checks if there are tool calls in the last assistant message
+// that do not have corresponding tool responses in the subsequent message history.
+func getPendingToolCalls(messages []llm.Message) ([]llm.ToolCall, int) {
+	// Find index of the last assistant message
+	lastAssistantIdx := -1
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == llm.RoleAssistant {
+			lastAssistantIdx = i
+			break
+		}
+	}
+	if lastAssistantIdx == -1 {
+		return nil, -1
+	}
+
+	assistantMsg := messages[lastAssistantIdx]
+	if len(assistantMsg.ToolCalls) == 0 {
+		return nil, -1
+	}
+
+	// Build a map of tool call IDs that have been executed (have a subsequent RoleTool response)
+	executed := make(map[string]bool)
+	for i := lastAssistantIdx + 1; i < len(messages); i++ {
+		if messages[i].Role == llm.RoleTool && messages[i].ToolCallID != "" {
+			executed[messages[i].ToolCallID] = true
+		}
+	}
+
+	// Filter down to only those tool calls that are not marked executed
+	var pending []llm.ToolCall
+	for _, tc := range assistantMsg.ToolCalls {
+		if !executed[tc.ID] {
+			pending = append(pending, tc)
+		}
+	}
+
+	return pending, lastAssistantIdx
 }

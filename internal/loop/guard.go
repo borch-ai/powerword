@@ -2,11 +2,14 @@ package loop
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 )
+
+var ErrSessionPaused = errors.New("session paused by user")
 
 // SecurityProfile defines the level of permission restriction for tool calls.
 type SecurityProfile int
@@ -71,7 +74,7 @@ func (g *Guard) Authorize(toolName string, args map[string]interface{}) (bool, e
 		return true, nil
 	}
 
-	_, _ = fmt.Fprintf(g.Out, "\n\x1b[1;33m[?]\x1b[0m Allow tool \x1b[1;36m%s\x1b[0m? (y/N) ", toolName)
+	_, _ = fmt.Fprintf(g.Out, "\n\x1b[1;33m[?]\x1b[0m Allow tool \x1b[1;36m%s\x1b[0m? (y/N/p to pause) ", toolName)
 
 	reader := bufio.NewReader(g.In)
 	resp, err := reader.ReadString('\n')
@@ -80,6 +83,9 @@ func (g *Guard) Authorize(toolName string, args map[string]interface{}) (bool, e
 	}
 
 	resp = strings.TrimSpace(strings.ToLower(resp))
+	if resp == "p" || resp == "pause" {
+		return false, ErrSessionPaused
+	}
 	if resp == "" && err == io.EOF {
 		return false, nil
 	}

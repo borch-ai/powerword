@@ -139,6 +139,26 @@ func TestGuard_Authorize_Interactive(t *testing.T) {
 			wantErr:      false,
 			expectPrompt: true,
 		},
+		{
+			name:         "Interactive profile pauses on p",
+			profile:      Interactive,
+			toolName:     "filesystem.delete_file",
+			input:        "p\n",
+			wantResult:   false,
+			wantErr:      true,
+			errMatch:     "session paused by user",
+			expectPrompt: true,
+		},
+		{
+			name:         "Interactive profile pauses on pause",
+			profile:      Interactive,
+			toolName:     "filesystem.delete_file",
+			input:        "pause\n",
+			wantResult:   false,
+			wantErr:      true,
+			errMatch:     "session paused by user",
+			expectPrompt: true,
+		},
 	}
 
 	for _, tt := range tests {
