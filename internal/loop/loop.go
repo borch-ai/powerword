@@ -281,6 +281,10 @@ func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt strin
 
 func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string) ([]llm.Message, error) {
 	for i := 0; i < cfg.MaxLoopIterations; i++ {
+		if err := checkBudget(cfg, tracker); err != nil {
+			return messages, err
+		}
+
 		mcpTools, listErr := registry.ListAllTools(ctx)
 		if listErr != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to list tools: %v\n", listErr)
@@ -306,6 +310,10 @@ func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient,
 		}
 
 		messages = append(messages, *assistantMsg)
+
+		if err := checkBudget(cfg, tracker); err != nil {
+			return messages, err
+		}
 
 		if len(assistantMsg.ToolCalls) == 0 {
 			break
@@ -393,3 +401,63 @@ func getOutputWriter(cfg *config.Config) io.Writer {
 	}
 	return os.Stdout
 }
+
+// BudgetExceededError indicates that a configured token or cost budget has been exceeded.
+type BudgetExceededError struct {
+	Reason string
+}
+
+func (e *BudgetExceededError) Error() string {
+	return "budget exceeded: " + e.Reason
+}
+
+// checkBudget checks if the accumulated usage has exceeded any configured budgets.
+func checkBudget(cfg *config.Config, tracker *telemetry.UsageTracker) error {
+	if cfg.MaxCost > 0 {
+		currentCost := tracker.EstimatedCost(cfg.Pricing)
+		if currentCost > cfg.MaxCost {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("estimated cost $%.5f exceeded maximum budget of $%.5f", currentCost, cfg.MaxCost),
+			}
+		}
+	}
+
+	if cfg.MaxTokens > 0 {
+		totalTokens := tracker.TotalTokens()
+		if totalTokens > cfg.MaxTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("total tokens %d exceeded maximum budget of %d", totalTokens, cfg.MaxTokens),
+			}
+		}
+	}
+
+	if cfg.MaxInputTokens > 0 {
+		inputTokens := tracker.TotalInputTokens()
+		if inputTokens > cfg.MaxInputTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("input tokens %d exceeded maximum budget of %d", inputTokens, cfg.MaxInputTokens),
+			}
+		}
+	}
+
+	if cfg.MaxOutputTokens > 0 {
+		outputTokens := tracker.TotalOutputTokens()
+		if outputTokens > cfg.MaxOutputTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("output tokens %d exceeded maximum budget of %d", outputTokens, cfg.MaxOutputTokens),
+			}
+		}
+	}
+
+	if cfg.MaxCachedTokens > 0 {
+		cachedTokens := tracker.TotalCachedTokens()
+		if cachedTokens > cfg.MaxCachedTokens {
+			return &BudgetExceededError{
+				Reason: fmt.Sprintf("cached tokens %d exceeded maximum budget of %d", cachedTokens, cfg.MaxCachedTokens),
+			}
+		}
+	}
+
+	return nil
+}
+

@@ -22,6 +22,11 @@ var (
 	autonomous      bool
 	issueIDString   string
 	gitRollback     bool
+	maxCost         float64
+	maxTokens       int
+	maxInputTokens  int
+	maxOutputTokens int
+	maxCachedTokens int
 )
 
 // Active holds the successfully loaded application configuration.
@@ -141,6 +146,21 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *Config) {
 	if cmd.Flags().Changed("git-rollback") {
 		cfg.GitRollback = gitRollback
 	}
+	if cmd.Flags().Changed("max-cost") {
+		cfg.MaxCost = maxCost
+	}
+	if cmd.Flags().Changed("max-tokens") {
+		cfg.MaxTokens = maxTokens
+	}
+	if cmd.Flags().Changed("max-input-tokens") {
+		cfg.MaxInputTokens = maxInputTokens
+	}
+	if cmd.Flags().Changed("max-output-tokens") {
+		cfg.MaxOutputTokens = maxOutputTokens
+	}
+	if cmd.Flags().Changed("max-cached-tokens") {
+		cfg.MaxCachedTokens = maxCachedTokens
+	}
 }
 
 func setupPersistentFlags(cmd *cobra.Command) {
@@ -158,6 +178,11 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	autonomous = false
 	issueIDString = ""
 	gitRollback = false
+	maxCost = 0.0
+	maxTokens = 0
+	maxInputTokens = 0
+	maxOutputTokens = 0
+	maxCachedTokens = 0
 
 	cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is powerword.toml or $HOME/.config/powerword/config.toml)")
 	cmd.PersistentFlags().StringVarP(&model, "model", "m", "", "active LLM model")
@@ -172,6 +197,11 @@ func setupPersistentFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVar(&autonomous, "autonomous", false, "run an autonomous repair loop")
 	cmd.PersistentFlags().StringVar(&issueIDString, "issue", "", "GitHub issue ID for autonomous review/repair")
 	cmd.PersistentFlags().BoolVar(&gitRollback, "git-rollback", false, "enable automated workspace rollbacks on execution loop failure")
+	cmd.PersistentFlags().Float64Var(&maxCost, "max-cost", 0.0, "maximum estimated cost budget in USD")
+	cmd.PersistentFlags().IntVar(&maxTokens, "max-tokens", 0, "maximum total tokens budget")
+	cmd.PersistentFlags().IntVar(&maxInputTokens, "max-input-tokens", 0, "maximum input tokens budget")
+	cmd.PersistentFlags().IntVar(&maxOutputTokens, "max-output-tokens", 0, "maximum output tokens budget")
+	cmd.PersistentFlags().IntVar(&maxCachedTokens, "max-cached-tokens", 0, "maximum cached tokens budget")
 }
 
 // Execute executes the root command.

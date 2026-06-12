@@ -1,6 +1,9 @@
 # plan: Task 6.2: Token & Cost Budgeting Guardrails
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
+**Go Version:** 1.26
+**Date Completed:** 2026-06-12
+**Unit Test Coverage:** 91.0% (statements)
 
 This task adds user-defined token and cost budgeting guardrails to prevent infinite loops and runaway API expenditures during long-running agent execution runs.
 
@@ -13,21 +16,21 @@ This task adds user-defined token and cost budgeting guardrails to prevent infin
 
 ### Config and Telemetry
 
-#### [MODIFY] [config.go](file:///Users/human/code/powerword/pkg/config/config.go)
-- [ ] Add config options `max_cost` and `max_tokens` (input/output/cached).
+#### [MODIFY] [config.go](../../pkg/config/config.go)
+- [x] Add config options `max_cost` and `max_tokens` (input/output/cached).
 
-#### [MODIFY] [telemetry.go](file:///Users/human/code/powerword/pkg/telemetry/telemetry.go)
-- [ ] Add checks within the telemetry tracking logic to verify if the current session costs have crossed the defined budget threshold.
+#### [MODIFY] [telemetry.go](../../pkg/telemetry/telemetry.go)
+- [x] Add checks within the telemetry tracking logic to verify if the current session costs have crossed the defined budget threshold.
 
-#### [MODIFY] [loop.go](file:///Users/human/code/powerword/internal/loop/loop.go)
-- [ ] Integrate budget check into the loop step validator and return a distinct budget exhaustion error.
+#### [MODIFY] [loop.go](../../internal/loop/loop.go)
+- [x] Integrate budget check into the loop step validator and return a distinct budget exhaustion error.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- [ ] Run `go test ./internal/llm/...` and `go test ./internal/loop/...` testing with mock token budgets.
+- [x] Run `go test ./pkg/telemetry/...` and `go test ./internal/loop/...` testing with mock token budgets.
 
 ### Manual Verification
-- [ ] Run `powerword` with `--max-cost 0.01` and verify that the run is aborted early when tool executions or prompt completions trigger costs exceeding $0.01.
+- [x] Run `powerword` with `--max-cost 0.01` and verify that the run is aborted early when tool executions or prompt completions trigger costs exceeding $0.01.
