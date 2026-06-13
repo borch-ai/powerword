@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -19,14 +20,13 @@ const lintPlansSchema = `{
 	"properties": {
 		"workspace_root": {
 			"type": "string",
-			"description": "Absolute or relative path to the workspace root containing plans/"
+			"description": "Optional absolute or relative path to the workspace root containing plans/. Defaults to POWERWORD_WORKSPACE_ROOT env var or current directory."
 		},
 		"plan_template_path": {
 			"type": "string",
 			"description": "Optional custom path to the plan template file"
 		}
-	},
-	"required": ["workspace_root"]
+	}
 }`
 
 type lintPlansArgs struct {
@@ -73,8 +73,16 @@ func handleLintPlans(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallTo
 		cfg.PlanTemplate = args.PlanTemplatePath
 	}
 
+	workspaceRoot := args.WorkspaceRoot
+	if workspaceRoot == "" {
+		workspaceRoot = os.Getenv("POWERWORD_WORKSPACE_ROOT")
+	}
+	if workspaceRoot == "" {
+		workspaceRoot = "."
+	}
+
 	var validationErrs []string
-	err := linter.ValidatePlans(args.WorkspaceRoot, cfg)
+	err := linter.ValidatePlans(workspaceRoot, cfg)
 	if err != nil {
 		var valErr *linter.PlanValidationError
 		if errors.As(err, &valErr) {
@@ -107,8 +115,8 @@ func handleLintPlans(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallTo
 }
 
 func parseValidationError(errStr string) lintError {
-	reLine := regexp.MustCompile(`^([^:]+):(\d+):\s*(.*)$`)
-	reNoLine := regexp.MustCompile(`^([^:]+):\s*(.*)$`)
+	reLine := regexp.MustCompile(`^(.*\.md):(\d+):\s*(.*)$`)
+	reNoLine := regexp.MustCompile(`^(.*\.md):\s*(.*)$`)
 
 	if matches := reLine.FindStringSubmatch(errStr); len(matches) > 3 {
 		file := matches[1]
