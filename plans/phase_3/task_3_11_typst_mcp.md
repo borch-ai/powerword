@@ -1,9 +1,9 @@
 # plan: Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed (Issue #TBD)
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-13
+**Unit Test Coverage:** 91.2%
 
 Implement `pw-mcp-typst`, a native Go MCP server that invokes a local Typst binary to compile book manuscripts and illustration assets into print-ready PDFs conforming to KDP bleed, margin, and resolution specifications. Primary consumer: the Pithos `assemble` engine (Pithos Task 4.2).
 
@@ -106,8 +106,10 @@ func (c *Compiler) Compile(ctx context.Context, templatePath, outputPath string)
 ## Verification Plan
 
 ### Automated Tests
-- `go test ./internal/typst/...` (unit, subprocess mocked)
-- `go test -tags=integration ./internal/typst/...` (requires typst binary)
+- `go test ./internal/plugins/typst/...` (unit, subprocess mocked)
+- `go test ./cmd/pw-mcp-typst/...` (unit, subprocess mocked)
+- `RUN_INTEGRATION_TESTS=true go test ./internal/plugins/typst/...` (unit + integration tests, requires typst binary)
+- `RUN_INTEGRATION_TESTS=true go test ./cmd/pw-mcp-typst/...` (unit + MCP integration tests calling actual typst compiler)
 
 ### Manual Verification
 1. `./bin/pw-mcp-typst` — starts and awaits input.

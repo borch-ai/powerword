@@ -1,4 +1,4 @@
-# plan: Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)
+# plan: Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)
 
 **Status:** Open (Issue #TBD)
 **Go Version:** 1.26.4
