@@ -1,4 +1,4 @@
-# plan: Task 3.14: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)
+# plan: Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)
 
 **Status:** Open (Issue #TBD)
 **Go Version:** 1.26.4
@@ -21,9 +21,12 @@ Implement `pw-mcp-pdfcheck`, a native Go MCP server that performs preflight vali
 Standard MCP server entry point registering the `validate_pdf` tool:
 ```go
 func main() {
-    srv := mcp.NewServer(mcp.Info{Name: "pw-mcp-pdfcheck", Version: "0.1.0"})
-    srv.AddTool(mcp.NewTool("validate_pdf", ...), handleValidatePDF)
-    if err := srv.Run(context.Background(), mcp.NewStdioTransport()); err != nil {
+    srv := mcp.NewServer(&mcp.Implementation{
+        Name:    "pw-mcp-pdfcheck",
+        Version: "0.1.0",
+    }, nil)
+    srv.AddTool(&mcp.Tool{Name: "validate_pdf", ...}, handleValidatePDF)
+    if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
         log.Fatal(err)
     }
 }

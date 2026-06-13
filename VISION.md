@@ -81,7 +81,7 @@ Each plugin is an independent Go binary implementing the MCP server protocol. Pl
 | Language | Go 1.26+ |
 | CLI Framework | `spf13/cobra` + `spf13/viper` |
 | MCP Protocol | `github.com/modelcontextprotocol/go-sdk` |
-| LLM Providers | `google/generative-ai-go`, `sashabaranov/go-openai`, `anthropics/anthropic-sdk-go` |
+| LLM Providers | `github.com/google/generative-ai-go`, `github.com/sashabaranov/go-openai`, `github.com/anthropics/anthropic-sdk-go` |
 | Config | TOML via Viper, `~/.config/powerword/config.toml` |
 
 ---
@@ -108,4 +108,4 @@ $ pw-mcp-critic --plan plans/phase_2/task_2_1_amazon_autocomplete.md --diff <(gi
 - **Not a single-vendor tool.** Every feature that works with Gemini must work with Claude and OpenAI.
 - **Not a monolith.** New capabilities always ship as a new `pw-mcp-*` plugin, never as additions to the core CLI binary.
 
-For the full ecosystem strategy, see [Kiln's STRATEGY.md](../kiln/STRATEGY.md).
+For the full ecosystem strategy, see Kiln's STRATEGY.md in the sibling Kiln repository.

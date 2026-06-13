@@ -1,4 +1,4 @@
-# plan: Task 3.13: EPUB Publication Builder (`pw-mcp-epub`)
+# plan: Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)
 
 **Status:** Open (Issue #TBD)
 **Go Version:** 1.26.4
@@ -21,9 +21,12 @@ Implement `pw-mcp-epub`, a native Go MCP server that compiles parodic manuscript
 Standard MCP server entry point registering the `compile_epub` tool:
 ```go
 func main() {
-    srv := mcp.NewServer(mcp.Info{Name: "pw-mcp-epub", Version: "0.1.0"})
-    srv.AddTool(mcp.NewTool("compile_epub", ...), handleCompileEPUB)
-    if err := srv.Run(context.Background(), mcp.NewStdioTransport()); err != nil {
+    srv := mcp.NewServer(&mcp.Implementation{
+        Name:    "pw-mcp-epub",
+        Version: "0.1.0",
+    }, nil)
+    srv.AddTool(&mcp.Tool{Name: "compile_epub", ...}, handleCompileEPUB)
+    if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
         log.Fatal(err)
     }
 }

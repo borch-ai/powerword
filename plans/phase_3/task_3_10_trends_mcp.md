@@ -23,10 +23,13 @@ Implement `pw-mcp-trends`, a native Go MCP server that provides market demand in
 Standard MCP server entry point:
 ```go
 func main() {
-    srv := mcp.NewServer(mcp.Info{Name: "pw-mcp-trends", Version: "0.1.0"})
-    srv.AddTool(mcp.NewTool("score_niche", ...), handleScoreNiche)
-    srv.AddTool(mcp.NewTool("get_trend_velocity", ...), handleTrendVelocity)
-    if err := srv.Run(context.Background(), mcp.NewStdioTransport()); err != nil {
+    srv := mcp.NewServer(&mcp.Implementation{
+        Name:    "pw-mcp-trends",
+        Version: "0.1.0",
+    }, nil)
+    srv.AddTool(&mcp.Tool{Name: "score_niche", ...}, handleScoreNiche)
+    srv.AddTool(&mcp.Tool{Name: "get_trend_velocity", ...}, handleTrendVelocity)
+    if err := srv.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
         log.Fatal(err)
     }
 }

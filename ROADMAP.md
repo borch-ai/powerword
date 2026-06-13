@@ -94,12 +94,13 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
     *   Implement a native Go MCP server that invokes a local Typst binary to compile book manuscripts and illustration assets into print-ready PDFs conforming to KDP bleed/margin specs. Primary consumer: the Pithos `assemble` engine (Task 4.2). This unblocks Pithos Phase 4 which is currently stalled waiting for this server.
     *   [Implementation Plan](plans/phase_3/task_3_11_typst_mcp.md)
-*   [ ] **Task 3.13: EPUB Publication Builder (`pw-mcp-epub`)**
+*   [ ] **Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)**
     *   Implement a native Go MCP server that compiles parodic manuscripts and illustration assets into spec-compliant EPUB digital publications. Primary consumer: Pithos (`digital-export`).
-    *   [Implementation Plan](plans/phase_3/task_3_13_epub_mcp.md)
-*   [ ] **Task 3.14: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
+    *   [Implementation Plan](plans/phase_3/task_3_12_epub_mcp.md)
+*   [ ] **Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
     *   Implement a native Go MCP server to perform deep validation of compiled PDF book geometry, bleed limits, embedded fonts, and image resolution (minimum 300 DPI) against Amazon KDP paperback ingest rules. Primary consumer: Pithos (`assemble`).
-    *   [Implementation Plan](plans/phase_3/task_3_14_pdfcheck_mcp.md)
+    *   [Implementation Plan](plans/phase_3/task_3_13_pdfcheck_mcp.md)
+
 
 
 

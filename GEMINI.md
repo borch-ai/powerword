@@ -43,7 +43,7 @@ powerword/
    - Use the standard Model Context Protocol (MCP) Go SDK (`github.com/modelcontextprotocol/go-sdk`).
    - Treat external plugins as independent CLI processes communicating via standard I/O (stdio).
 5. **Centralized Capability Architecture:**
-   - Powerword is the sole repository for all shared AI capabilities (`pw-mcp-*` servers) inside the Borch-AI ecosystem. Sibling codebases (like Pithos and Kiln) must remain clean of low-level LLM client implementations or capability libraries. They consume these binaries as stdio subprocesses.
+   - Powerword is the sole repository for all shared AI capabilities (`pw-mcp-*` servers) inside the Borch-AI ecosystem. Sibling codebases (like Pithos and Kiln) must remain clean of low-level LLM client implementations or capability libraries. They consume these capability plugins as stdio subprocesses and import shared packages (such as `pkg/llm` and `pkg/telemetry`) directly, avoiding any duplication of core capability logic.
 
 ---
 
