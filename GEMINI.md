@@ -42,6 +42,8 @@ powerword/
 4. **Agent-Friendly Tooling Integration:**
    - Use the standard Model Context Protocol (MCP) Go SDK (`github.com/modelcontextprotocol/go-sdk`).
    - Treat external plugins as independent CLI processes communicating via standard I/O (stdio).
+5. **Centralized Capability Architecture:**
+   - Powerword is the sole repository for all shared AI capabilities (`pw-mcp-*` servers) inside the Borch-AI ecosystem. Sibling codebases (like Pithos and Kiln) must remain clean of low-level LLM client implementations or capability libraries. They consume these binaries as stdio subprocesses.
 
 ---
 
@@ -71,6 +73,7 @@ Powerword works in tandem with other applications (e.g., the Lamplighter dashboa
     - `github.com/modelcontextprotocol/go-sdk` (MCP)
     - `google.golang.org/api` (Gemini SDK)
     - `github.com/sashabaranov/go-openai` (OpenAI SDK)
+    - `github.com/anthropics/anthropic-sdk-go` (Anthropic SDK)
 
 ---
 

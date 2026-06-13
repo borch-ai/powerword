@@ -20,6 +20,8 @@ IMAGEGEN_PLUGIN=pw-mcp-imagegen
 KDP_MATH_PLUGIN=pw-mcp-kdp-math
 SEO_PLUGIN=pw-mcp-seo
 VIRAL_PLUGIN=pw-mcp-viral
+EPUB_PLUGIN=pw-mcp-epub
+PDFCHECK_PLUGIN=pw-mcp-pdfcheck
 CRITIC_PLUGIN=pw-mcp-critic
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
@@ -40,6 +42,8 @@ build:
 	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOBUILD) -o bin/$(SEO_PLUGIN) ./cmd/$(SEO_PLUGIN); fi
 	@if [ -d cmd/$(VIRAL_PLUGIN) ]; then $(GOBUILD) -o bin/$(VIRAL_PLUGIN) ./cmd/$(VIRAL_PLUGIN); fi
 	@if [ -d cmd/$(CRITIC_PLUGIN) ]; then $(GOBUILD) -o bin/$(CRITIC_PLUGIN) ./cmd/$(CRITIC_PLUGIN); fi
+	@if [ -d cmd/$(EPUB_PLUGIN) ]; then $(GOBUILD) -o bin/$(EPUB_PLUGIN) ./cmd/$(EPUB_PLUGIN); fi
+	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOBUILD) -o bin/$(PDFCHECK_PLUGIN) ./cmd/$(PDFCHECK_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -52,6 +56,8 @@ install:
 	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SEO_PLUGIN); fi
 	@if [ -d cmd/$(VIRAL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(VIRAL_PLUGIN); fi
 	@if [ -d cmd/$(CRITIC_PLUGIN) ]; then $(GOCMD) install ./cmd/$(CRITIC_PLUGIN); fi
+	@if [ -d cmd/$(EPUB_PLUGIN) ]; then $(GOCMD) install ./cmd/$(EPUB_PLUGIN); fi
+	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOCMD) install ./cmd/$(PDFCHECK_PLUGIN); fi
 
 install-hooks:
 	@echo "Installing git hooks..."

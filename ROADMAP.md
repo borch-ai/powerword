@@ -4,6 +4,18 @@ This roadmap defines the engineering journey to build **Powerword**, the vendor-
 
 ---
 
+## Ecosystem Context
+
+Powerword is the **infrastructure layer** of the Borch-AI publishing stack. It provides the MCP plugin network and shared Go packages (`pkg/llm`, `pkg/config`, `pkg/telemetry`) that all sibling projects consume.
+
+- **Pithos** imports `pkg/llm`, `pkg/telemetry`; invokes `pw-mcp-imagegen`, `pw-mcp-seo`, `pw-mcp-kdp-math` binaries.
+- **Kiln** invokes `pw-mcp-seo`, `pw-mcp-imagegen` directly; drives Pithos as a subprocess.
+- **Lamplighter** — future consumer of `pw-mcp-telemetry` for real-time cost dashboards.
+
+Powerword **does not depend on** any sibling project. Additions to this roadmap that are clearly domain-specific to publishing or kiln orchestration should be implemented here as MCP servers, then *consumed* by the appropriate sibling.
+
+---
+
 ## Phase 1: Foundation
 Focus: Bootstrapping the CLI application, establishing the LLM interface layer, and building a basic prompt-response stream.
 
@@ -76,6 +88,20 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.9: Google Doc MCP Plugin (GDoc)**
     *   Implement a native Go MCP server to create, read, and update Google Docs to export manuscripts for editing and import them back.
     *   [Implementation Plan](plans/phase_3/task_3_9_gdoc_mcp.md)
+*   [ ] **Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)**
+    *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.
+    *   [Implementation Plan](plans/phase_3/task_3_10_trends_mcp.md)
+*   [ ] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
+    *   Implement a native Go MCP server that invokes a local Typst binary to compile book manuscripts and illustration assets into print-ready PDFs conforming to KDP bleed/margin specs. Primary consumer: the Pithos `assemble` engine (Task 4.2). This unblocks Pithos Phase 4 which is currently stalled waiting for this server.
+    *   [Implementation Plan](plans/phase_3/task_3_11_typst_mcp.md)
+*   [ ] **Task 3.13: EPUB Publication Builder (`pw-mcp-epub`)**
+    *   Implement a native Go MCP server that compiles parodic manuscripts and illustration assets into spec-compliant EPUB digital publications. Primary consumer: Pithos (`digital-export`).
+    *   [Implementation Plan](plans/phase_3/task_3_13_epub_mcp.md)
+*   [ ] **Task 3.14: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
+    *   Implement a native Go MCP server to perform deep validation of compiled PDF book geometry, bleed limits, embedded fonts, and image resolution (minimum 300 DPI) against Amazon KDP paperback ingest rules. Primary consumer: Pithos (`assemble`).
+    *   [Implementation Plan](plans/phase_3/task_3_14_pdfcheck_mcp.md)
+
+
 
 ---
 
@@ -180,7 +206,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
     *   Introduce support for running agent loops in a completely isolated Git worktree, including copying/mounting uncommitted changes and selectively symlinking caches/dependencies to speed up builds.
     *   [Implementation Plan](plans/phase_6/task_6_13_isolated_worktrees.md)
 *   [ ] **Task 6.14: Publish Automated Binary Releases of MCP Plugins**
-    *   Extend the release CI workflow to compile and attach all MCP plugin binaries (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`) to GitHub Releases.
+    *   Extend the release CI workflow to compile and attach all MCP plugin binaries (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`, `pw-mcp-epub`, `pw-mcp-pdfcheck`) to GitHub Releases.
     *   [Implementation Plan](plans/phase_6/task_6_14_publish_mcp_releases.md)
 *   [x] **Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite**
     *   Implement a dedicated integration test suite using build tags (`//go:build integration`) to test the compiled binary CLI workflows, session file operations, and native stdio MCP plugin transport handshakes.
@@ -191,6 +217,9 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.17: Shared LLM Structured Outputs & Schema Enforcement**
     *   Enhance `pkg/llm` in Powerword to support first-class structured/schema constraints (e.g., OpenAI Structured Outputs and Gemini response schema). Provide standard option builders and type-safe translations in all client adapters.
     *   [Implementation Plan](plans/phase_6/task_6_17_llm_structured_outputs.md)
+*   [ ] **Task 6.18: Speculative — Pithos Pipeline MCP Server (`pw-mcp-pithos`)**
+    *   Wrap the Pithos book production pipeline behind a formal MCP server, enabling Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration). Not to be built until Pithos `deploy` is fully implemented.
+    *   [Implementation Plan](plans/phase_6/task_6_18_pithos_mcp_server.md)
 
 
 
