@@ -81,10 +81,10 @@ Compiles a single-page book cover with spine.
 
 ### Typst Template Generation
 
-#### [NEW] [template.go](file://../../internal/typst/template.go)
+#### [NEW] [template.go](file://../../internal/plugins/typst/template.go)
 Go `text/template` templates embedded via `go:embed` for both interior and cover layouts.
 
-#### [NEW] [compiler.go](file://../../internal/typst/compiler.go)
+#### [NEW] [compiler.go](file://../../internal/plugins/typst/compiler.go)
 ```go
 type Compiler struct {
     typstBin string
@@ -95,7 +95,7 @@ func (c *Compiler) Compile(ctx context.Context, templatePath, outputPath string)
 
 ### Tests
 
-#### [NEW] [typst](file://../../internal/typst)
+#### [NEW] [typst_test.go](file://../../internal/plugins/typst/typst_test.go)
 - Template generation produces valid `.typ` syntax.
 - Compiler integration test (`//go:build integration`) requires real `typst` binary.
 - Unit tests mock subprocess execution.

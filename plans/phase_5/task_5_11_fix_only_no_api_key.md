@@ -16,6 +16,11 @@ The root cause: `persistentPreRunE` in `pkg/config/root.go` calls `cfg.Validate(
 `review --fix`. The `--fix` execution path never touches the LLM, so the key
 requirement is spurious.
 
+## User Review Required
+
+> [!NOTE]
+> Moving `Validate()` calls from `PersistentPreRunE` into subcommand RunE methods that actually require LLM access.
+
 ## Root Cause
 
 ```
@@ -30,7 +35,7 @@ persistentPreRunE
 
 ### `pkg/config/root.go`
 
-#### [MODIFY] [root.go](file://../pkg/config/root.go)
+#### [MODIFY] [root.go](file://../../pkg/config/root.go)
 
 Add a `fixOnly` flag probe to `persistentPreRunE`. When the invoked command is
 `review` and the `--fix` flag is set without `--local` or `--issue`, skip
