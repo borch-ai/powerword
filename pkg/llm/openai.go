@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -119,7 +120,26 @@ func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools [
 		opt(cfg)
 	}
 
-	if cfg.ResponseMIMEType == "application/json" {
+	if cfg.ResponseSchema != nil {
+		var schemaMap map[string]any
+		schemaMap, err = generateJSONSchema(cfg.ResponseSchema)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate JSON schema: %w", err)
+		}
+		var schemaBytes []byte
+		schemaBytes, err = json.Marshal(schemaMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal JSON schema map: %w", err)
+		}
+		req.ResponseFormat = &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONSchema,
+			JSONSchema: &openai.ChatCompletionResponseFormatJSONSchema{
+				Name:   "structured_output",
+				Strict: true,
+				Schema: json.RawMessage(schemaBytes),
+			},
+		}
+	} else if cfg.ResponseMIMEType == "application/json" {
 		req.ResponseFormat = &openai.ChatCompletionResponseFormat{
 			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
 		}

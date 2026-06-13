@@ -17,10 +17,11 @@
 
 # Project-specific binaries
 /powerword
-/pw-mcp-fs
-/pw-mcp-git
-/pw-mcp-shell
+/pw-mcp-*
 /bin/
+cmd/powerword/powerword
+cmd/pw-mcp-*/pw-mcp-*
+
 
 # IDEs/Editors configuration
 .idea/

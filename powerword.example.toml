@@ -1,5 +1,5 @@
 model = "claude-sonnet-4-6"
-disable_critic = true
+enable_critic = false
 
 [servers.kdp_math]
    command = "go"

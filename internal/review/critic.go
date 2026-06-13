@@ -104,7 +104,7 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 	validationCmd := ""
 	if checkMakefileExists() {
 		validationCmd = "make all"
-		if cfg.DisableCritic {
+		if !cfg.EnableCritic {
 			fmt.Println("Running local validation (make all) directly...")
 		} else {
 			fmt.Println("Running local validation (make all) via MCP pw-mcp-critic...")
@@ -113,7 +113,7 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 		fmt.Println("No Makefile found, skipping local validation")
 	}
 
-	if cfg.DisableCritic {
+	if !cfg.EnableCritic {
 		fmt.Println("Critic LLM review is disabled in config. Skipping LLM review.")
 		if validationCmd != "" {
 			fields := strings.Fields(validationCmd)

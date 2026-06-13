@@ -54,6 +54,7 @@ func TestParseIssueBody_Empty(t *testing.T) {
 
 func newTestConfig(endpoint string, gitDiffVal string, openAIKey string) *config.Config {
 	return &config.Config{
+		EnableCritic:   true,
 		CriticProvider: "openai",
 		CriticModel:    "gpt-4",
 		CriticEndpoint: endpoint,
@@ -428,7 +429,7 @@ func TestVerifyWorkspace_CriticServerConfigFallback(t *testing.T) {
 	_ = VerifyWorkspace(context.Background(), plan, cfg)
 }
 
-func TestVerifyWorkspace_DisableCritic(t *testing.T) {
+func TestVerifyWorkspace_EnableCriticFalse(t *testing.T) {
 	origExec := execCommand
 	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "make" {
@@ -440,7 +441,7 @@ func TestVerifyWorkspace_DisableCritic(t *testing.T) {
 
 	plan := &Plan{Goal: "test"}
 	cfg := &config.Config{
-		DisableCritic: true,
+		EnableCritic: false,
 	}
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)
@@ -449,7 +450,7 @@ func TestVerifyWorkspace_DisableCritic(t *testing.T) {
 	}
 }
 
-func TestVerifyWorkspace_DisableCritic_ValidationFails(t *testing.T) {
+func TestVerifyWorkspace_EnableCriticFalse_ValidationFails(t *testing.T) {
 	origExec := execCommand
 	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "make" {
@@ -462,7 +463,7 @@ func TestVerifyWorkspace_DisableCritic_ValidationFails(t *testing.T) {
 
 	plan := &Plan{Goal: "test"}
 	cfg := &config.Config{
-		DisableCritic: true,
+		EnableCritic: false,
 	}
 
 	err := VerifyWorkspace(context.Background(), plan, cfg)

@@ -130,7 +130,20 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	if cfg.ResponseMIMEType != "" {
+	if cfg.ResponseSchema != nil {
+		var schemaMap map[string]any
+		schemaMap, err = generateJSONSchema(cfg.ResponseSchema)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate JSON schema: %w", err)
+		}
+		var convertedSchema *genai.Schema
+		convertedSchema, err = convertSchema(schemaMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert JSON schema to Gemini Schema: %w", err)
+		}
+		model.ResponseMIMEType = "application/json"
+		model.ResponseSchema = convertedSchema
+	} else if cfg.ResponseMIMEType != "" {
 		model.ResponseMIMEType = cfg.ResponseMIMEType
 	}
 

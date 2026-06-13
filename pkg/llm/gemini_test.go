@@ -483,3 +483,110 @@ func TestGeminiClient_Generate_JSONMode(t *testing.T) {
 		t.Fatal("timeout waiting for request to be captured")
 	}
 }
+
+func TestGeminiClient_Generate_WithResponseSchema(t *testing.T) {
+	capturedChan := make(chan map[string]any, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		var capturedPayload map[string]any
+		if err == nil {
+			_ = json.Unmarshal(body, &capturedPayload)
+		}
+		capturedChan <- capturedPayload
+
+		resp := []any{
+			map[string]any{
+				"candidates": []any{
+					map[string]any{
+						"content": map[string]any{
+							"parts": []any{
+								map[string]any{
+									"text": `{"field": "test"}`,
+								},
+							},
+							"role": "model",
+						},
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type SchemaType struct {
+		Field string `json:"field"`
+	}
+
+	messages := []Message{
+		{Role: RoleUser, Content: "Hello"},
+	}
+
+	_, err = client.Generate(context.Background(), messages, nil, WithResponseSchema(&SchemaType{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case capturedPayload := <-capturedChan:
+		checkGeminiResponseSchemaPayload(t, capturedPayload)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for request to be captured")
+	}
+}
+
+func checkGeminiResponseSchemaPayload(t *testing.T, capturedPayload map[string]any) {
+	t.Helper()
+	genCfg, ok := capturedPayload["generationConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("generationConfig not found in payload: %+v", capturedPayload)
+	}
+	mimeType, ok := genCfg["responseMimeType"].(string)
+	if !ok || mimeType != "application/json" {
+		t.Errorf("expected responseMimeType to be 'application/json', got %v", mimeType)
+	}
+	respSchema, ok := genCfg["responseSchema"].(map[string]any)
+	if !ok {
+		t.Fatal("responseSchema not found in generationConfig")
+	}
+	if tVal, okType := respSchema["type"].(float64); !okType || tVal != 6 {
+		t.Errorf("expected type to be 6 (TypeObject), got %v", respSchema["type"])
+	}
+	properties, ok := respSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("properties not found in responseSchema")
+	}
+	fieldSchema, ok := properties["field"].(map[string]any)
+	if !ok {
+		t.Fatal("field not found in properties")
+	}
+	if tVal, okType := fieldSchema["type"].(float64); !okType || tVal != 1 {
+		t.Errorf("expected type to be 1 (TypeString), got %v", fieldSchema["type"])
+	}
+}
+
+func TestGeminiClient_Generate_WithResponseSchema_Error(t *testing.T) {
+	opts := []option.ClientOption{
+		option.WithAPIKey("dummy-key"),
+	}
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch := make(chan int)
+	_, err = client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil, WithResponseSchema(ch))
+	if err == nil {
+		t.Fatal("expected error for unsupported schema type, got nil")
+	}
+}
