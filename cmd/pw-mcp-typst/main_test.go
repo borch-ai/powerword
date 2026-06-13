@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +17,17 @@ import (
 
 	"github.com/borch-ai/powerword/pkg/config"
 )
+
+func createTinyPNG(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{255, 0, 0, 255})
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("failed to encode png: %v", err)
+	}
+	return buf.Bytes()
+}
 
 func assertResponse(t *testing.T, res *mcp.CallToolResult, wantError bool, wantSubstr string) {
 	t.Helper()
@@ -211,13 +226,9 @@ Prompt 1
 	if err := os.Mkdir(imagesDir, 0700); err != nil {
 		t.Fatalf("failed to create images dir: %v", err)
 	}
-	realPNG, err := os.ReadFile("/Users/human/code/pithos/books/red-riding-hood/images/page_1.png")
-	if err != nil {
-		t.Fatalf("failed to read source png: %v", err)
-	}
+	realPNG := createTinyPNG(t)
 	//nolint:gosec // paths are generated safely in tempDir
-	err = os.WriteFile(filepath.Join(imagesDir, "page_1.png"), realPNG, 0600)
-	if err != nil {
+	if err := os.WriteFile(filepath.Join(imagesDir, "page_1.png"), realPNG, 0600); err != nil {
 		t.Fatalf("failed to write mock image: %v", err)
 	}
 
@@ -254,13 +265,9 @@ func TestTypst_MCP_CompileCoverSuccess(t *testing.T) {
 
 	tempDir := t.TempDir()
 	frontImgPath := filepath.Join(tempDir, "front.png")
-	realPNG, err := os.ReadFile("/Users/human/code/pithos/books/red-riding-hood/images/page_1.png")
-	if err != nil {
-		t.Fatalf("failed to read source png: %v", err)
-	}
+	realPNG := createTinyPNG(t)
 	//nolint:gosec // paths are generated safely in tempDir
-	err = os.WriteFile(frontImgPath, realPNG, 0600)
-	if err != nil {
+	if err := os.WriteFile(frontImgPath, realPNG, 0600); err != nil {
 		t.Fatalf("failed to write mock image: %v", err)
 	}
 
@@ -350,13 +357,9 @@ Prompt 1
 	if err := os.Mkdir(imagesDir, 0700); err != nil {
 		t.Fatalf("failed to create images dir: %v", err)
 	}
-	realPNG, err := os.ReadFile("/Users/human/code/pithos/books/red-riding-hood/images/page_1.png")
-	if err != nil {
-		t.Fatalf("failed to read source png: %v", err)
-	}
+	realPNG := createTinyPNG(t)
 	//nolint:gosec // paths are generated safely in tempDir
-	err = os.WriteFile(filepath.Join(imagesDir, "page_1.png"), realPNG, 0600)
-	if err != nil {
+	if err := os.WriteFile(filepath.Join(imagesDir, "page_1.png"), realPNG, 0600); err != nil {
 		t.Fatalf("failed to write image: %v", err)
 	}
 
@@ -403,13 +406,9 @@ func TestIntegrationTypst_MCP_CompileCover(t *testing.T) {
 
 	tempDir := t.TempDir()
 	frontImgPath := filepath.Join(tempDir, "front.png")
-	realPNG, err := os.ReadFile("/Users/human/code/pithos/books/red-riding-hood/images/page_1.png")
-	if err != nil {
-		t.Fatalf("failed to read source png: %v", err)
-	}
+	realPNG := createTinyPNG(t)
 	//nolint:gosec // paths are generated safely in tempDir
-	err = os.WriteFile(frontImgPath, realPNG, 0600)
-	if err != nil {
+	if err := os.WriteFile(frontImgPath, realPNG, 0600); err != nil {
 		t.Fatalf("failed to write image: %v", err)
 	}
 
