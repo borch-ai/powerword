@@ -96,7 +96,7 @@ const (
 				"description": "Font family name, default: 'Georgia'"
 			}
 		},
-		"required": ["manuscript_path", "images_dir", "output_path"]
+		"required": ["manuscript_path", "output_path"]
 	}`
 
 	compileCoverSchema = `{
@@ -147,7 +147,7 @@ const (
 	}`
 )
 
-func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) {
+func setupServer(workspaceRoot string, _ *config.Config) (*mcp.Server, error) {
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "pw-mcp-typst",
 		Version: "0.1.0",
@@ -200,9 +200,15 @@ func parseAndSanitizeInterior(compiler *typst.Compiler, args *interiorArgs) (*in
 	if err != nil {
 		return nil, fmt.Errorf("manuscript path error: %w", err)
 	}
-	absImages, err := compiler.CheckSandbox(args.ImagesDir)
-	if err != nil {
-		return nil, fmt.Errorf("images directory error: %w", err)
+	var absImages string
+	if !strings.HasSuffix(strings.ToLower(absManuscript), ".typ") {
+		if args.ImagesDir == "" {
+			return nil, fmt.Errorf("images directory is required for Markdown manuscripts")
+		}
+		absImages, err = compiler.CheckSandbox(args.ImagesDir)
+		if err != nil {
+			return nil, fmt.Errorf("images directory error: %w", err)
+		}
 	}
 	absOutput, err := compiler.CheckSandbox(args.OutputPath)
 	if err != nil {

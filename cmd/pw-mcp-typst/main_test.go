@@ -310,10 +310,9 @@ func TestTypst_MCP_CompileInteriorTypstSuccess(t *testing.T) {
 
 	args := fmt.Sprintf(`{
 		"manuscript_path": %q,
-		"images_dir": %q,
 		"output_path": %q,
 		"page_size": "8.5in,8.5in"
-	}`, manuscriptPath, tempDir, outputPath)
+	}`, manuscriptPath, outputPath)
 
 	res, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "compile_interior",
