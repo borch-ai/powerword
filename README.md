@@ -24,12 +24,11 @@ Powerword comes packaged with a suite of built-in, lightweight MCP servers compi
   - `pw-mcp-git` — Repository introspection, branch management, and diffing.
   - `pw-mcp-shell` — Sandboxed shell execution with safety parameters.
   - `pw-mcp-critic` — Workspace plan conformance and LLM review gate.
-- **Domain-Specific Capabilities (Completed & Bundled):**
+- **Domain-Specific Capabilities (Publishing & Intelligence):**
   - `pw-mcp-imagegen` — Multimodal AI asset generation (DALL-E 3, Imagen 3, Veo).
   - `pw-mcp-kdp-math` — Print margin, bleed, and spine calculations.
   - `pw-mcp-seo` — Kindle Direct Publishing (KDP) keyword, search, and catalog optimization tool.
   - `pw-mcp-viral` — ASMR audio narration synthesis and ffmpeg video trailer stitching.
-- **Planned / Backlog Capabilities (Active Roadmap):**
   - `pw-mcp-typst` — PDF interior and cover compilation via Typst layout compiler.
   - `pw-mcp-trends` — Autocomplete scraping and demand velocity keyword scoring.
   - `pw-mcp-epub` — Spec-compliant EPUB digital ebook formatting engine.
