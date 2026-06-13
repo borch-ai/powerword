@@ -682,3 +682,35 @@ func TestIsPathAbsolute_Windows(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePlans_GitIgnoredFileSuccess(t *testing.T) {
+	tmpDir := t.TempDir()
+	plansDir := filepath.Join(tmpDir, "plans")
+	if err := os.Mkdir(plansDir, 0750); err != nil {
+		t.Fatalf("failed to create plans dir: %v", err)
+	}
+
+	planContent := `# plan: Task 1.1: Test Plan
+**Status:** Open
+
+## User Review Required
+None.
+
+## Proposed Changes
+#### [MODIFY] [powerword.toml](file://../powerword.toml)
+- Edit it.
+
+## Verification Plan
+### Automated Tests
+- Run tests.
+`
+	if err := os.WriteFile(filepath.Join(plansDir, "task_1_1.md"), []byte(planContent), 0600); err != nil {
+		t.Fatalf("failed to write plan file: %v", err)
+	}
+
+	cfg := &config.Config{}
+	err := ValidatePlans(tmpDir, cfg)
+	if err != nil {
+		t.Errorf("expected no validation errors for ignored powerword.toml file, got: %v", err)
+	}
+}

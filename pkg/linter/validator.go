@@ -296,6 +296,25 @@ func validateSinglePlan(workspaceRoot string, planFile string, titleRegex *regex
 	return fileErrs
 }
 
+func isGitIgnoredOrOptional(path string) bool {
+	base := filepath.Base(path)
+	ignoredBases := map[string]bool{
+		"powerword.toml":       true,
+		"config.yaml":          true,
+		".env":                 true,
+		".powerword-critic.md": true,
+		"review_out.txt":       true,
+	}
+	if ignoredBases[base] {
+		return true
+	}
+	if strings.HasPrefix(base, ".env.") {
+		return true
+	}
+	return false
+}
+
+//nolint:gocognit,nestif
 func validateLink(workspaceRoot, planFile string, lineNum int, line string, label string, pathStr string, status *string) []string {
 	var errs []string
 
@@ -327,20 +346,24 @@ func validateLink(workspaceRoot, planFile string, lineNum int, line string, labe
 	}
 
 	if strings.Contains(line, "[MODIFY]") {
-		//nolint:gosec
-		if fi, err := os.Stat(absPath); err != nil {
-			errs = append(errs, fmt.Sprintf("%s:%d: modified file %q does not exist on disk", planFile, lineNum, absPath))
-		} else if fi.IsDir() {
-			errs = append(errs, fmt.Sprintf("%s:%d: modified path %q is a directory, not a file", planFile, lineNum, absPath))
+		if !isGitIgnoredOrOptional(absPath) {
+			//nolint:gosec
+			if fi, err := os.Stat(absPath); err != nil {
+				errs = append(errs, fmt.Sprintf("%s:%d: modified file %q does not exist on disk", planFile, lineNum, absPath))
+			} else if fi.IsDir() {
+				errs = append(errs, fmt.Sprintf("%s:%d: modified path %q is a directory, not a file", planFile, lineNum, absPath))
+			}
 		}
 	}
 
 	if strings.Contains(line, "[NEW]") && strings.ToLower(*status) == "completed" {
-		//nolint:gosec
-		if fi, err := os.Stat(absPath); err != nil {
-			errs = append(errs, fmt.Sprintf("%s:%d: completed new file %q does not exist on disk", planFile, lineNum, absPath))
-		} else if fi.IsDir() {
-			errs = append(errs, fmt.Sprintf("%s:%d: completed new path %q is a directory, not a file", planFile, lineNum, absPath))
+		if !isGitIgnoredOrOptional(absPath) {
+			//nolint:gosec
+			if fi, err := os.Stat(absPath); err != nil {
+				errs = append(errs, fmt.Sprintf("%s:%d: completed new file %q does not exist on disk", planFile, lineNum, absPath))
+			} else if fi.IsDir() {
+				errs = append(errs, fmt.Sprintf("%s:%d: completed new path %q is a directory, not a file", planFile, lineNum, absPath))
+			}
 		}
 	}
 
