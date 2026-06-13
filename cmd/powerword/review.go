@@ -5,6 +5,7 @@ import (
 
 	"github.com/borch-ai/powerword/internal/review"
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/linter"
 
 	"github.com/spf13/cobra"
 )
@@ -47,7 +48,7 @@ func newReviewCmd() *cobra.Command {
 
 			if fixPlans {
 				cmd.Printf("Checking and auto-fixing absolute paths, labels, and metadata in plan files...\n")
-				fixedCount, err := review.FixAbsolutePathsInPlans(".", cfg)
+				fixedCount, err := linter.FixAbsolutePathsInPlans(".", cfg)
 				if err != nil {
 					return err
 				}

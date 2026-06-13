@@ -24,6 +24,7 @@ EPUB_PLUGIN=pw-mcp-epub
 PDFCHECK_PLUGIN=pw-mcp-pdfcheck
 CRITIC_PLUGIN=pw-mcp-critic
 TYPST_PLUGIN=pw-mcp-typst
+LINTER_PLUGIN=pw-mcp-linter
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -46,6 +47,7 @@ build:
 	@if [ -d cmd/$(EPUB_PLUGIN) ]; then $(GOBUILD) -o bin/$(EPUB_PLUGIN) ./cmd/$(EPUB_PLUGIN); fi
 	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOBUILD) -o bin/$(PDFCHECK_PLUGIN) ./cmd/$(PDFCHECK_PLUGIN); fi
 	@if [ -d cmd/$(TYPST_PLUGIN) ]; then $(GOBUILD) -o bin/$(TYPST_PLUGIN) ./cmd/$(TYPST_PLUGIN); fi
+	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOBUILD) -o bin/$(LINTER_PLUGIN) ./cmd/$(LINTER_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -61,6 +63,7 @@ install:
 	@if [ -d cmd/$(EPUB_PLUGIN) ]; then $(GOCMD) install ./cmd/$(EPUB_PLUGIN); fi
 	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOCMD) install ./cmd/$(PDFCHECK_PLUGIN); fi
 	@if [ -d cmd/$(TYPST_PLUGIN) ]; then $(GOCMD) install ./cmd/$(TYPST_PLUGIN); fi
+	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOCMD) install ./cmd/$(LINTER_PLUGIN); fi
 
 install-hooks:
 	@echo "Installing git hooks..."
@@ -80,7 +83,7 @@ check-coverage: test
 	$(GOCMD) run ./cmd/powerword check-coverage $(MIN_COVERAGE) coverage.out
 
 markdown-lint:
-	$(GOCMD) run scripts/lint_markdown/main.go
+	$(GOCMD) run ./cmd/powerword lint-plans
 
 fix-plans:
 	$(GOCMD) run ./cmd/powerword review --local --fix

@@ -13,6 +13,7 @@ import (
 
 	internalmcp "github.com/borch-ai/powerword/internal/mcp"
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/linter"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -97,7 +98,7 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 		return errors.New("VerifyWorkspace requires non-nil plan and cfg")
 	}
 
-	if err := ValidatePlans(".", cfg); err != nil {
+	if err := linter.ValidatePlans(".", cfg); err != nil {
 		return err
 	}
 

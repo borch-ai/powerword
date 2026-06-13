@@ -26,7 +26,7 @@ To make this automated for developers, we will also add a `fix-plans` target to 
 
 ### Review Subsystem
 
-#### [MODIFY] [validator.go](file://../../internal/review/validator.go)
+#### [MODIFY] [validator.go](file://../../pkg/linter/validator.go)
 - Implement `isPathAbsolute(pathStr string) bool` to check if a resolved link path is absolute.
 - In `validateLink`, add a check using `isPathAbsolute`:
   ```go
@@ -48,7 +48,7 @@ To make this automated for developers, we will also add a `fix-plans` target to 
   - Writes the modified file back to disk if any changes were made.
   - Returns the total count of modifications made across all plan files.
 
-#### [MODIFY] [validator_test.go](file://../../internal/review/validator_test.go)
+#### [MODIFY] [validator_test.go](file://../../pkg/linter/validator_test.go)
 - Update existing tests (e.g., `TestValidatePlans_CopilotComments`) since they might contain mock absolute paths that would now fail validation.
 - Add a new unit test `TestValidatePlans_AbsoluteLinksError` to verify that absolute links are correctly caught and flagged.
 - Add a unit test `TestFixAbsolutePathsInPlans` to verify that:

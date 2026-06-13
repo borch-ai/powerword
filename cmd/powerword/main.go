@@ -15,6 +15,8 @@ func main() {
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRunCmd())
 	rootCmd.AddCommand(newCheckCoverageCmd())
+	rootCmd.AddCommand(newLintPlansCmd())
+	rootCmd.AddCommand(newLintGoCmd())
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

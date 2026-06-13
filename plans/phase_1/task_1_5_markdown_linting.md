@@ -26,18 +26,18 @@ Establish continuous integration gates to ensure all documentation files (.md) f
 
 ### Configuration & Scripters
 
-#### [NEW] [linter.go](file://../../internal/linter/linter.go)
+#### [NEW] [linter.go](file://../../pkg/linter/linter.go)
 - Core Go-native logic for checking basic Markdown formatting:
   - `MD024` (Duplicate headers): Enabled to prevent duplicate header strings within the same file.
   - `MD029` (Ordered list prefix): Standardized to use `1.` style prefixes or sequential prefixes starting from 1.
   - Skips text within code blocks to prevent false positives.
 - Core Go-native logic for checking plan files under `plans/` for required template headings.
 
-#### [NEW] [linter_test.go](file://../../internal/linter/linter_test.go)
+#### [NEW] [linter_test.go](file://../../pkg/linter/linter_test.go)
 - Comprehensive unit tests covering header duplicates, nested lists, list resets, style violations, and plan templates.
 - Enforces strict coverage threshold.
 
-#### [NEW] [main.go](file://../../scripts/lint_markdown/main.go) <!-- markdown -->
+#### [DELETE] [main.go](file://../../scripts/lint_markdown/main.go) <!-- markdown -->
 - Walks the project directory and checks all markdown files with `linter.LintMarkdown`.
 
 #### [NEW] [main.go](file://../../scripts/lint_plans/main.go)

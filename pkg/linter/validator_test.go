@@ -1,4 +1,4 @@
-package review
+package linter
 
 import (
 	"os"
@@ -601,7 +601,7 @@ go 1.25.3
 **Unit Test Coverage:** 92%
 
 ## Proposed Changes
-#### [MODIFY] [wrong_label.go](file:///` + strings.ReplaceAll(dummyFile, "\\", "/") + `)
+#### [MODIFY] [my_file.go](file:///` + strings.ReplaceAll(dummyFile, "\\", "/") + `)
 - Edit it.
 #### [NEW] [my_file.go](../my_file.go)
 - Edit it.
