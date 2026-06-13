@@ -32,10 +32,10 @@ Integrate plan template and relative link conformance checks directly into the `
 
 ### Review Subsystem
 
-#### [NEW] [default_template.md](file://../../internal/review/default_template.md)
+#### [NEW] [default_template.md](file://../../pkg/linter/default_template.md)
 - Define a generic default implementation plan template to embed.
 
-#### [NEW] [validator.go](file://../../internal/review/validator.go)
+#### [NEW] [validator.go](file://../../pkg/linter/validator.go)
 - Use `//go:embed default_template.md` to embed the generic fallback template.
 - Implement `ValidatePlans(workspaceRoot string, cfg *config.Config) error` which:
   1. Resolves the active template text using the resolution order (workspace file -> global config path -> embedded fallback).

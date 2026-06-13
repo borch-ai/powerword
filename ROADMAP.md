@@ -200,14 +200,14 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.11: Generalized MCP Critic Server**
     *   Refactor the existing Powerword Local Critic subsystem into a standalone, generalized Model Context Protocol (MCP) server (pw-mcp-critic) to be shared across projects.
     *   [Implementation Plan](plans/phase_6/task_6_11_critic_mcp.md)
-*   [ ] **Task 6.12: Speculative: Standalone Plan Linter Subcommand & MCP Tool**
-    *   Expose the local plan template validation and relative link conformance checks as a standalone CLI subcommand (e.g. powerword lint-plans) and package it as an independent MCP tool, enabling external CI processes or coding agents to validate plans interactively before submission.
+*   [ ] **Task 6.12: Standalone Linter Suite (CLI, `pw-mcp-linter`)**
+    *   Promote `internal/linter` to `pkg/linter` (public). Add `powerword lint-plans` and `powerword lint-go` subcommands. Build `pw-mcp-linter` as a standalone MCP server exposing a `lint_plans` tool that returns structured JSON errors, allowing autonomous agents to run cheap pre-flight plan checks.
     *   [Implementation Plan](plans/phase_6/task_6_12_standalone_plan_linter.md)
 *   [ ] **Task 6.13: Isolated Execution via Git Worktrees**
     *   Introduce support for running agent loops in a completely isolated Git worktree, including copying/mounting uncommitted changes and selectively symlinking caches/dependencies to speed up builds.
     *   [Implementation Plan](plans/phase_6/task_6_13_isolated_worktrees.md)
 *   [ ] **Task 6.14: Publish Automated Binary Releases of MCP Plugins**
-    *   Extend the release CI workflow to compile and attach all MCP plugin binaries (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`, `pw-mcp-epub`, `pw-mcp-pdfcheck`) to GitHub Releases.
+    *   Extend the release CI workflow to compile and attach all MCP plugin binaries (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`, `pw-mcp-epub`, `pw-mcp-pdfcheck`, `pw-mcp-linter`) to GitHub Releases.
     *   [Implementation Plan](plans/phase_6/task_6_14_publish_mcp_releases.md)
 *   [x] **Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite**
     *   Implement a dedicated integration test suite using build tags (`//go:build integration`) to test the compiled binary CLI workflows, session file operations, and native stdio MCP plugin transport handshakes.
@@ -224,6 +224,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)**
     *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.
     *   [Implementation Plan](plans/phase_6/task_6_19_trends_mcp.md)
+
 
 
 
