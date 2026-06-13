@@ -2,7 +2,7 @@
 
 **Status:** Open
 
-Extend the GitHub Actions release workflow in Powerword to compile, package, and publish the suite of native Go MCP servers (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`) along with the core `powerword` binary.
+Extend the GitHub Actions release workflow in Powerword to compile, package, and publish the suite of native Go MCP servers (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`, `pw-mcp-epub`, `pw-mcp-pdfcheck`) along with the core `powerword` binary.
 
 ## User Review Required
 

@@ -1,87 +1,111 @@
 
-# Powerword: Vendor-Agnostic Agentic CLI
+# Powerword: The AI Capability Layer for Automated Business Pipelines
 
 ## Overview
 
-Powerword is a lightweight, extensible command-line interface designed to bring vendor-agnostic, agentic systems engineering capabilities directly to the terminal. It acts as an intelligent command-line operations copilot, orchestrating communication between multiple Large Language Models (LLMs) and a decentralized ecosystem of infrastructure and operations tools utilizing the Model Context Protocol (MCP).
+Powerword is the **shared AI capability infrastructure** of the Borch-AI ecosystem. It is not a product — it is the engine room. Where Kiln orchestrates business decisions and Pithos runs production factories, Powerword provides the AI primitives both depend on: multi-provider LLM access, a growing library of native Go MCP plugins, and shared telemetry/cost accounting packages.
 
-Written entirely in Go, Powerword prioritizes execution speed, straightforward single-binary distribution, and high-performance concurrency suitable for local developer environments, staging bastions, and automated, headless CI/CD pipelines.
+Written entirely in Go, Powerword prioritizes performance, single-binary distribution, and high-concurrency execution suitable for interactive terminal use, headless CI/CD pipelines, and subprocess invocation from orchestrators like Kiln and Pithos.
+
+> [!NOTE]
+> Powerword serves two distinct consumers: (1) **Developers** — using `powerword` as an interactive agentic CLI copilot for engineering tasks; (2) **Borch-AI pipelines** — Kiln and Pithos consume `pw-mcp-*` plugins via MCP stdio as production AI capabilities. Both use cases are first-class.
+
+---
+
+## Ecosystem Position
+
+Powerword sits at the **base of the Borch-AI stack**. Everything above it is a consumer; Powerword depends on nothing within the ecosystem.
+
+```
+Kiln (intelligence + orchestration)
+  └── Pithos (book factory)
+        └── pw-mcp-imagegen  ─┐
+            pw-mcp-seo        ├── Powerword (AI capabilities)
+            pw-mcp-typst      │     ├── pkg/llm        (LLM abstraction)
+            pw-mcp-trends     │     ├── pkg/telemetry  (cost accounting)
+            pw-mcp-critic    ─┘     └── MCP plugin SDK
+```
+
+Powerword never imports Kiln or Pithos. They import Powerword.
+
+---
 
 ## Core Objectives
 
-1. **Vendor Independence:** Users should not be locked into a single model provider. Powerword supports configurable backends (Gemini, Claude, OpenAI) and local, self-hosted models (via Ollama or vLLM).
-2. **Standardized Extensibility:** Instead of a proprietary plugin system, Powerword leverages the open standard of the Model Context Protocol (MCP) to interact with local and remote systems.
-3. **Operations & Systems Automation:** The CLI goes beyond generic coding tasks. It supports targeted agentic reasoning loops (ReAct/Tool Calling) with a specialized suite of system, database, and cloud MCP tools to inspect cluster configurations, debug services, query DB states, and triage system errors.
-4. **Cloud-Native & Headless Execution:** Designed with a lightweight, zero-dependency architecture (ideal for staging environments or remote servers) that can run autonomously as part of automated CI/CD pipelines.
+1. **Vendor Independence**: Support Gemini, Claude, OpenAI, and local models (Ollama/vLLM) through a single `LLMClient` interface. No pipeline should be locked to a single provider.
+2. **MCP Plugin Ecosystem**: Every AI capability (image generation, SEO metadata, PDF layout, market intelligence) lives as an independent `pw-mcp-*` Go binary. No capability logic belongs in Kiln or Pithos.
+3. **Shared Cost Accounting**: All token consumption and API spend anywhere in the Borch-AI stack flows through `pkg/telemetry`. A single source of truth for pipeline economics.
+4. **Interactive Agentic CLI**: The `powerword` binary provides a general-purpose, vendor-agnostic agentic loop for developers — separate from, but architecturally identical to, the headless plugin invocations Kiln and Pithos perform.
+5. **Phase 7 Readiness**: As Kiln expands into multi-segment market intelligence, new `pw-mcp-*` plugins (`pw-mcp-trends`, `pw-mcp-typst`) must be built here before Kiln can consume them.
+
+---
 
 ## Architecture
 
-Powerword is divided into three primary components:
+### 1. The Core Interactive Loop (`cmd/powerword/`)
 
-### 1. The Core Shim (The Router & Loop)
+The `powerword` CLI binary — the developer-facing agentic copilot:
+- **LLM Abstraction** (`pkg/llm`): Uniform `Generate`/`Stream` interface over Gemini, Claude, OpenAI.
+- **Session Management**: Persistent conversation history with checkpoint/resume capability.
+- **MCP Client**: Dynamically loads and invokes `pw-mcp-*` plugins via stdio transport.
+- **Output Engine**: Streaming markdown rendering with syntax highlighting in the terminal.
 
-The main executable is a minimal Go application. Its primary responsibilities are:
+### 2. The MCP Plugin Library (`cmd/pw-mcp-*/`)
 
-* **State & Config Management:** Parsing user intents, managing API keys securely, and handling session state.
-* **The Execution Loop:** Managing the iterative process of sending prompts to the LLM, receiving tool-call requests, routing those requests to the appropriate MCP server, and returning the results to the LLM.
-* **LLM Abstraction Layer:** A unified Go interface masking the specific REST/gRPC implementations of the various model providers.
+Each plugin is an independent Go binary implementing the MCP server protocol. Plugins are invoked as subprocesses by any MCP client (Powerword, Pithos, or Kiln directly).
 
-### 2. The Plugin Layer (MCP Servers)
+**Current and planned plugins:**
 
-Tools and capabilities are decoupled from the core CLI. They operate as independent MCP servers.
+| Plugin | Purpose | Primary Consumer |
+|---|---|---|
+| `pw-mcp-imagegen` | DALL-E 3 image generation with style references | Pithos (`brew`), Kiln (validate cover) |
+| `pw-mcp-seo` | Amazon KDP keyword and A+ content generation | Kiln (`deploy`) |
+| `pw-mcp-kdp-math` | Print margin, spine, bleed calculations | Pithos (`assemble`) |
+| `pw-mcp-typst` | PDF layout via Typst compiler (Phase 3.11) | Pithos (`assemble`) |
+| `pw-mcp-trends` | Market demand signals: Amazon Autocomplete + SerpAPI (Phase 3.10) | Kiln (`scout`, Phase 7) |
+| `pw-mcp-critic` | LLM-powered diff review against implementation plans | Kiln, Pithos (pre-push hooks) |
+| `pw-mcp-fs` | File system read/write | `powerword` interactive |
+| `pw-mcp-git` | Git operations | `powerword` interactive |
 
-* Powerword utilizes `github.com/modelcontextprotocol/go-sdk` to manage the lifecycle and communication protocol (stdio or SSE) with these plugins.
-* While Powerword can interface with existing Node or Python MCP servers in the wild, the standard library of Powerword plugins will be implemented in Go to ensure high performance and lower memory overhead.
-* Examples: File system reader, Git integration, Kubernetes cluster introspection tool, or direct database connectors.
+### 3. Shared Packages (`pkg/`)
 
-### 3. The Output Engine
+- **`pkg/llm`**: Public, imported by Pithos and (via replace directive) Kiln. The LLM abstraction interface and all provider implementations.
+- **`pkg/telemetry`**: Token counting, cost tracking, and pipeline cost reporting. Shared by all tools.
 
-A robust formatting engine to render markdown, syntax-highlighted code, and structured data natively in the terminal without UI clutter.
+---
 
 ## Technology Stack
 
-* **Language:** Go (1.26+)
-* **CLI Framework:** `spf13/cobra` (Command routing) and `spf13/viper` (Configuration management).
-* **Tooling Protocol:** `github.com/modelcontextprotocol/go-sdk` for standardizing tool descriptions and executions.
-* **LLM SDKs:** Standard Go clients for targeted APIs (e.g., `google.golang.org/api`, `github.com/sashabaranov/go-openai`, etc.).
+| Layer | Technology |
+|---|---|
+| Language | Go 1.26+ |
+| CLI Framework | `spf13/cobra` + `spf13/viper` |
+| MCP Protocol | `github.com/modelcontextprotocol/go-sdk` |
+| LLM Providers | `github.com/google/generative-ai-go`, `github.com/sashabaranov/go-openai`, `github.com/anthropics/anthropic-sdk-go` |
+| Config | TOML via Viper, `~/.config/powerword/config.toml` |
+
+---
 
 ## Example Workflow
 
 ```bash
-# Execute a command using the default configured model (e.g., Gemini 1.5 Pro)
-$ powerword "Analyze the error logs in ./var/log and summarize the database connection failures."
+# Interactive developer use: analyze a codebase
+$ powerword "Review the error handling in ./internal/forge and identify any places where context cancellation isn't respected."
 
-# Core Shim Process:
-# 1. Powerword loads local MCP plugins (e.g., `pw-mcp-fs`).
-# 2. Transmits the user prompt + the schema of available MCP tools to the LLM.
-# 3. LLM requests to execute `pw-mcp-fs.read_directory(./var/log)`.
-# 4. Powerword routes the request via the go-sdk to the plugin, retrieves the text, and returns it to the LLM.
-# 5. LLM analyzes the context and streams the final markdown response to stdout.
+# Headless pipeline use (invoked by Kiln during deploy):
+$ echo '{"tool":"generate_kdp_metadata","args":{...}}' | pw-mcp-seo
 
+# Pre-push critic hook (invoked by Kiln/Pithos git hooks):
+$ pw-mcp-critic --plan plans/phase_2/task_2_1_amazon_autocomplete.md --diff <(git diff HEAD)
 ```
 
-## Roadmap
-
-**Phase 1: Foundation**
-
-* Establish the Cobra/Viper CLI structure.
-* Implement the LLM abstraction interface for at least two providers.
-* Build the basic interactive prompt and streaming response loop.
-
-**Phase 2: Protocol Integration**
-
-* Integrate `modelcontextprotocol/go-sdk` into the core loop.
-* Develop the transport layer to connect to external MCP servers via `stdio`.
-* Implement standard tool-calling translation logic (converting an LLM's specific tool-call JSON into standard MCP JSON-RPC).
-
-**Phase 3: The Go Plugin Ecosystem**
-
-* Author the first suite of native Go MCP servers (Local File System, Git basics, Shell execution execution with strict guardrails).
-* Implement a plugin registry or local manifest file to easily install/enable plugins.
-
-**Phase 4: Advanced Agentic Features**
-
-* Multi-model orchestration (e.g., using a fast local model for tool routing, and a large frontier model for complex reasoning).
-* Headless pipeline execution modes for CI/CD integration.
-
 ---
+
+## What Powerword Is Not
+
+- **Not a business orchestrator.** Kiln owns the pipeline decisions. Powerword provides the tools, not the strategy.
+- **Not a book factory.** Pithos owns production. Powerword provides the AI primitives Pithos uses.
+- **Not a single-vendor tool.** Every feature that works with Gemini must work with Claude and OpenAI.
+- **Not a monolith.** New capabilities always ship as a new `pw-mcp-*` plugin, never as additions to the core CLI binary.
+
+For the full ecosystem strategy, see Kiln's STRATEGY.md in the sibling Kiln repository.
