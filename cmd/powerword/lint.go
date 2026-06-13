@@ -168,11 +168,16 @@ func newLintGoCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+
 			// 1. Check if golangci-lint is installed
 			_, err := exec.LookPath("golangci-lint")
 			if err != nil {
 				cmd.Println("Warning: golangci-lint not found in PATH, running basic go vet...")
-				goCmd := exec.CommandContext(cmd.Context(), "go", "vet", "./...")
+				goCmd := exec.CommandContext(ctx, "go", "vet", "./...")
 				goCmd.Stdout = os.Stdout
 				goCmd.Stderr = os.Stderr
 				return goCmd.Run()
@@ -186,7 +191,7 @@ func newLintGoCmd() *cobra.Command {
 			defer cleanup()
 
 			// 3. Run golangci-lint
-			lintCtx, lintCancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
+			lintCtx, lintCancel := context.WithTimeout(ctx, 5*time.Minute)
 			defer lintCancel()
 
 			//nolint:gosec

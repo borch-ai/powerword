@@ -23,7 +23,7 @@ func TestCheckCoverageCmd_Success(t *testing.T) {
 
 	// Write valid statement referencing real validator.go file
 	content := "mode: set\n" +
-		"github.com/borch-ai/powerword/internal/review/validator.go:37.52,41.2 3 1\n"
+		"github.com/borch-ai/powerword/pkg/linter/validator.go:37.52,41.2 3 1\n"
 
 	if err := os.WriteFile(covFile, []byte(content), 0600); err != nil {
 		t.Fatalf("failed to write cover file: %v", err)

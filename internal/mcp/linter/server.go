@@ -29,6 +29,11 @@ const lintPlansSchema = `{
 	}
 }`
 
+var (
+	reLine   = regexp.MustCompile(`^(.*\.md):(\d+):\s*(.*)$`)
+	reNoLine = regexp.MustCompile(`^(.*\.md):\s*(.*)$`)
+)
+
 type lintPlansArgs struct {
 	WorkspaceRoot    string `json:"workspace_root"`
 	PlanTemplatePath string `json:"plan_template_path"`
@@ -115,9 +120,6 @@ func handleLintPlans(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallTo
 }
 
 func parseValidationError(errStr string) lintError {
-	reLine := regexp.MustCompile(`^(.*\.md):(\d+):\s*(.*)$`)
-	reNoLine := regexp.MustCompile(`^(.*\.md):\s*(.*)$`)
-
 	if matches := reLine.FindStringSubmatch(errStr); len(matches) > 3 {
 		file := matches[1]
 		line, _ := strconv.Atoi(matches[2])
