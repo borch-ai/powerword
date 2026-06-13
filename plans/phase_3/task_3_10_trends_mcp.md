@@ -19,7 +19,7 @@ Implement `pw-mcp-trends`, a native Go MCP server that provides market demand in
 
 ### New Binary: `cmd/pw-mcp-trends/`
 
-#### [NEW] [cmd/pw-mcp-trends/main.go](file://../../cmd/pw-mcp-trends/main.go)
+#### [NEW] [main.go](file://../../cmd/pw-mcp-trends/main.go)
 Standard MCP server entry point:
 ```go
 func main() {
@@ -57,7 +57,7 @@ func main() {
 
 ### `TrendSource` Interface
 
-#### [NEW] [internal/trends/source.go](file://../../internal/trends/source.go)
+#### [NEW] [source.go](file://../../internal/trends/source.go)
 ```go
 type TrendSource interface {
     Score(ctx context.Context, keyword string, limit int) ([]Candidate, error)
@@ -70,7 +70,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 
 ### Tests
 
-#### [NEW] [internal/trends/*_test.go](file://../../internal/trends/)
+#### [NEW] [trends](file://../../internal/trends)
 - Mock HTTP servers for Amazon and SerpAPI.
 - MCP tool handler tests with mock sources.
 - 91%+ coverage.

@@ -34,7 +34,7 @@ Implement `pw-mcp-typst`, a native Go MCP server that invokes a local Typst bina
 
 ### New Binary: `cmd/pw-mcp-typst/`
 
-#### [NEW] [cmd/pw-mcp-typst/main.go](file://../../cmd/pw-mcp-typst/main.go)
+#### [NEW] [main.go](file://../../cmd/pw-mcp-typst/main.go)
 Standard MCP server entry point registering two tools: `compile_interior` and `compile_cover`.
 
 ### MCP Tools
@@ -81,10 +81,10 @@ Compiles a single-page book cover with spine.
 
 ### Typst Template Generation
 
-#### [NEW] [internal/typst/template.go](file://../../internal/typst/template.go)
+#### [NEW] [template.go](file://../../internal/typst/template.go)
 Go `text/template` templates embedded via `go:embed` for both interior and cover layouts.
 
-#### [NEW] [internal/typst/compiler.go](file://../../internal/typst/compiler.go)
+#### [NEW] [compiler.go](file://../../internal/typst/compiler.go)
 ```go
 type Compiler struct {
     typstBin string
@@ -95,7 +95,7 @@ func (c *Compiler) Compile(ctx context.Context, templatePath, outputPath string)
 
 ### Tests
 
-#### [NEW] [internal/typst/*_test.go](file://../../internal/typst/)
+#### [NEW] [typst](file://../../internal/typst)
 - Template generation produces valid `.typ` syntax.
 - Compiler integration test (`//go:build integration`) requires real `typst` binary.
 - Unit tests mock subprocess execution.
