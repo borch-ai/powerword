@@ -88,10 +88,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.9: Google Doc MCP Plugin (GDoc)**
     *   Implement a native Go MCP server to create, read, and update Google Docs to export manuscripts for editing and import them back.
     *   [Implementation Plan](plans/phase_3/task_3_9_gdoc_mcp.md)
-*   [ ] **Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)**
-    *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.
-    *   [Implementation Plan](plans/phase_3/task_3_10_trends_mcp.md)
-*   [ ] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
+*   [x] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
     *   Implement a native Go MCP server that invokes a local Typst binary to compile book manuscripts and illustration assets into print-ready PDFs conforming to KDP bleed/margin specs. Primary consumer: the Pithos `assemble` engine (Task 4.2). This unblocks Pithos Phase 4 which is currently stalled waiting for this server.
     *   [Implementation Plan](plans/phase_3/task_3_11_typst_mcp.md)
 *   [ ] **Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)**
@@ -121,7 +118,7 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [ ] **Task 4.4: Cloud Orchestrator Plugin (AWS/GCP)**
     *   Create a lightweight Go MCP server to parse cloud console resource metadata (EC2/GCE states, cloud watch logs, storage buckets) to query deployment status.
     *   [Implementation Plan](plans/phase_4/task_4_4_cloud_mcp.md)
-*   [ ] **Task 4.5: Shareable Telemetry Subpackage Refactor**
+*   [x] **Task 4.5: Shareable Telemetry Subpackage Refactor**
     *   Refactor the telemetry and token cost accounting logic from `internal/llm/telemetry.go` to a dependency-free public package `pkg/telemetry`.
     *   Change the module name of `powerword` to `github.com/borch-ai/powerword` so it is importable.
     *   [Implementation Plan](plans/phase_4/task_4_5_telemetry_refactor.md)
@@ -161,6 +158,9 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [ ] **Task 5.10: Re-enable Local Critic (Ollama)**
     *   Re-enable the local critic LLM reviews configured with a local model run offline via Ollama, once the hardware is prepared.
     *   [Implementation Plan](plans/phase_5/task_5_10_reenable_local_critic.md)
+*   [ ] **Task 5.11: Allow `review --fix` Without an API Key**
+    *   `powerword review --fix` auto-corrects plan file formatting but currently fails with "no API keys found" even though no LLM call is made. Fix `persistentPreRunE` to skip `cfg.Validate()` for fix-only invocations; move API key validation into each subcommand's `RunE` at the point where LLM access is actually needed.
+    *   [Implementation Plan](plans/phase_5/task_5_11_fix_only_no_api_key.md)
 
 ---
 
@@ -173,7 +173,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.2: Token & Cost Budgeting Guardrails**
     *   Add user-defined dollar and token budget safety valves per session or loop to prevent runaway API spend.
     *   [Implementation Plan](plans/phase_6/task_6_2_token_budgets.md)
-*   [ ] **Task 6.3: Pause & Resume Session States**
+*   [x] **Task 6.3: Pause & Resume Session States**
     *   Introduce mechanisms to serialize execution frames, enabling manual user fixes before resuming a paused agent session.
     *   [Implementation Plan](plans/phase_6/task_6_3_session_resumability.md)
 *   [ ] **Task 6.4: Granular Tool Access Profiles**
@@ -221,6 +221,9 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.18: Speculative — Pithos Pipeline MCP Server (`pw-mcp-pithos`)**
     *   Wrap the Pithos book production pipeline behind a formal MCP server, enabling Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration). Not to be built until Pithos `deploy` is fully implemented.
     *   [Implementation Plan](plans/phase_6/task_6_18_pithos_mcp_server.md)
+*   [ ] **Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)**
+    *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.
+    *   [Implementation Plan](plans/phase_6/task_6_19_trends_mcp.md)
 
 
 
