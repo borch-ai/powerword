@@ -28,6 +28,16 @@ func newReviewCmd() *cobra.Command {
 				return fmt.Errorf("configuration not loaded")
 			}
 
+			// Validate flag conflicts early to avoid partial execution of plan fixes in invalid states.
+			if !listen {
+				if localOnly && issueID != "" {
+					return fmt.Errorf("cannot provide both --local and --issue flags")
+				}
+				if !fixPlans && !localOnly && issueID == "" {
+					return fmt.Errorf("either --issue or --local must be provided")
+				}
+			}
+
 			if fixPlans {
 				cmd.Printf("Checking and auto-fixing absolute paths, labels, and metadata in plan files...\n")
 				fixedCount, err := linter.FixAbsolutePathsInPlans(".", cfg)
@@ -54,13 +64,6 @@ func newReviewCmd() *cobra.Command {
 					return err
 				}
 				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
-			}
-
-			if !localOnly && issueID == "" {
-				return fmt.Errorf("either --issue or --local must be provided")
-			}
-			if localOnly && issueID != "" {
-				return fmt.Errorf("cannot provide both --local and --issue flags")
 			}
 
 			// Beyond this point, an LLM call will be made — validate API keys.

@@ -10,16 +10,8 @@ import (
 	"github.com/borch-ai/powerword/pkg/config"
 )
 
-func TestReviewCmd_FixOnlyNoAPIKey(t *testing.T) {
-	// 1. Set config.Active to a config with no API keys
-	origConfig := config.Active
-	config.Active = &config.Config{
-		APIKeys: config.APIKeys{},
-	}
-	defer func() { config.Active = origConfig }()
-
-	// 2. Create a temporary workspace directory to simulate a repo
-	tmpDir := t.TempDir()
+func setupMockWorkspace(t *testing.T, tmpDir string) string {
+	t.Helper()
 
 	// Write a mock go.mod so getGoVersionFromMod works
 	goModPath := filepath.Join(tmpDir, "go.mod")
@@ -64,6 +56,24 @@ func TestReviewCmd_FixOnlyNoAPIKey(t *testing.T) {
 		t.Fatalf("failed to write mock plan: %v", err)
 	}
 
+	return planPath
+}
+
+func TestReviewCmd_FixOnlyNoAPIKey(t *testing.T) {
+	origConfig := config.Active
+	defer func() { config.Active = origConfig }()
+
+	tmpDir := t.TempDir()
+
+	// Write a mock config file with no API keys
+	cfgFilePath := filepath.Join(tmpDir, "powerword.toml")
+	err := os.WriteFile(cfgFilePath, []byte("[api_keys]\n"), 0600)
+	if err != nil {
+		t.Fatalf("failed to write empty config: %v", err)
+	}
+
+	planPath := setupMockWorkspace(t, tmpDir)
+
 	// Save current working directory and change to tmpDir so review looks for plans in "."
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -75,14 +85,16 @@ func TestReviewCmd_FixOnlyNoAPIKey(t *testing.T) {
 	}
 	defer func() { _ = os.Chdir(cwd) }()
 
-	// 3. Create the command and run review --fix
-	cmd := newReviewCmd()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"--fix"})
+	// 3. Create the root command, register the review command, and execute review --fix
+	rootCmd := config.NewRootCmd()
+	rootCmd.AddCommand(newReviewCmd())
 
-	err = cmd.Execute()
+	buf := new(bytes.Buffer)
+	rootCmd.SetOut(buf)
+	rootCmd.SetErr(buf)
+	rootCmd.SetArgs([]string{"review", "--fix", "--config", cfgFilePath})
+
+	err = rootCmd.Execute()
 	if err != nil {
 		t.Fatalf("unexpected error executing review --fix: %v", err)
 	}
@@ -108,17 +120,21 @@ func TestReviewCmd_FixOnlyNoAPIKey(t *testing.T) {
 }
 
 func TestReviewCmd_LocalRequiresAPIKey(t *testing.T) {
-	// Set config.Active to a config with no API keys
 	origConfig := config.Active
-	config.Active = &config.Config{
-		APIKeys: config.APIKeys{},
-	}
 	defer func() { config.Active = origConfig }()
 
-	cmd := newReviewCmd()
-	cmd.SetArgs([]string{"--local"})
+	tmpDir := t.TempDir()
+	cfgFilePath := filepath.Join(tmpDir, "powerword.toml")
+	err := os.WriteFile(cfgFilePath, []byte("[api_keys]\n"), 0600)
+	if err != nil {
+		t.Fatalf("failed to write empty config: %v", err)
+	}
 
-	err := cmd.Execute()
+	rootCmd := config.NewRootCmd()
+	rootCmd.AddCommand(newReviewCmd())
+	rootCmd.SetArgs([]string{"review", "--local", "--config", cfgFilePath})
+
+	err = rootCmd.Execute()
 	if err == nil {
 		t.Fatalf("expected error due to missing API keys, got nil")
 	}
@@ -128,20 +144,21 @@ func TestReviewCmd_LocalRequiresAPIKey(t *testing.T) {
 }
 
 func TestReviewCmd_LocalWithAPIKey(t *testing.T) {
-	// Set config.Active to a config with API keys
 	origConfig := config.Active
-	config.Active = &config.Config{
-		APIKeys: config.APIKeys{
-			Gemini: "fake-key",
-		},
-	}
 	defer func() { config.Active = origConfig }()
 
-	// Assert that calling review --local fails on something other than API key validation
-	cmd := newReviewCmd()
-	cmd.SetArgs([]string{"--local"})
+	tmpDir := t.TempDir()
+	cfgFilePath := filepath.Join(tmpDir, "powerword.toml")
+	err := os.WriteFile(cfgFilePath, []byte("[api_keys]\ngemini = \"fake-key\"\n"), 0600)
+	if err != nil {
+		t.Fatalf("failed to write config with api key: %v", err)
+	}
 
-	err := cmd.Execute()
+	rootCmd := config.NewRootCmd()
+	rootCmd.AddCommand(newReviewCmd())
+	rootCmd.SetArgs([]string{"review", "--local", "--config", cfgFilePath})
+
+	err = rootCmd.Execute()
 	// It should NOT fail on config validation ("no API keys found")
 	if err != nil && strings.Contains(err.Error(), "no API keys found") {
 		t.Errorf("did not expect API key validation error, got: %v", err)
@@ -149,27 +166,30 @@ func TestReviewCmd_LocalWithAPIKey(t *testing.T) {
 }
 
 func TestReviewCmd_InvalidFlags(t *testing.T) {
-	// Set config.Active with valid API keys to pass config validation
 	origConfig := config.Active
-	config.Active = &config.Config{
-		APIKeys: config.APIKeys{
-			Gemini: "fake-key",
-		},
-	}
 	defer func() { config.Active = origConfig }()
 
+	tmpDir := t.TempDir()
+	cfgFilePath := filepath.Join(tmpDir, "powerword.toml")
+	err := os.WriteFile(cfgFilePath, []byte("[api_keys]\ngemini = \"fake-key\"\n"), 0600)
+	if err != nil {
+		t.Fatalf("failed to write config with api key: %v", err)
+	}
+
 	// 1. Missing both local and issue
-	cmd1 := newReviewCmd()
-	cmd1.SetArgs([]string{})
-	err1 := cmd1.Execute()
+	rootCmd1 := config.NewRootCmd()
+	rootCmd1.AddCommand(newReviewCmd())
+	rootCmd1.SetArgs([]string{"review", "--config", cfgFilePath})
+	err1 := rootCmd1.Execute()
 	if err1 == nil || !strings.Contains(err1.Error(), "either --issue or --local must be provided") {
 		t.Errorf("expected 'either --issue or --local must be provided', got %v", err1)
 	}
 
 	// 2. Both local and issue provided
-	cmd2 := newReviewCmd()
-	cmd2.SetArgs([]string{"--local", "--issue", "123"})
-	err2 := cmd2.Execute()
+	rootCmd2 := config.NewRootCmd()
+	rootCmd2.AddCommand(newReviewCmd())
+	rootCmd2.SetArgs([]string{"review", "--local", "--issue", "123", "--config", cfgFilePath})
+	err2 := rootCmd2.Execute()
 	if err2 == nil || !strings.Contains(err2.Error(), "cannot provide both --local and --issue flags") {
 		t.Errorf("expected 'cannot provide both --local and --issue flags', got %v", err2)
 	}
