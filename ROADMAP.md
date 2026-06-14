@@ -191,8 +191,8 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.8: Inline Graphics Rendering**
     *   Integrate Kitty, iTerm2, and Sixel protocols to render generated graphics (images/plots) directly within supported terminal sessions.
     *   [Implementation Plan](plans/phase_6/task_6_8_terminal_graphics.md)
-*   [ ] **Task 6.9: Rich Interactive Consent TUI**
-    *   Replace standard shell prompts with a Bubbletea-based terminal interface detailing tool calls and risk profiles.
+*   [ ] **Task 6.9: Rich Interactive Consent TUI & Remote Approvals**
+    *   Replace standard shell prompts with a Bubbletea-based terminal interface detailing tool calls and risk profiles. Integrate Firebase RTDB remote consent signaling `/tunnels/{tunnelId}/approval` to support mobile biometric approval handshakes from Lamplighter.
     *   [Implementation Plan](plans/phase_6/task_6_9_interactive_consent_tui.md)
 *   [ ] **Task 6.10: Headless JSON Envelopes & PR Review Mode**
     *   Standardize structured JSON outputs for CI integration and build webhooks to orchestrate inline PR comment review loops.

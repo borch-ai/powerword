@@ -19,6 +19,10 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("configuration not loaded")
 			}
 
+			if err := cfg.Validate(); err != nil {
+				return err
+			}
+
 			prompt := ""
 			if len(args) > 0 {
 				prompt = args[0]

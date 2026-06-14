@@ -24,7 +24,9 @@ Configure a structured GitHub Issue Form template for project plans, and impleme
 
 ### GitHub Issue Templates
 
-#### [NEW] [implementation-plan.yml](file://../../.github/ISSUE_TEMPLATE/implementation-plan.yml)
+#### [MOVED] implementation-plan.yml → borch-ai/.github
+- Originally created at `.github/ISSUE_TEMPLATE/implementation-plan.yml` in the powerword repo.
+- Subsequently moved to the `borch-ai/.github` org repository where it is inherited automatically by all borch-ai repos. No longer exists in this repo.
 - Define a structured YAML-based GitHub Issue Form. This ensures that when a new plan is created as an issue, it has distinct, parseable sections:
   ```yaml
   name: Implementation Plan

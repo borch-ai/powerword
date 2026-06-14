@@ -28,6 +28,19 @@ func newReviewCmd() *cobra.Command {
 				return fmt.Errorf("configuration not loaded")
 			}
 
+			if fixPlans {
+				cmd.Printf("Checking and auto-fixing absolute paths, labels, and metadata in plan files...\n")
+				fixedCount, err := linter.FixAbsolutePathsInPlans(".", cfg)
+				if err != nil {
+					return err
+				}
+				cmd.Printf("Auto-fix complete. Modified %d plan file(s).\n", fixedCount)
+				// If --fix was the only flag, we're done — no LLM step needed.
+				if !localOnly && issueID == "" && !listen {
+					return nil
+				}
+			}
+
 			if listen {
 				listenPort := port
 				if listenPort == 0 {
@@ -35,6 +48,10 @@ func newReviewCmd() *cobra.Command {
 					if listenPort == 0 {
 						listenPort = 8080
 					}
+				}
+				// Beyond this point, LLM calls or webhook handlers will be executed — validate API keys.
+				if err := cfg.Validate(); err != nil {
+					return err
 				}
 				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
 			}
@@ -46,13 +63,9 @@ func newReviewCmd() *cobra.Command {
 				return fmt.Errorf("cannot provide both --local and --issue flags")
 			}
 
-			if fixPlans {
-				cmd.Printf("Checking and auto-fixing absolute paths, labels, and metadata in plan files...\n")
-				fixedCount, err := linter.FixAbsolutePathsInPlans(".", cfg)
-				if err != nil {
-					return err
-				}
-				cmd.Printf("Auto-fix complete. Modified %d plan file(s).\n", fixedCount)
+			// Beyond this point, an LLM call will be made — validate API keys.
+			if err := cfg.Validate(); err != nil {
+				return err
 			}
 
 			var plan *review.Plan

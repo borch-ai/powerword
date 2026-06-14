@@ -10,6 +10,10 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 > **Standalone Repository Creation**:
 > This task involves setting up a brand new Git repository `github.com/borch-ai/mcp-telemetry` to build the `pw-mcp-telemetry` binary.
 
+> [!NOTE]
+> **Lamplighter Telemetry Compatibility**:
+> The JSON-RPC tool returns from `pw-mcp-telemetry` (specifically token counts and estimated costs) will conform to Lamplighter's signaling payload requirements (`input_tokens`, `output_tokens`, `estimated_cost`, `daily_quota_cap`). This allows Powerword (or wrapping IDE extensions) to cleanly serialize and publish these metrics directly to the Firebase Realtime Database at `/tunnels/{tunnelId}/telemetry`.
+
 ---
 
 ## Proposed Changes
