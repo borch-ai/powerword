@@ -45,9 +45,9 @@ func newReviewCmd() *cobra.Command {
 				listenPort := port
 				if listenPort == 0 {
 					listenPort = cfg.WebhookPort
-					if listenPort == 0 {
-						listenPort = 8080
-					}
+				}
+				if listenPort == 0 {
+					listenPort = 8080
 				}
 				// Beyond this point, LLM calls or webhook handlers will be executed — validate API keys.
 				if err := cfg.Validate(); err != nil {

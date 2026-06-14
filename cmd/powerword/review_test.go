@@ -97,6 +97,7 @@ func TestReviewCmd_FixOnlyNoAPIKey(t *testing.T) {
 	}
 
 	// Verify the file was modified to relative path
+	//nolint:gosec
 	fixedContent, err := os.ReadFile(planPath)
 	if err != nil {
 		t.Fatalf("failed to read fixed plan: %v", err)
