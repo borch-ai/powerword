@@ -3,6 +3,7 @@ package epub
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -383,6 +384,28 @@ func TestCompileEPUB_BadStylesheet(t *testing.T) {
 	err := CompileEPUB(context.Background(), opts)
 	if err == nil {
 		t.Error("expected error for non-existent stylesheet, got nil")
+	}
+}
+
+func TestCompileEPUB_ContextCancelled(t *testing.T) {
+	tempDir := t.TempDir()
+	opts := CompileOpts{
+		ManuscriptPath: filepath.Join(tempDir, "manuscript.md"),
+		OutputPath:     filepath.Join(tempDir, "output.epub"),
+		Title:          "Title",
+		Author:         "Author",
+	}
+	_ = os.WriteFile(opts.ManuscriptPath, []byte("# Chapter 1\nContent"), 0600)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	err := CompileEPUB(ctx, opts)
+	if err == nil {
+		t.Error("expected context canceled error, got nil")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected error to be context.Canceled, got: %v", err)
 	}
 }
 

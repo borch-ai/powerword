@@ -60,6 +60,12 @@ func TestValidateBaseURL(t *testing.T) {
 			defaultValue: "https://default.com",
 			want:         "https://default.com",
 		},
+		{
+			name:         "unsafe scheme URL",
+			envURL:       "file://localhost/path",
+			defaultValue: "https://default.com",
+			want:         "https://default.com",
+		},
 	}
 
 	for _, tc := range tests {

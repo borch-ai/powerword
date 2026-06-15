@@ -81,7 +81,7 @@ func TestEpub_MCP_CompileEpub(t *testing.T) {
 	session, ctx, cleanup := startTestServer(t, tempDir)
 	defer cleanup()
 
-	// Test successful compilation
+	// Test successful compilation with images_dir
 	argsJSON := fmt.Sprintf(`{
 		"manuscript_path": %q,
 		"images_dir": %q,
@@ -98,6 +98,42 @@ func TestEpub_MCP_CompileEpub(t *testing.T) {
 		t.Fatalf("CallTool failed: %v", err)
 	}
 	assertResponse(t, res, false, "successfully compiled EPUB")
+
+	// Test successful compilation without images_dir (optional)
+	argsNoImagesJSON := fmt.Sprintf(`{
+		"manuscript_path": %q,
+		"images_dir": "",
+		"output_path": %q,
+		"title": "My Book",
+		"author": "Me"
+	}`, manuscriptPath, outputPath)
+
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "compile_epub",
+		Arguments: json.RawMessage(argsNoImagesJSON),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, res, false, "successfully compiled EPUB")
+
+	// Test path traversal sandbox validation
+	sandboxArgsJSON := fmt.Sprintf(`{
+		"manuscript_path": "../outside.md",
+		"images_dir": "",
+		"output_path": %q,
+		"title": "My Book",
+		"author": "Me"
+	}`, outputPath)
+
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "compile_epub",
+		Arguments: json.RawMessage(sandboxArgsJSON),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, res, true, "outside of workspace")
 
 	// Test missing parameter error
 	badArgsJSON := fmt.Sprintf(`{

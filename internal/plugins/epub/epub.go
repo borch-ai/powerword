@@ -146,7 +146,12 @@ var generateUUIDFn = GenerateUUID
 
 // CompileEPUB compiles a book manuscript and illustration assets into an EPUB file.
 func CompileEPUB(ctx context.Context, opts CompileOpts) error {
-	_ = ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if opts.Language == "" {
 		opts.Language = "en"
 	}
@@ -179,12 +184,20 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 		HasStylesheet: opts.StylesheetPath != "",
 	}
 
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+
 	outDir := filepath.Dir(opts.OutputPath)
 	if outDir != "" {
 		// Enforce directory permissions to be 0750 or less for security
 		if err = os.MkdirAll(outDir, 0750); err != nil {
 			return fmt.Errorf("failed to create output directory %s: %w", outDir, err)
 		}
+	}
+
+	if err = ctx.Err(); err != nil {
+		return err
 	}
 
 	outFile, err := os.Create(opts.OutputPath)
@@ -194,9 +207,18 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 	defer func() { _ = outFile.Close() }()
 
 	zipWriter := zip.NewWriter(outFile)
-	defer func() { _ = zipWriter.Close() }()
+	var zipClosed bool
+	defer func() {
+		if !zipClosed {
+			_ = zipWriter.Close()
+		}
+	}()
 
 	if err = writeMimetype(zipWriter); err != nil {
+		return err
+	}
+
+	if err = ctx.Err(); err != nil {
 		return err
 	}
 
@@ -210,7 +232,15 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 		}
 	}
 
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+
 	if err = writeImages(zipWriter, opts.ImagesDir, images); err != nil {
+		return err
+	}
+
+	if err = ctx.Err(); err != nil {
 		return err
 	}
 
@@ -218,11 +248,28 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 		return err
 	}
 
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+
 	if err = writeTOC(zipWriter, compCtx); err != nil {
 		return err
 	}
 
-	return writeChapters(zipWriter, compCtx, opts.StylesheetPath != "")
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+
+	if err = writeChapters(zipWriter, compCtx, opts.StylesheetPath != ""); err != nil {
+		return err
+	}
+
+	zipClosed = true
+	if err = zipWriter.Close(); err != nil {
+		return fmt.Errorf("failed to close zip writer: %w", err)
+	}
+
+	return nil
 }
 
 func writeMimetype(zw *zip.Writer) error {

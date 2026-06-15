@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/borch-ai/powerword/internal/plugins/epub"
@@ -56,6 +58,26 @@ func run() error {
 	return srv.Run(context.Background(), transport)
 }
 
+func checkSandbox(absRoot, target string) (string, error) {
+	if target == "" {
+		return "", nil
+	}
+	if filepath.IsAbs(target) {
+		rel, err := filepath.Rel(absRoot, target)
+		if err != nil {
+			return "", err
+		}
+		target = rel
+	}
+
+	clean := filepath.Clean(target)
+	if strings.HasPrefix(clean, "..") {
+		return "", fmt.Errorf("path %s is outside of workspace", target)
+	}
+
+	return securejoin.SecureJoin(absRoot, target)
+}
+
 const compileEpubSchema = `{
 	"type": "object",
 	"properties": {
@@ -88,10 +110,15 @@ const compileEpubSchema = `{
 			"description": "Optional path to a custom CSS file."
 		}
 	},
-	"required": ["manuscript_path", "images_dir", "output_path", "title", "author"]
+	"required": ["manuscript_path", "output_path", "title", "author"]
 }`
 
 func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) {
+	absRoot, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute workspace root: %w", err)
+	}
+
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "pw-mcp-epub",
 		Version: "0.1.0",
@@ -101,12 +128,12 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 		Name:        "compile_epub",
 		Description: "Compiles a book manuscript and illustration assets into a spec-compliant EPUB 3 document.",
 		InputSchema: json.RawMessage(compileEpubSchema),
-	}, handleCompileEPUB())
+	}, handleCompileEPUB(absRoot))
 
 	return srv, nil
 }
 
-func handleCompileEPUB() func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleCompileEPUB(absRoot string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args struct {
 			ManuscriptPath string `json:"manuscript_path"`
@@ -121,21 +148,59 @@ func handleCompileEPUB() func(context.Context, *mcp.CallToolRequest) (*mcp.CallT
 			return nil, err
 		}
 
-		if args.ManuscriptPath == "" || args.ImagesDir == "" || args.OutputPath == "" || args.Title == "" || args.Author == "" {
+		if args.ManuscriptPath == "" || args.OutputPath == "" || args.Title == "" || args.Author == "" {
 			return &mcp.CallToolResult{
 				IsError: true,
 				Content: []mcp.Content{&mcp.TextContent{Text: "missing required parameters"}},
 			}, nil
 		}
 
+		absManuscript, err := checkSandbox(absRoot, args.ManuscriptPath)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid manuscript_path: %v", err)}},
+			}, nil
+		}
+
+		var absImages string
+		if args.ImagesDir != "" {
+			absImages, err = checkSandbox(absRoot, args.ImagesDir)
+			if err != nil {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid images_dir: %v", err)}},
+				}, nil
+			}
+		}
+
+		absOutput, err := checkSandbox(absRoot, args.OutputPath)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid output_path: %v", err)}},
+			}, nil
+		}
+
+		var absStylesheet string
+		if args.StylesheetPath != "" {
+			absStylesheet, err = checkSandbox(absRoot, args.StylesheetPath)
+			if err != nil {
+				return &mcp.CallToolResult{
+					IsError: true,
+					Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid stylesheet_path: %v", err)}},
+				}, nil
+			}
+		}
+
 		opts := epub.CompileOpts{
-			ManuscriptPath: args.ManuscriptPath,
-			ImagesDir:      args.ImagesDir,
-			OutputPath:     args.OutputPath,
+			ManuscriptPath: absManuscript,
+			ImagesDir:      absImages,
+			OutputPath:     absOutput,
 			Title:          args.Title,
 			Author:         args.Author,
 			Language:       args.Language,
-			StylesheetPath: args.StylesheetPath,
+			StylesheetPath: absStylesheet,
 		}
 
 		if err := epub.CompileEPUB(ctx, opts); err != nil {
