@@ -10,5 +10,5 @@ permissions:
 
 jobs:
   run:
-    uses: borch-ai/.github/.github/workflows/go-ci-standalone.yml@main
+    uses: borch-ai/.github/.github/workflows/go-ci-standalone.yml@fix/go-ci-auth
     secrets: inherit
