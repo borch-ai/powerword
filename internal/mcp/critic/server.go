@@ -135,6 +135,7 @@ Git Diff:
 %s
 
 Check if ALL proposed changes are implemented in the diff. Check for any omissions, bugs, or missing tests.
+Important: The Git Diff may contain new or modified plan files under the "plans/" directory. If a plan file in the diff has "Status: Open" or is not marked as "Completed", do not expect the code changes described in that plan to be implemented in this diff. Only expect code changes to be implemented for plans that are marked as "Completed".
 If the Local Validation Output indicates a failure (e.g. compile or test errors), you MUST reject the changes.
 If there are any missing changes or issues, clearly list them and end your response with exactly "VERDICT: REJECT".
 If the diff fully implements the plan correctly and all validations pass, end your response with exactly "VERDICT: ACCEPT".`,

@@ -111,9 +111,11 @@ func cleanPages(pages []Page) {
 	for i := range pages {
 		text := strings.TrimSpace(pages[i].Text)
 		text = strings.ReplaceAll(text, "\r\n", "\n")
-		text = strings.ReplaceAll(text, "\n\n", "\x00")
-		text = strings.ReplaceAll(text, "\n", " \\\n")
-		pages[i].Text = strings.ReplaceAll(text, "\x00", "\n\n")
+		paragraphs := strings.Split(text, "\n\n")
+		for j := range paragraphs {
+			paragraphs[j] = strings.ReplaceAll(paragraphs[j], "\n", " \\\n")
+		}
+		pages[i].Text = strings.Join(paragraphs, "\n\n")
 		pages[i].Prompt = strings.TrimSpace(pages[i].Prompt)
 	}
 }
