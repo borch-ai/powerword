@@ -76,10 +76,11 @@ Go library implementing EPUB container packaging and file structure layouts.
 ## Verification Plan
 
 ### Automated Tests
-- `go test -race ./cmd/pw-mcp-epub/... ./internal/plugins/epub/...`
-- `make check-coverage` — ≥91%
+- Unit Tests: `go test -race ./cmd/pw-mcp-epub/... ./internal/plugins/epub/...`
+- Integration Tests: `go test -v -tags=integration ./internal/mcp/...` (specifically `TestMCP_EpubPlugin_StdoutStdin` which compiles and runs the plugin binary via stdio transport)
+- Coverage Check: `make check-coverage` — ≥91% overall coverage (currently 91.1%)
 
 ### Manual Verification
-1. `./bin/pw-mcp-epub` — starts and waits for stdio input.
-2. Send a `compile_epub` tool call with a test manuscript and verify a valid `.epub` is written.
-3. Validate output file with `epubcheck` command-line utility to confirm 100% compliance with EPUB 3 requirements.
+1. Build the binary: `make build`.
+2. Launch manually: `./bin/pw-mcp-epub` (listens on stdio).
+3. Validate output files with standard ZIP and XML inspect tools.
