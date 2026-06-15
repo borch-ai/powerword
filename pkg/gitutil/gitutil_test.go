@@ -180,6 +180,7 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 	// Mock git command failure
 	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" {
+			//nolint:gosec
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
 			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "HELPER_EXIT_CODE=1")
 			return cmd
@@ -197,6 +198,7 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 
 	// Test coverage warning filtering with mocked output
 	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		//nolint:gosec
 		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
 		cmd.Env = append(os.Environ(),
 			"GO_WANT_HELPER_PROCESS=1",
@@ -241,6 +243,7 @@ func TestGitUtil_MockedLookPath(t *testing.T) {
 	}
 	origExec := ExecCommand
 	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		//nolint:gosec
 		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "HELPER_EXIT_CODE=0")
 		return cmd
