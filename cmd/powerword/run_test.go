@@ -22,7 +22,11 @@ func TestRunCmd_NotLoaded(t *testing.T) {
 
 func TestRunCmd_NoRunner(t *testing.T) {
 	origConfig := config.Active
-	config.Active = &config.Config{}
+	config.Active = &config.Config{
+		APIKeys: config.APIKeys{
+			Gemini: "fake-key",
+		},
+	}
 	defer func() { config.Active = origConfig }()
 
 	origRunner := config.Runner
@@ -38,7 +42,11 @@ func TestRunCmd_NoRunner(t *testing.T) {
 
 func TestRunCmd_StandardRunner(t *testing.T) {
 	origConfig := config.Active
-	config.Active = &config.Config{}
+	config.Active = &config.Config{
+		APIKeys: config.APIKeys{
+			Gemini: "fake-key",
+		},
+	}
 	defer func() { config.Active = origConfig }()
 
 	origRunner := config.Runner

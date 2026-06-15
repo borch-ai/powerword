@@ -28,22 +28,14 @@ func newReviewCmd() *cobra.Command {
 				return fmt.Errorf("configuration not loaded")
 			}
 
-			if listen {
-				listenPort := port
-				if listenPort == 0 {
-					listenPort = cfg.WebhookPort
-					if listenPort == 0 {
-						listenPort = 8080
-					}
+			// Validate flag conflicts early to avoid partial execution of plan fixes in invalid states.
+			if !listen {
+				if localOnly && issueID != "" {
+					return fmt.Errorf("cannot provide both --local and --issue flags")
 				}
-				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
-			}
-
-			if !localOnly && issueID == "" {
-				return fmt.Errorf("either --issue or --local must be provided")
-			}
-			if localOnly && issueID != "" {
-				return fmt.Errorf("cannot provide both --local and --issue flags")
+				if !fixPlans && !localOnly && issueID == "" {
+					return fmt.Errorf("either --issue or --local must be provided")
+				}
 			}
 
 			if fixPlans {
@@ -53,6 +45,30 @@ func newReviewCmd() *cobra.Command {
 					return err
 				}
 				cmd.Printf("Auto-fix complete. Modified %d plan file(s).\n", fixedCount)
+				// If --fix was the only flag, we're done — no LLM step needed.
+				if !localOnly && issueID == "" && !listen {
+					return nil
+				}
+			}
+
+			if listen {
+				listenPort := port
+				if listenPort == 0 {
+					listenPort = cfg.WebhookPort
+				}
+				if listenPort == 0 {
+					listenPort = 8080
+				}
+				// Beyond this point, LLM calls or webhook handlers will be executed — validate API keys.
+				if err := cfg.Validate(); err != nil {
+					return err
+				}
+				return review.StartWebhookListener(cmd.Context(), cfg, listenPort)
+			}
+
+			// Beyond this point, an LLM call will be made — validate API keys.
+			if err := cfg.Validate(); err != nil {
+				return err
 			}
 
 			var plan *review.Plan

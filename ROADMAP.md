@@ -158,7 +158,7 @@ Focus: Delivering a fully autonomous local-to-remote review feedback and code co
 *   [ ] **Task 5.10: Re-enable Local Critic (Ollama)**
     *   Re-enable the local critic LLM reviews configured with a local model run offline via Ollama, once the hardware is prepared.
     *   [Implementation Plan](plans/phase_5/task_5_10_reenable_local_critic.md)
-*   [ ] **Task 5.11: Allow `review --fix` Without an API Key**
+*   [x] **Task 5.11: Allow `review --fix` Without an API Key**
     *   `powerword review --fix` auto-corrects plan file formatting but currently fails with "no API keys found" even though no LLM call is made. Fix `persistentPreRunE` to skip `cfg.Validate()` for fix-only invocations; move API key validation into each subcommand's `RunE` at the point where LLM access is actually needed.
     *   [Implementation Plan](plans/phase_5/task_5_11_fix_only_no_api_key.md)
 
@@ -191,8 +191,8 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.8: Inline Graphics Rendering**
     *   Integrate Kitty, iTerm2, and Sixel protocols to render generated graphics (images/plots) directly within supported terminal sessions.
     *   [Implementation Plan](plans/phase_6/task_6_8_terminal_graphics.md)
-*   [ ] **Task 6.9: Rich Interactive Consent TUI**
-    *   Replace standard shell prompts with a Bubbletea-based terminal interface detailing tool calls and risk profiles.
+*   [ ] **Task 6.9: Rich Interactive Consent TUI & Remote Approvals**
+    *   Replace standard shell prompts with a Bubbletea-based terminal interface detailing tool calls and risk profiles. Integrate Firebase RTDB remote consent signaling `/tunnels/{tunnelId}/approval` to support mobile biometric approval handshakes from Lamplighter.
     *   [Implementation Plan](plans/phase_6/task_6_9_interactive_consent_tui.md)
 *   [ ] **Task 6.10: Headless JSON Envelopes & PR Review Mode**
     *   Standardize structured JSON outputs for CI integration and build webhooks to orchestrate inline PR comment review loops.

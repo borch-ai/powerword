@@ -20,6 +20,10 @@ func newModelsCmd() *cobra.Command {
 				return fmt.Errorf("configuration not loaded")
 			}
 
+			if err := cfg.Validate(); err != nil {
+				return err
+			}
+
 			client, err := llm.NewClient(cfg)
 			if err != nil {
 				return fmt.Errorf("failed to initialize LLM client: %w", err)

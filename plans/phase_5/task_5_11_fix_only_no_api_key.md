@@ -1,9 +1,9 @@
 # plan: Task 5.11: Allow `review --fix` Without an API Key
 
-**Status:** Open
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-13
+**Unit Test Coverage:** 91.20%
 
 `powerword review --fix` auto-corrects plan file formatting (absolute paths → relative,
 label normalization, metadata fixes). It performs **no LLM inference** — it only reads

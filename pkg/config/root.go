@@ -69,7 +69,11 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 
 	applyFlagOverrides(cmd, cfg)
 
-	if !cfg.ListSessions {
+	// API key validation is now the responsibility of each subcommand that
+	// actually requires LLM access. Commands that perform pure local I/O
+	// (e.g. review --fix, list-sessions) must not be blocked by missing keys.
+	// Legacy path: keep validation here only for the root run command.
+	if cmd.Name() == "powerword" && !cfg.ListSessions {
 		if err := cfg.Validate(); err != nil {
 			return err
 		}
