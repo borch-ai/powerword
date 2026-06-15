@@ -1,6 +1,6 @@
 //go:build integration
 
-package mcp_test
+package main_test
 
 import (
 	"context"
@@ -16,18 +16,17 @@ import (
 	"github.com/borch-ai/powerword/pkg/config"
 )
 
-var fsPluginPath string
+var pluginPath string
 
 func TestMain(m *testing.M) {
-	// Dynamically build the pw-mcp-fs plugin
 	tmpDir, err := os.MkdirTemp("", "pw-mcp-fs-integration-*")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
 
-	fsPluginPath = filepath.Join(tmpDir, "pw-mcp-fs")
-	cmd := exec.Command("go", "build", "-o", fsPluginPath, "../../cmd/pw-mcp-fs")
+	pluginPath = filepath.Join(tmpDir, "pw-mcp-fs")
+	cmd := exec.Command("go", "build", "-o", pluginPath, ".")
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to build pw-mcp-fs: %v\n", err)
 		os.RemoveAll(tmpDir)
@@ -60,7 +59,7 @@ func TestMCP_FSPlugin_StdoutStdin(t *testing.T) {
 
 	// Setup server config
 	srvCfg := config.ServerConfig{
-		Command: fsPluginPath,
+		Command: pluginPath,
 		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir},
 	}
 
@@ -84,7 +83,6 @@ func TestMCP_FSPlugin_StdoutStdin(t *testing.T) {
 		t.Fatalf("failed to list tools: %v", err)
 	}
 
-	// Verify we got the tools we expect (read_file, write_file, etc.)
 	foundReadFile := false
 	for _, tool := range tools {
 		if tool.Name == "read_file" {
@@ -108,7 +106,6 @@ func TestMCP_FSPlugin_StdoutStdin(t *testing.T) {
 		t.Fatalf("tool execution returned error: %v", result)
 	}
 
-	// Translate and format tool result
 	resStr, err := mcp.FormatToolResult(result)
 	if err != nil {
 		t.Fatalf("failed to format tool result: %v", err)

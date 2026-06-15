@@ -94,7 +94,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
     *   Implement a native Go MCP server that invokes a local Typst binary to compile book manuscripts and illustration assets into print-ready PDFs conforming to KDP bleed/margin specs. Primary consumer: the Pithos `assemble` engine (Task 4.2). This unblocks Pithos Phase 4 which is currently stalled waiting for this server.
     *   [Implementation Plan](plans/phase_3/task_3_11_typst_mcp.md)
-*   [ ] **Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)**
+*   [x] **Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)**
     *   Implement a native Go MCP server that compiles parodic manuscripts and illustration assets into spec-compliant EPUB digital publications. Primary consumer: Pithos (`digital-export`).
     *   [Implementation Plan](plans/phase_3/task_3_12_epub_mcp.md)
 *   [ ] **Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
@@ -106,9 +106,9 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.15: Typst Mixed Layout Templates (`pw-mcp-typst`)**
     *   Extend `pw-mcp-typst` compile tools to support left-hand text, right-hand image, and other layout styles instead of only full-bleed backgrounds.
     *   [Implementation Plan](plans/phase_3/task_3_15_typst_mixed_layouts.md)
-
-
-
+*   [ ] **Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)**
+    *   Extend the `pw-mcp-viral` toolset with a slideshow generator tool (`viral_stitch_slideshow`) that compiles sequences of paired images and audio narration segments into a single unified MP4 video trailer using ffmpeg.
+    *   [Implementation Plan](plans/phase_3/task_3_16_viral_slideshow.md)
 
 ---
 

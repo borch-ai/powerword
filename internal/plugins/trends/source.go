@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -24,6 +25,22 @@ type Candidate struct {
 type TrendSource interface {
 	Score(ctx context.Context, keyword string, limit int) ([]Candidate, error)
 	Name() string
+}
+
+func validateBaseURL(envURL, defaultValue string) string {
+	if envURL == "" {
+		return defaultValue
+	}
+	parsed, err := url.Parse(envURL)
+	if err != nil {
+		return defaultValue
+	}
+	host := parsed.Hostname()
+	scheme := parsed.Scheme
+	if (scheme == "http" || scheme == "https") && (host == "localhost" || host == "127.0.0.1" || host == "::1") {
+		return strings.TrimSuffix(envURL, "/")
+	}
+	return defaultValue
 }
 
 // AmazonAutocomplete fetches completions from Amazon Autocomplete API.
@@ -47,8 +64,10 @@ func (a *AmazonAutocomplete) Name() string {
 // Score queries the Amazon autocomplete suggestions.
 func (a *AmazonAutocomplete) Score(ctx context.Context, keyword string, limit int) ([]Candidate, error) {
 	escapedQuery := url.QueryEscape(keyword)
-	u := fmt.Sprintf("https://completion.amazon.com/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", escapedQuery)
+	baseURL := validateBaseURL(os.Getenv("POWERWORD_AMAZON_BASE_URL"), "https://completion.amazon.com")
+	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", baseURL, escapedQuery)
 
+	//nolint:gosec // u is constructed from trusted defaults or test environment variables
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Amazon request: %w", err)
@@ -56,6 +75,7 @@ func (a *AmazonAutocomplete) Score(ctx context.Context, keyword string, limit in
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
+	//nolint:gosec // requests are sent to verified autocomplete endpoints
 	resp, err := a.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("amazon request failed: %w", err)
@@ -176,13 +196,16 @@ func (s *SerpAPITrends) fetchSerpAPIData(ctx context.Context, keyword string, pe
 	}
 
 	escapedQuery := url.QueryEscape(keyword)
-	u := fmt.Sprintf("https://serpapi.com/search?engine=google_trends&q=%s&api_key=%s&data_type=TIMESERIES&date=%s", escapedQuery, s.apiKey, url.QueryEscape(dateParam))
+	baseURL := validateBaseURL(os.Getenv("POWERWORD_SERPAPI_BASE_URL"), "https://serpapi.com")
+	u := fmt.Sprintf("%s/search?engine=google_trends&q=%s&api_key=%s&data_type=TIMESERIES&date=%s", baseURL, escapedQuery, s.apiKey, url.QueryEscape(dateParam))
 
+	//nolint:gosec // u is constructed from trusted defaults or test environment variables
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SerpAPI request: %w", err)
 	}
 
+	//nolint:gosec // requests are sent to verified SerpAPI endpoints
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("SerpAPI request failed: %w", err)
