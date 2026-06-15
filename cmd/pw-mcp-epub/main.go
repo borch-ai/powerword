@@ -133,17 +133,57 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 	return srv, nil
 }
 
+type compileArgs struct {
+	ManuscriptPath string `json:"manuscript_path"`
+	ImagesDir      string `json:"images_dir"`
+	OutputPath     string `json:"output_path"`
+	Title          string `json:"title"`
+	Author         string `json:"author"`
+	Language       string `json:"language"`
+	StylesheetPath string `json:"stylesheet_path"`
+}
+
+func validateCompileArgs(absRoot string, args *compileArgs) (epub.CompileOpts, error) {
+	absManuscript, err := checkSandbox(absRoot, args.ManuscriptPath)
+	if err != nil {
+		return epub.CompileOpts{}, fmt.Errorf("invalid manuscript_path: %w", err)
+	}
+
+	var absImages string
+	if args.ImagesDir != "" {
+		absImages, err = checkSandbox(absRoot, args.ImagesDir)
+		if err != nil {
+			return epub.CompileOpts{}, fmt.Errorf("invalid images_dir: %w", err)
+		}
+	}
+
+	absOutput, err := checkSandbox(absRoot, args.OutputPath)
+	if err != nil {
+		return epub.CompileOpts{}, fmt.Errorf("invalid output_path: %w", err)
+	}
+
+	var absStylesheet string
+	if args.StylesheetPath != "" {
+		absStylesheet, err = checkSandbox(absRoot, args.StylesheetPath)
+		if err != nil {
+			return epub.CompileOpts{}, fmt.Errorf("invalid stylesheet_path: %w", err)
+		}
+	}
+
+	return epub.CompileOpts{
+		ManuscriptPath: absManuscript,
+		ImagesDir:      absImages,
+		OutputPath:     absOutput,
+		Title:          args.Title,
+		Author:         args.Author,
+		Language:       args.Language,
+		StylesheetPath: absStylesheet,
+	}, nil
+}
+
 func handleCompileEPUB(absRoot string) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var args struct {
-			ManuscriptPath string `json:"manuscript_path"`
-			ImagesDir      string `json:"images_dir"`
-			OutputPath     string `json:"output_path"`
-			Title          string `json:"title"`
-			Author         string `json:"author"`
-			Language       string `json:"language"`
-			StylesheetPath string `json:"stylesheet_path"`
-		}
+		var args compileArgs
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return nil, err
 		}
@@ -155,52 +195,12 @@ func handleCompileEPUB(absRoot string) func(context.Context, *mcp.CallToolReques
 			}, nil
 		}
 
-		absManuscript, err := checkSandbox(absRoot, args.ManuscriptPath)
+		opts, err := validateCompileArgs(absRoot, &args)
 		if err != nil {
 			return &mcp.CallToolResult{
 				IsError: true,
-				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid manuscript_path: %v", err)}},
+				Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}},
 			}, nil
-		}
-
-		var absImages string
-		if args.ImagesDir != "" {
-			absImages, err = checkSandbox(absRoot, args.ImagesDir)
-			if err != nil {
-				return &mcp.CallToolResult{
-					IsError: true,
-					Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid images_dir: %v", err)}},
-				}, nil
-			}
-		}
-
-		absOutput, err := checkSandbox(absRoot, args.OutputPath)
-		if err != nil {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid output_path: %v", err)}},
-			}, nil
-		}
-
-		var absStylesheet string
-		if args.StylesheetPath != "" {
-			absStylesheet, err = checkSandbox(absRoot, args.StylesheetPath)
-			if err != nil {
-				return &mcp.CallToolResult{
-					IsError: true,
-					Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("invalid stylesheet_path: %v", err)}},
-				}, nil
-			}
-		}
-
-		opts := epub.CompileOpts{
-			ManuscriptPath: absManuscript,
-			ImagesDir:      absImages,
-			OutputPath:     absOutput,
-			Title:          args.Title,
-			Author:         args.Author,
-			Language:       args.Language,
-			StylesheetPath: absStylesheet,
 		}
 
 		if err := epub.CompileEPUB(ctx, opts); err != nil {

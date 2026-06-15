@@ -214,53 +214,7 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 		}
 	}()
 
-	if err = writeMimetype(zipWriter); err != nil {
-		return err
-	}
-
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	if err = writeContainerXML(zipWriter); err != nil {
-		return err
-	}
-
-	if opts.StylesheetPath != "" {
-		if err = writeStylesheet(zipWriter, opts.StylesheetPath); err != nil {
-			return err
-		}
-	}
-
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	if err = writeImages(zipWriter, opts.ImagesDir, images); err != nil {
-		return err
-	}
-
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	if err = writeOPF(zipWriter, compCtx); err != nil {
-		return err
-	}
-
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	if err = writeTOC(zipWriter, compCtx); err != nil {
-		return err
-	}
-
-	if err = ctx.Err(); err != nil {
-		return err
-	}
-
-	if err = writeChapters(zipWriter, compCtx, opts.StylesheetPath != ""); err != nil {
+	if err = writeZipArchive(ctx, zipWriter, compCtx, opts, images); err != nil {
 		return err
 	}
 
@@ -270,6 +224,54 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 	}
 
 	return nil
+}
+
+func writeZipArchive(ctx context.Context, zw *zip.Writer, compCtx compileContext, opts CompileOpts, images []ImageAsset) error {
+	if err := writeMimetype(zw); err != nil {
+		return err
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := writeContainerXML(zw); err != nil {
+		return err
+	}
+
+	if opts.StylesheetPath != "" {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := writeStylesheet(zw, opts.StylesheetPath); err != nil {
+			return err
+		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := writeImages(zw, opts.ImagesDir, images); err != nil {
+		return err
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := writeOPF(zw, compCtx); err != nil {
+		return err
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := writeTOC(zw, compCtx); err != nil {
+		return err
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return writeChapters(zw, compCtx, opts.StylesheetPath != "")
 }
 
 func writeMimetype(zw *zip.Writer) error {
