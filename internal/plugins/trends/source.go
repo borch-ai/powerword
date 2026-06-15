@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -47,7 +48,11 @@ func (a *AmazonAutocomplete) Name() string {
 // Score queries the Amazon autocomplete suggestions.
 func (a *AmazonAutocomplete) Score(ctx context.Context, keyword string, limit int) ([]Candidate, error) {
 	escapedQuery := url.QueryEscape(keyword)
-	u := fmt.Sprintf("https://completion.amazon.com/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", escapedQuery)
+	baseURL := "https://completion.amazon.com"
+	if envURL := os.Getenv("POWERWORD_AMAZON_BASE_URL"); envURL != "" {
+		baseURL = envURL
+	}
+	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", baseURL, escapedQuery)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -176,7 +181,11 @@ func (s *SerpAPITrends) fetchSerpAPIData(ctx context.Context, keyword string, pe
 	}
 
 	escapedQuery := url.QueryEscape(keyword)
-	u := fmt.Sprintf("https://serpapi.com/search?engine=google_trends&q=%s&api_key=%s&data_type=TIMESERIES&date=%s", escapedQuery, s.apiKey, url.QueryEscape(dateParam))
+	baseURL := "https://serpapi.com"
+	if envURL := os.Getenv("POWERWORD_SERPAPI_BASE_URL"); envURL != "" {
+		baseURL = envURL
+	}
+	u := fmt.Sprintf("%s/search?engine=google_trends&q=%s&api_key=%s&data_type=TIMESERIES&date=%s", baseURL, escapedQuery, s.apiKey, url.QueryEscape(dateParam))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
