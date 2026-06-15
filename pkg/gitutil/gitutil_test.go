@@ -184,7 +184,7 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 		return origExec(ctx, command, args...)
 	}
 
-	_, err := RunGitCommand(ctx, "/tmp", "status")
+	_, err := RunGitCommand(ctx, t.TempDir(), "status")
 	if err == nil {
 		t.Error("expected RunGitCommand to return error when git command fails")
 	}
@@ -198,7 +198,7 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 		return exec.CommandContext(ctx, "sh", "-c", "echo 'warning: GOCOVERDIR not set\nactual output'; exit 1")
 	}
 
-	_, err = RunGitCommand(ctx, "/tmp", "status")
+	_, err = RunGitCommand(ctx, t.TempDir(), "status")
 	if err == nil {
 		t.Fatal("expected command to fail")
 	}
@@ -228,7 +228,7 @@ func TestGitUtil_GitBinaryNotFound(t *testing.T) {
 	_ = os.Setenv("PATH", "")
 
 	ctx := context.Background()
-	_, err := RunGitCommand(ctx, "/tmp", "status")
+	_, err := RunGitCommand(ctx, t.TempDir(), "status")
 	if err == nil || !strings.Contains(err.Error(), "git binary not found in PATH") {
 		t.Errorf("expected git binary not found error, got: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestGitUtil_MockedLookPath(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	_, err := RunGitCommand(ctx, "/tmp", "status")
+	_, err := RunGitCommand(ctx, t.TempDir(), "status")
 	if err != nil {
 		t.Errorf("expected success with mocked LookPath, got: %v", err)
 	}
