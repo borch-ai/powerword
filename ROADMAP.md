@@ -97,6 +97,12 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
     *   Implement a native Go MCP server to perform deep validation of compiled PDF book geometry, bleed limits, embedded fonts, and image resolution (minimum 300 DPI) against Amazon KDP paperback ingest rules. Primary consumer: Pithos (`assemble`).
     *   [Implementation Plan](plans/phase_3/task_3_13_pdfcheck_mcp.md)
+*   [x] **Task 3.14: Typst Verse Line Break Formatting (`pw-mcp-typst`)**
+    *   Preserve line breaks inside parsed Markdown stanzas and replace them with Typst-compliant break markers (` \\\n `) before compiling the PDF.
+    *   [Implementation Plan](plans/phase_3/task_3_14_typst_line_breaks.md)
+*   [ ] **Task 3.15: Typst Mixed Layout Templates (`pw-mcp-typst`)**
+    *   Extend `pw-mcp-typst` compile tools to support left-hand text, right-hand image, and other layout styles instead of only full-bleed backgrounds.
+    *   [Implementation Plan](plans/phase_3/task_3_15_typst_mixed_layouts.md)
 
 
 

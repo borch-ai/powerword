@@ -104,7 +104,7 @@ He fretted over market shares.
 		t.Fatalf("expected 2 pages, got %d", len(pages))
 	}
 
-	if pages[0].Number != 1 || pages[0].Text != "Mr. Eggerton, with worried gaze,\nSat high upon the shelf." || pages[0].Prompt != "The scene is a grand, ornate office." {
+	if pages[0].Number != 1 || pages[0].Text != "Mr. Eggerton, with worried gaze, \\\nSat high upon the shelf." || pages[0].Prompt != "The scene is a grand, ornate office." {
 		t.Errorf("page 1 mismatch: %+v", pages[0])
 	}
 
