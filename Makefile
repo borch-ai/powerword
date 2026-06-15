@@ -20,6 +20,7 @@ IMAGEGEN_PLUGIN=pw-mcp-imagegen
 KDP_MATH_PLUGIN=pw-mcp-kdp-math
 SEO_PLUGIN=pw-mcp-seo
 VIRAL_PLUGIN=pw-mcp-viral
+TRENDS_PLUGIN=pw-mcp-trends
 EPUB_PLUGIN=pw-mcp-epub
 PDFCHECK_PLUGIN=pw-mcp-pdfcheck
 CRITIC_PLUGIN=pw-mcp-critic
@@ -43,6 +44,7 @@ build:
 	@if [ -d cmd/$(KDP_MATH_PLUGIN) ]; then $(GOBUILD) -o bin/$(KDP_MATH_PLUGIN) ./cmd/$(KDP_MATH_PLUGIN); fi
 	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOBUILD) -o bin/$(SEO_PLUGIN) ./cmd/$(SEO_PLUGIN); fi
 	@if [ -d cmd/$(VIRAL_PLUGIN) ]; then $(GOBUILD) -o bin/$(VIRAL_PLUGIN) ./cmd/$(VIRAL_PLUGIN); fi
+	@if [ -d cmd/$(TRENDS_PLUGIN) ]; then $(GOBUILD) -o bin/$(TRENDS_PLUGIN) ./cmd/$(TRENDS_PLUGIN); fi
 	@if [ -d cmd/$(CRITIC_PLUGIN) ]; then $(GOBUILD) -o bin/$(CRITIC_PLUGIN) ./cmd/$(CRITIC_PLUGIN); fi
 	@if [ -d cmd/$(EPUB_PLUGIN) ]; then $(GOBUILD) -o bin/$(EPUB_PLUGIN) ./cmd/$(EPUB_PLUGIN); fi
 	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOBUILD) -o bin/$(PDFCHECK_PLUGIN) ./cmd/$(PDFCHECK_PLUGIN); fi
@@ -59,11 +61,13 @@ install:
 	@if [ -d cmd/$(KDP_MATH_PLUGIN) ]; then $(GOCMD) install ./cmd/$(KDP_MATH_PLUGIN); fi
 	@if [ -d cmd/$(SEO_PLUGIN) ]; then $(GOCMD) install ./cmd/$(SEO_PLUGIN); fi
 	@if [ -d cmd/$(VIRAL_PLUGIN) ]; then $(GOCMD) install ./cmd/$(VIRAL_PLUGIN); fi
+	@if [ -d cmd/$(TRENDS_PLUGIN) ]; then $(GOCMD) install ./cmd/$(TRENDS_PLUGIN); fi
 	@if [ -d cmd/$(CRITIC_PLUGIN) ]; then $(GOCMD) install ./cmd/$(CRITIC_PLUGIN); fi
 	@if [ -d cmd/$(EPUB_PLUGIN) ]; then $(GOCMD) install ./cmd/$(EPUB_PLUGIN); fi
 	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOCMD) install ./cmd/$(PDFCHECK_PLUGIN); fi
 	@if [ -d cmd/$(TYPST_PLUGIN) ]; then $(GOCMD) install ./cmd/$(TYPST_PLUGIN); fi
 	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOCMD) install ./cmd/$(LINTER_PLUGIN); fi
+
 
 install-hooks:
 	@echo "Installing git hooks..."

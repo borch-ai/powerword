@@ -1,9 +1,9 @@
 # plan: Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-15
+**Unit Test Coverage:** 89.9% (internal/plugins/trends), 64.1% (cmd/pw-mcp-trends), project-wide overall 91.2%
 
 Implement `pw-mcp-trends`, a native Go MCP server that provides market demand intelligence by wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends. Primary consumer: the Kiln `scout` engine. This plugin lifts the market intelligence logic out of Kiln's `internal/scout` package and makes it reusable by any MCP client.
 
