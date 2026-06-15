@@ -479,3 +479,63 @@ func TestInternalHelpers_Errors(t *testing.T) {
 		t.Error("expected writeChapters to fail on closed zip writer")
 	}
 }
+
+type cancelWriter struct {
+	w      io.Writer
+	cancel func()
+	limit  int
+	count  int
+}
+
+func (c *cancelWriter) Write(p []byte) (int, error) {
+	c.count++
+	if c.count >= c.limit {
+		c.cancel()
+	}
+	return c.w.Write(p)
+}
+
+func TestWriteZipArchive_Coverage(t *testing.T) {
+	tempDir := t.TempDir()
+	dummyFile := filepath.Join(tempDir, "dummy.txt")
+	_ = os.WriteFile(dummyFile, []byte("test"), 0600)
+
+	compCtx := compileContext{
+		Chapters: []Chapter{{Filename: "c.xhtml"}},
+		Language: "en",
+	}
+
+	opts := CompileOpts{
+		StylesheetPath: dummyFile,
+		ImagesDir:      tempDir,
+	}
+
+	images := []ImageAsset{{Filename: "dummy.txt"}}
+
+	// 1. Test zip failure
+	zwErr := zip.NewWriter(errorWriter{})
+	w, err := zwErr.CreateHeader(&zip.FileHeader{
+		Name:   "trigger-error",
+		Method: zip.Store,
+	})
+	if err == nil {
+		_, _ = w.Write(make([]byte, 5000))
+	}
+	if err := writeZipArchive(context.Background(), zwErr, compCtx, opts, images); err == nil {
+		t.Error("expected writeZipArchive to fail with errorWriter")
+	}
+
+	// 2. Loop with cancelWriter to trigger context cancellation at various steps
+	for limit := 1; limit <= 25; limit++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		cw := &cancelWriter{
+			w:      io.Discard,
+			cancel: cancel,
+			limit:  limit,
+		}
+		zw := zip.NewWriter(cw)
+
+		_ = writeZipArchive(ctx, zw, compCtx, opts, images)
+		cancel() // cleanup context
+	}
+}
