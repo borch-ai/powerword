@@ -17,6 +17,61 @@ func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return m(req)
 }
 
+func TestValidateBaseURL(t *testing.T) {
+	tests := []struct {
+		name         string
+		envURL       string
+		defaultValue string
+		want         string
+	}{
+		{
+			name:         "empty string",
+			envURL:       "",
+			defaultValue: "https://default.com",
+			want:         "https://default.com",
+		},
+		{
+			name:         "invalid URL",
+			envURL:       "://invalid",
+			defaultValue: "https://default.com",
+			want:         "https://default.com",
+		},
+		{
+			name:         "valid localhost URL",
+			envURL:       "http://localhost:8080/",
+			defaultValue: "https://default.com",
+			want:         "http://localhost:8080",
+		},
+		{
+			name:         "valid 127.0.0.1 URL",
+			envURL:       "http://127.0.0.1:9090",
+			defaultValue: "https://default.com",
+			want:         "http://127.0.0.1:9090",
+		},
+		{
+			name:         "valid ipv6 loopback URL",
+			envURL:       "http://[::1]:9090",
+			defaultValue: "https://default.com",
+			want:         "http://[::1]:9090",
+		},
+		{
+			name:         "unsafe external URL",
+			envURL:       "https://malicious.com",
+			defaultValue: "https://default.com",
+			want:         "https://default.com",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateBaseURL(tc.envURL, tc.defaultValue)
+			if got != tc.want {
+				t.Errorf("validateBaseURL(%q, %q) = %q, want %q", tc.envURL, tc.defaultValue, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestAmazonAutocomplete_Score_Success(t *testing.T) {
 	client := &http.Client{
 		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {

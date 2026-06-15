@@ -12,8 +12,14 @@ import (
 )
 
 func TestGenerateUUID(t *testing.T) {
-	u1 := GenerateUUID()
-	u2 := GenerateUUID()
+	u1, err1 := GenerateUUID()
+	if err1 != nil {
+		t.Fatalf("unexpected error: %v", err1)
+	}
+	u2, err2 := GenerateUUID()
+	if err2 != nil {
+		t.Fatalf("unexpected error: %v", err2)
+	}
 
 	if len(u1) != 36 {
 		t.Errorf("expected UUID length to be 36, got %d", len(u1))
@@ -26,6 +32,28 @@ func TestGenerateUUID(t *testing.T) {
 	parts := strings.Split(u1, "-")
 	if len(parts) != 5 {
 		t.Errorf("expected 5 hyphen-separated parts in UUID, got %v", parts)
+	}
+}
+
+func TestGenerateUUID_Error(t *testing.T) {
+	oldFn := generateUUIDFn
+	generateUUIDFn = func() (string, error) {
+		return "", fmt.Errorf("mocked uuid error")
+	}
+	defer func() { generateUUIDFn = oldFn }()
+
+	// Verify CompileEPUB propagates GenerateUUID error
+	tempDir := t.TempDir()
+	opts := CompileOpts{
+		ManuscriptPath: filepath.Join(tempDir, "manuscript.md"),
+		OutputPath:     filepath.Join(tempDir, "output.epub"),
+		Title:          "Title",
+		Author:         "Author",
+	}
+	_ = os.WriteFile(opts.ManuscriptPath, []byte("# Chapter 1\nContent"), 0600)
+	err := CompileEPUB(context.Background(), opts)
+	if err == nil {
+		t.Error("expected error from CompileEPUB when GenerateUUID fails, got nil")
 	}
 }
 
@@ -154,9 +182,10 @@ func TestCompileEPUB(t *testing.T) {
 	tempDir := t.TempDir()
 
 	manuscriptPath := filepath.Join(tempDir, "manuscript.md")
-	manuscriptContent := `# Chapter 1
-Hello world.
-![Image](test_img.png)
+	manuscriptContent := `# Chapter 1 & Special <tag>
+Hello world & raw text <foo>.
+![Image & alt](test_img.png)
+### Minor header & tag <bar>
 `
 	_ = os.WriteFile(manuscriptPath, []byte(manuscriptContent), 0600)
 
@@ -165,7 +194,7 @@ Hello world.
 
 	imagesDir := filepath.Join(tempDir, "images")
 	_ = os.Mkdir(imagesDir, 0750)
-	_ = os.WriteFile(filepath.Join(imagesDir, "test-img.png"), []byte("pngdata"), 0600)
+	_ = os.WriteFile(filepath.Join(imagesDir, "test_img.png"), []byte("pngdata"), 0600)
 
 	outputPath := filepath.Join(tempDir, "output.epub")
 
@@ -173,8 +202,8 @@ Hello world.
 		ManuscriptPath: manuscriptPath,
 		ImagesDir:      imagesDir,
 		OutputPath:     outputPath,
-		Title:          "Test Book Title",
-		Author:         "Test Author Name",
+		Title:          "Test Book & Title <with tags>",
+		Author:         "Test Author & Name <with tags>",
 		Language:       "en",
 		StylesheetPath: stylesheetPath,
 	}
@@ -223,7 +252,7 @@ Hello world.
 	expectedFiles := map[string]bool{
 		"META-INF/container.xml":   false,
 		"EPUB/css/stylesheet.css":  false,
-		"EPUB/images/test-img.png": false,
+		"EPUB/images/test_img.png": false,
 		"EPUB/content.opf":         false,
 		"EPUB/toc.xhtml":           false,
 		"EPUB/chap_1.xhtml":        false,
@@ -239,6 +268,70 @@ Hello world.
 		if !found {
 			t.Errorf("missing expected file in EPUB: %s", filename)
 		}
+	}
+
+	verifyOPFEscaping(t, rc)
+	verifyTOCEscaping(t, rc)
+	verifyChapterEscaping(t, rc)
+}
+
+func verifyOPFEscaping(t *testing.T, rc *zip.ReadCloser) {
+	t.Helper()
+	opfFile, err := rc.Open("EPUB/content.opf")
+	if err != nil {
+		t.Fatalf("failed to open content.opf: %v", err)
+	}
+	defer func() { _ = opfFile.Close() }()
+	opfContent, err := io.ReadAll(opfFile)
+	if err != nil {
+		t.Fatalf("failed to read content.opf: %v", err)
+	}
+	if !strings.Contains(string(opfContent), "<dc:title>Test Book &amp; Title &lt;with tags&gt;</dc:title>") {
+		t.Errorf("expected dc:title to be escaped in content.opf, got %s", string(opfContent))
+	}
+	if !strings.Contains(string(opfContent), "<dc:creator id=\"creator\">Test Author &amp; Name &lt;with tags&gt;</dc:creator>") {
+		t.Errorf("expected dc:creator to be escaped in content.opf, got %s", string(opfContent))
+	}
+}
+
+func verifyTOCEscaping(t *testing.T, rc *zip.ReadCloser) {
+	t.Helper()
+	tocFile, err := rc.Open("EPUB/toc.xhtml")
+	if err != nil {
+		t.Fatalf("failed to open toc.xhtml: %v", err)
+	}
+	defer func() { _ = tocFile.Close() }()
+	tocContent, err := io.ReadAll(tocFile)
+	if err != nil {
+		t.Fatalf("failed to read toc.xhtml: %v", err)
+	}
+	if !strings.Contains(string(tocContent), "Chapter 1 &amp; Special &lt;tag&gt;") {
+		t.Errorf("expected chapter title to be escaped in toc.xhtml, got %s", string(tocContent))
+	}
+}
+
+func verifyChapterEscaping(t *testing.T, rc *zip.ReadCloser) {
+	t.Helper()
+	chapFile, err := rc.Open("EPUB/chap_1.xhtml")
+	if err != nil {
+		t.Fatalf("failed to open chap_1.xhtml: %v", err)
+	}
+	defer func() { _ = chapFile.Close() }()
+	chapContent, err := io.ReadAll(chapFile)
+	if err != nil {
+		t.Fatalf("failed to read chap_1.xhtml: %v", err)
+	}
+	if !strings.Contains(string(chapContent), "<h1>Chapter 1 &amp; Special &lt;tag&gt;</h1>") {
+		t.Errorf("expected header H1 to be escaped in chap_1.xhtml, got %s", string(chapContent))
+	}
+	if !strings.Contains(string(chapContent), "Hello world &amp; raw text &lt;foo&gt;.") {
+		t.Errorf("expected inline body text to be escaped in chap_1.xhtml, got %s", string(chapContent))
+	}
+	if !strings.Contains(string(chapContent), "alt=\"Image &amp; alt\"") {
+		t.Errorf("expected image alt text to be escaped in chap_1.xhtml, got %s", string(chapContent))
+	}
+	if !strings.Contains(string(chapContent), "<h3>Minor header &amp; tag &lt;bar&gt;</h3>") {
+		t.Errorf("expected minor header H3 to be escaped in chap_1.xhtml, got %s", string(chapContent))
 	}
 }
 
@@ -359,7 +452,7 @@ func TestInternalHelpers_Errors(t *testing.T) {
 	if err := writeTOC(zw, compileContext{}); err == nil {
 		t.Error("expected writeTOC to fail on closed zip writer")
 	}
-	if err := writeChapters(zw, compileContext{Chapters: []Chapter{{Filename: "c.xhtml"}}}, false, "en"); err == nil {
+	if err := writeChapters(zw, compileContext{Chapters: []Chapter{{Filename: "c.xhtml"}}, Language: "en"}, false); err == nil {
 		t.Error("expected writeChapters to fail on closed zip writer")
 	}
 }

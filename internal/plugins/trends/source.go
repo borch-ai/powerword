@@ -27,6 +27,21 @@ type TrendSource interface {
 	Name() string
 }
 
+func validateBaseURL(envURL, defaultValue string) string {
+	if envURL == "" {
+		return defaultValue
+	}
+	parsed, err := url.Parse(envURL)
+	if err != nil {
+		return defaultValue
+	}
+	host := parsed.Hostname()
+	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+		return strings.TrimSuffix(envURL, "/")
+	}
+	return defaultValue
+}
+
 // AmazonAutocomplete fetches completions from Amazon Autocomplete API.
 type AmazonAutocomplete struct {
 	client *http.Client
@@ -48,10 +63,7 @@ func (a *AmazonAutocomplete) Name() string {
 // Score queries the Amazon autocomplete suggestions.
 func (a *AmazonAutocomplete) Score(ctx context.Context, keyword string, limit int) ([]Candidate, error) {
 	escapedQuery := url.QueryEscape(keyword)
-	baseURL := "https://completion.amazon.com"
-	if envURL := os.Getenv("POWERWORD_AMAZON_BASE_URL"); envURL != "" {
-		baseURL = envURL
-	}
+	baseURL := validateBaseURL(os.Getenv("POWERWORD_AMAZON_BASE_URL"), "https://completion.amazon.com")
 	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", baseURL, escapedQuery)
 
 	//nolint:gosec // u is constructed from trusted defaults or test environment variables
@@ -183,10 +195,7 @@ func (s *SerpAPITrends) fetchSerpAPIData(ctx context.Context, keyword string, pe
 	}
 
 	escapedQuery := url.QueryEscape(keyword)
-	baseURL := "https://serpapi.com"
-	if envURL := os.Getenv("POWERWORD_SERPAPI_BASE_URL"); envURL != "" {
-		baseURL = envURL
-	}
+	baseURL := validateBaseURL(os.Getenv("POWERWORD_SERPAPI_BASE_URL"), "https://serpapi.com")
 	u := fmt.Sprintf("%s/search?engine=google_trends&q=%s&api_key=%s&data_type=TIMESERIES&date=%s", baseURL, escapedQuery, s.apiKey, url.QueryEscape(dateParam))
 
 	//nolint:gosec // u is constructed from trusted defaults or test environment variables

@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -131,13 +132,17 @@ const (
 )
 
 // GenerateUUID generates a random RFC 4122 Version 4 UUID.
-func GenerateUUID() string {
+func GenerateUUID() (string, error) {
 	uuid := make([]byte, 16)
-	_, _ = rand.Read(uuid)
+	if _, err := rand.Read(uuid); err != nil {
+		return "", fmt.Errorf("failed to read random bytes for UUID: %w", err)
+	}
 	uuid[8] = (uuid[8] & 0x3f) | 0x80
 	uuid[6] = (uuid[6] & 0x0f) | 0x40
-	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:])
+	return fmt.Sprintf("%x-%x-%x-%x-%x", uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:]), nil
 }
+
+var generateUUIDFn = GenerateUUID
 
 // CompileEPUB compiles a book manuscript and illustration assets into an EPUB file.
 func CompileEPUB(ctx context.Context, opts CompileOpts) error {
@@ -159,12 +164,15 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	uuidVal := GenerateUUID()
+	uuidVal, err := generateUUIDFn()
+	if err != nil {
+		return fmt.Errorf("failed to generate book UUID: %w", err)
+	}
 	compCtx := compileContext{
-		Title:         opts.Title,
-		Author:        opts.Author,
+		Title:         html.EscapeString(opts.Title),
+		Author:        html.EscapeString(opts.Author),
 		UUID:          uuidVal,
-		Language:      opts.Language,
+		Language:      html.EscapeString(opts.Language),
 		ModifiedTime:  now,
 		Chapters:      chapters,
 		Images:        images,
@@ -214,7 +222,7 @@ func CompileEPUB(ctx context.Context, opts CompileOpts) error {
 		return err
 	}
 
-	return writeChapters(zipWriter, compCtx, opts.StylesheetPath != "", opts.Language)
+	return writeChapters(zipWriter, compCtx, opts.StylesheetPath != "")
 }
 
 func writeMimetype(zw *zip.Writer) error {
@@ -316,7 +324,7 @@ func writeTOC(zw *zip.Writer, compCtx compileContext) error {
 	return nil
 }
 
-func writeChapters(zw *zip.Writer, compCtx compileContext, hasStylesheet bool, lang string) error {
+func writeChapters(zw *zip.Writer, compCtx compileContext, hasStylesheet bool) error {
 	chapTmpl, err := template.New("chapter").Parse(chapterTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to parse chapter template: %w", err)
@@ -330,7 +338,7 @@ func writeChapters(zw *zip.Writer, compCtx compileContext, hasStylesheet bool, l
 		}
 		cCtx := chapContext{
 			Title:         chap.Title,
-			Language:      lang,
+			Language:      compCtx.Language,
 			Body:          chap.Body,
 			HasStylesheet: hasStylesheet,
 		}
@@ -422,7 +430,7 @@ func ParseManuscript(content string) []Chapter {
 			chapID := fmt.Sprintf("chap_%d", len(parser.chapters)+1)
 			parser.currentChap = &Chapter{
 				ID:       chapID,
-				Title:    headerText,
+				Title:    html.EscapeString(headerText),
 				Filename: fmt.Sprintf("%s.xhtml", chapID),
 			}
 			continue
@@ -454,7 +462,7 @@ func (p *manuscriptParser) parseLine(trimmed string) {
 	if strings.HasPrefix(trimmed, "### ") {
 		p.closeAll()
 		headerText := strings.TrimSpace(strings.TrimPrefix(trimmed, "### "))
-		_, _ = fmt.Fprintf(&p.bodyBuilder, "<h3>%s</h3>\n", headerText)
+		_, _ = fmt.Fprintf(&p.bodyBuilder, "<h3>%s</h3>\n", html.EscapeString(headerText))
 		return
 	}
 
@@ -504,7 +512,7 @@ func (p *manuscriptParser) parseLine(trimmed string) {
 }
 
 func (p *manuscriptParser) parseInlineMarkup(text string) string {
-	res := text
+	res := html.EscapeString(text)
 	res = p.imgRegex.ReplaceAllString(res, `<img src="images/$2" alt="$1" />`)
 	res = p.boldRegex.ReplaceAllString(res, "<strong>$1</strong>")
 	res = p.italicRegex1.ReplaceAllString(res, "<em>$1</em>")

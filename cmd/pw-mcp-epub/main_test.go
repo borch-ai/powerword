@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -191,5 +193,7 @@ func TestRun_Success(t *testing.T) {
 	// should run and exit immediately on EOF
 	err := run()
 	// StdioTransport exit error is acceptable on direct EOF
-	_ = err
+	if err != nil && !errors.Is(err, io.EOF) && !strings.Contains(err.Error(), "EOF") {
+		t.Errorf("expected clean exit or EOF error from run(), got: %v", err)
+	}
 }
