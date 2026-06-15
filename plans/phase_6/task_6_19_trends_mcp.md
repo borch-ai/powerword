@@ -73,7 +73,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 
 ### Tests
 
-#### [NEW] [trends](file://../../internal/plugins/trends)
+#### [NEW] [source_test.go](file://../../internal/plugins/trends/source_test.go)
 - Mock HTTP servers for Amazon and SerpAPI.
 - MCP tool handler tests with mock sources.
 - 91%+ coverage.
