@@ -107,7 +107,11 @@ He fretted over market shares.
 		t.Fatalf("expected 2 pages, got %d", len(pages))
 	}
 
-	expectedPage1Text := "Mr. Eggerton, with worried gaze, \\\nSat high upon the shelf.\n\nHe fretted over market shares, \\\nAnd thought about himself."
+	expectedPage1Text := `Mr. Eggerton, with worried gaze, \
+Sat high upon the shelf.
+
+He fretted over market shares, \
+And thought about himself.`
 	if pages[0].Number != 1 || pages[0].Text != expectedPage1Text || pages[0].Prompt != "The scene is a grand, ornate office." {
 		t.Errorf("page 1 mismatch: %+v", pages[0])
 	}
