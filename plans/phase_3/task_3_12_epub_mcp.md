@@ -1,9 +1,9 @@
 # plan: Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-15
+**Unit Test Coverage:** 89.9% (internal/plugins/epub), 73.0% (cmd/pw-mcp-epub), project-wide overall 91.1%
 
 Implement `pw-mcp-epub`, a native Go MCP server that compiles parodic manuscripts and illustration assets into spec-compliant EPUB digital publications. Primary consumer: the Pithos `digital-export` pipeline.
 
