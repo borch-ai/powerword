@@ -235,13 +235,7 @@ func TestRun_ConfigParsing(t *testing.T) {
 	// Let's test `run` error when custom config doesn't exist but has bad formatting, etc.
 	// Or simply test setupServer initialization.
 	tempDir := t.TempDir()
-	errSet := os.Setenv("POWERWORD_WORKSPACE_ROOT", tempDir)
-	if errSet != nil {
-		t.Fatalf("failed to set env: %v", errSet)
-	}
-	defer func() {
-		_ = os.Unsetenv("POWERWORD_WORKSPACE_ROOT")
-	}()
+	t.Setenv("POWERWORD_WORKSPACE_ROOT", tempDir)
 
 	// powerword.toml doesn't exist, should load config("")
 	srv, err := setupServer(tempDir, nil, nil)
