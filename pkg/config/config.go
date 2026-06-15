@@ -90,12 +90,18 @@ type ViralConfig struct {
 	FFmpegPath   string `mapstructure:"ffmpeg_path"`   // path to ffmpeg executable
 }
 
+// TrendsConfig holds parameters for the Trends plugin.
+type TrendsConfig struct {
+	SerpAPIKey string `mapstructure:"serp_api_key"`
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
 	KDPMath  KDPMathConfig  `mapstructure:"kdp_math"`
 	SEO      SEOConfig      `mapstructure:"seo"`
 	Viral    ViralConfig    `mapstructure:"viral"`
+	Trends   TrendsConfig   `mapstructure:"trends"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -209,6 +215,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.viral.tts_voice_id", "alloy")
 	v.SetDefault("plugins.viral.video_backend", "mock")
 	v.SetDefault("plugins.viral.ffmpeg_path", "ffmpeg")
+	v.SetDefault("plugins.trends.serp_api_key", "")
 
 	// Read config files in order
 	readErr := readConfigFile(v, configFilesToTry, cfgFile)
@@ -267,6 +274,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.viral.video_backend", "POWERWORD_VIRAL_VIDEO_BACKEND")
 	bindEnv(v, "plugins.viral.video_api_key", "POWERWORD_VIRAL_VIDEO_API_KEY")
 	bindEnv(v, "plugins.viral.ffmpeg_path", "POWERWORD_VIRAL_FFMPEG_PATH")
+	bindEnv(v, "plugins.trends.serp_api_key", "POWERWORD_SERP_API_KEY")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

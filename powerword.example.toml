@@ -8,3 +8,13 @@ enable_critic = false
 [servers.seo]
    command = "go"
    args = ["run", "./cmd/pw-mcp-seo"]
+
+[servers.trends]
+   command = "go"
+   args = ["run", "./cmd/pw-mcp-trends"]
+
+[plugins.trends]
+# SerpAPI key for Google Trends velocity scores.
+# If unset, only Amazon completion data is returned.
+serp_api_key = ""
+

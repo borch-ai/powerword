@@ -1,9 +1,9 @@
 # plan: Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-15
+**Unit Test Coverage:** 89.9% (internal/plugins/trends), 64.1% (cmd/pw-mcp-trends), project-wide overall 91.2%
 
 Implement `pw-mcp-trends`, a native Go MCP server that provides market demand intelligence by wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends. Primary consumer: the Kiln `scout` engine. This plugin lifts the market intelligence logic out of Kiln's `internal/scout` package and makes it reusable by any MCP client.
 
@@ -60,7 +60,7 @@ func main() {
 
 ### `TrendSource` Interface
 
-#### [NEW] [source.go](file://../../internal/trends/source.go)
+#### [NEW] [source.go](file://../../internal/plugins/trends/source.go)
 ```go
 type TrendSource interface {
     Score(ctx context.Context, keyword string, limit int) ([]Candidate, error)
@@ -73,7 +73,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 
 ### Tests
 
-#### [NEW] [trends](file://../../internal/trends)
+#### [NEW] [source_test.go](file://../../internal/plugins/trends/source_test.go)
 - Mock HTTP servers for Amazon and SerpAPI.
 - MCP tool handler tests with mock sources.
 - 91%+ coverage.
@@ -83,7 +83,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 ## Verification Plan
 
 ### Automated Tests
-- `go test -race ./cmd/pw-mcp-trends/... ./internal/trends/...`
+- `go test -race ./cmd/pw-mcp-trends/... ./internal/plugins/trends/...`
 - `make check-coverage` — ≥91%
 
 ### Manual Verification
