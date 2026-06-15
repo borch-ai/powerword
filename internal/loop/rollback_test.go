@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/borch-ai/powerword/pkg/gitutil"
 )
 
 func runGitCmd(t *testing.T, dir string, args ...string) string {
@@ -207,8 +209,8 @@ func TestWorkspaceSnapshot_CleanUp(t *testing.T) {
 
 //nolint:gocognit,funlen
 func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
-	origExec := execCommand
-	defer func() { execCommand = origExec }()
+	origExec := gitutil.ExecCommand
+	defer func() { gitutil.ExecCommand = origExec }()
 
 	tmpDir := t.TempDir()
 	initGitRepo(t, tmpDir)
@@ -216,7 +218,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. failed to get original HEAD
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "rev-parse" && args[1] == "HEAD" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -228,7 +230,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 1b. failed to get show-toplevel when dir is empty
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "rev-parse" && args[1] == "--show-toplevel" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -240,7 +242,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 2. failed to check git status
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -258,7 +260,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 3. failed to stash changes
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "stash" && args[1] == "push" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -270,7 +272,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// Restore original exec to take a successful snapshot with stash
-	execCommand = origExec
+	gitutil.ExecCommand = origExec
 	snap, err := NewWorkspaceSnapshot(ctx, tmpDir)
 	if err != nil {
 		t.Fatalf("expected successful snapshot creation, got: %v", err)
@@ -280,7 +282,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 4. failed to reset to original commit in Restore
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "reset" && args[1] == "--hard" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -292,7 +294,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 5. failed to clean in Restore
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 0 && args[0] == "clean" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -304,7 +306,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 6. failed to list stash in Restore (findStashIndex failure)
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "stash" && args[1] == "list" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -316,7 +318,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 7. stash message not found (findStashIndex not found)
-	execCommand = origExec
+	gitutil.ExecCommand = origExec
 	badSnap := &WorkspaceSnapshot{
 		Dir:            tmpDir,
 		OriginalCommit: snap.OriginalCommit,
@@ -329,7 +331,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 8. failed to pop stash in Restore
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "stash" && args[1] == "pop" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -341,7 +343,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 9. CleanUp: failed to list stash (findStashIndex failure)
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "stash" && args[1] == "list" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -353,7 +355,7 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 	}
 
 	// 10. CleanUp: failed to drop stash
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "stash" && args[1] == "drop" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -366,8 +368,8 @@ func TestWorkspaceSnapshot_MockedErrors(t *testing.T) {
 }
 
 func TestNewWorkspaceSnapshot_StashApplyFails(t *testing.T) {
-	origExec := execCommand
-	defer func() { execCommand = origExec }()
+	origExec := gitutil.ExecCommand
+	defer func() { gitutil.ExecCommand = origExec }()
 
 	tmpDir := t.TempDir()
 	initGitRepo(t, tmpDir)
@@ -381,7 +383,7 @@ func TestNewWorkspaceSnapshot_StashApplyFails(t *testing.T) {
 	ctx := context.Background()
 
 	// Mock git stash apply failure
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" && len(args) > 1 && args[0] == "stash" && args[1] == "apply" {
 			return exec.CommandContext(ctx, "false")
 		}
@@ -394,6 +396,7 @@ func TestNewWorkspaceSnapshot_StashApplyFails(t *testing.T) {
 	}
 }
 
+//nolint:errcheck
 func TestWorkspaceSnapshot_GitBinaryNotFound(t *testing.T) {
 	origPath := os.Getenv("PATH")
 	defer func() { _ = os.Setenv("PATH", origPath) }()

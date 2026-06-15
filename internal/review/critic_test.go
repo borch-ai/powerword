@@ -141,6 +141,9 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(0)
 	}
 	if cmd == "echo" {
+		if len(args) > 1 {
+			_, _ = fmt.Fprintln(os.Stdout, strings.Join(args[1:], " "))
+		}
 		os.Exit(0)
 	}
 	if cmd == "fail" {

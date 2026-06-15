@@ -90,12 +90,7 @@ fix-plans:
 
 
 lint:
-	@if command -v golangci-lint >/dev/null; then \
-		golangci-lint run; \
-	else \
-		echo "golangci-lint not installed, running basic go vet..."; \
-		$(GOCMD) vet ./...; \
-	fi
+	$(GOCMD) run ./cmd/powerword lint-go
 
 vuln:
 	@GOBIN=$$(go env GOBIN); \
