@@ -19,7 +19,7 @@ Extract low-level Git commands and command execution from the internal rollback 
 
 ### Shared Git Engine
 
-#### [NEW] [gitutil.go](file:///Users/human/code/powerword/pkg/gitutil/gitutil.go)
+#### [NEW] [gitutil.go](file://../../pkg/gitutil/gitutil.go)
 Create the `pkg/gitutil` package exposing clean APIs for Git operations:
 * Support custom commands runner through package-level function variable `var ExecCommand = exec.CommandContext` to allow unit-test mocking.
 * `func RunGitCommand(ctx context.Context, dir string, args ...string) (string, error)` (executes git commands and filters coverage warnings).
@@ -36,18 +36,18 @@ Create the `pkg/gitutil` package exposing clean APIs for Git operations:
 * `func StashDrop(ctx context.Context, dir string, index int) error`
 * `func StashList(ctx context.Context, dir string) (string, error)`
 
-#### [NEW] [gitutil_test.go](file:///Users/human/code/powerword/pkg/gitutil/gitutil_test.go)
+#### [NEW] [gitutil_test.go](file://../../pkg/gitutil/gitutil_test.go)
 * Add unit tests using temporary directories and mocked command executions to test success and failure paths of the newly added APIs.
 * Verify coverage for `pkg/gitutil` meets the `≥91.0%` threshold.
 
 ### Rollback Refactor
 
-#### [MODIFY] [rollback.go](file:///Users/human/code/powerword/internal/loop/rollback.go)
+#### [MODIFY] [rollback.go](file://../../internal/loop/rollback.go)
 * Import `github.com/borch-ai/powerword/pkg/gitutil`.
 * Replace internal command runners and command calls (like stashing, cleaning, and resetting) with calls to the shared `gitutil` package.
 * Delete local duplicate `runGitCommand` method.
 
-#### [MODIFY] [rollback_test.go](file:///Users/human/code/powerword/internal/loop/rollback_test.go)
+#### [MODIFY] [rollback_test.go](file://../../internal/loop/rollback_test.go)
 * Adjust internal test mocks to hook into the new package level mocking configurations of `pkg/gitutil`.
 
 ---

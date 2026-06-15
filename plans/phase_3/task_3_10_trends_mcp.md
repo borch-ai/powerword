@@ -111,7 +111,7 @@ time-series.
 
 ### `TrendSource` Interface & Implementations
 
-#### [NEW] [internal/trends/source.go](file://../../internal/trends/source.go)
+#### [NEW] [source.go](file://../../internal/trends/source.go)
 
 ```go
 // TrendSource is the extension interface for market intelligence backends.
@@ -146,7 +146,7 @@ Implementations in the same package:
 The MCP handler merges results by keyword, summing `Completions` and taking the
 max `TrendScore` across sources.
 
-#### [NEW] [internal/trends/source_test.go](file://../../internal/trends/source_test.go)
+#### [NEW] [source_test.go](file://../../internal/trends/source_test.go)
 
 Mock HTTP servers:
 - Amazon: correct completion JSON → correct `Candidate` list.
