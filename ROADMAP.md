@@ -88,6 +88,9 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.9: Google Doc MCP Plugin (GDoc)**
     *   Implement a native Go MCP server to create, read, and update Google Docs to export manuscripts for editing and import them back.
     *   [Implementation Plan](plans/phase_3/task_3_9_gdoc_mcp.md)
+*   [ ] **Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)**
+    *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine (Task 2.2). Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface. Blocks Kiln Task 2.2.
+    *   [Implementation Plan](plans/phase_3/task_3_10_trends_mcp.md)
 *   [x] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
     *   Implement a native Go MCP server that invokes a local Typst binary to compile book manuscripts and illustration assets into print-ready PDFs conforming to KDP bleed/margin specs. Primary consumer: the Pithos `assemble` engine (Task 4.2). This unblocks Pithos Phase 4 which is currently stalled waiting for this server.
     *   [Implementation Plan](plans/phase_3/task_3_11_typst_mcp.md)
@@ -230,6 +233,10 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)**
     *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.
     *   [Implementation Plan](plans/phase_6/task_6_19_trends_mcp.md)
+*   [x] **Task 6.20: Shared Git Utility Package (`pkg/gitutil`)**
+    *   Extract the Git command execution logic from internal rollback utilities into a reusable, public package `pkg/gitutil` for use across sibling projects.
+    *   [Implementation Plan](plans/phase_6/task_6_20_shared_git_utility.md)
+
 
 
 

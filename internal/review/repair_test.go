@@ -13,6 +13,7 @@ import (
 
 	"github.com/borch-ai/powerword/internal/loop"
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/gitutil"
 	"github.com/borch-ai/powerword/pkg/llm"
 )
 
@@ -221,6 +222,7 @@ func TestRunAutonomousLoop_ExtractDiffError(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,nestif
 func TestRunAutonomousLoop_GitRollbackSuccess(t *testing.T) {
 	origExec := execCommand
 	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
@@ -234,16 +236,25 @@ func TestRunAutonomousLoop_GitRollbackSuccess(t *testing.T) {
 	}
 	defer func() { execCommand = origExec }()
 
-	loop.SetExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	origGitutilExec := gitutil.ExecCommand
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" {
 			if len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
 				return mockExecCommandContext(ctx, "echo")
 			}
+			if len(args) > 1 && args[0] == "rev-parse" {
+				if args[1] == "--show-toplevel" {
+					return mockExecCommandContext(ctx, "echo", ".")
+				}
+				if args[1] == "--is-inside-work-tree" {
+					return mockExecCommandContext(ctx, "echo", "true")
+				}
+			}
 			return mockExecCommandContext(ctx, "echo", args...)
 		}
 		return mockExecCommandContext(ctx, command, args...)
-	})
-	defer func() { loop.SetExecCommand(origExec) }()
+	}
+	defer func() { gitutil.ExecCommand = origGitutilExec }()
 
 	origExtract := ExtractGitDiff
 	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
@@ -281,6 +292,7 @@ func TestRunAutonomousLoop_GitRollbackSuccess(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,nestif
 func TestRunAutonomousLoop_GitRollbackFailure(t *testing.T) {
 	origExec := execCommand
 	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
@@ -294,16 +306,25 @@ func TestRunAutonomousLoop_GitRollbackFailure(t *testing.T) {
 	}
 	defer func() { execCommand = origExec }()
 
-	loop.SetExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	origGitutilExec := gitutil.ExecCommand
+	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" {
 			if len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
 				return mockExecCommandContext(ctx, "echo")
 			}
+			if len(args) > 1 && args[0] == "rev-parse" {
+				if args[1] == "--show-toplevel" {
+					return mockExecCommandContext(ctx, "echo", ".")
+				}
+				if args[1] == "--is-inside-work-tree" {
+					return mockExecCommandContext(ctx, "echo", "true")
+				}
+			}
 			return mockExecCommandContext(ctx, "echo", args...)
 		}
 		return mockExecCommandContext(ctx, command, args...)
-	})
-	defer func() { loop.SetExecCommand(origExec) }()
+	}
+	defer func() { gitutil.ExecCommand = origGitutilExec }()
 
 	origExtract := ExtractGitDiff
 	ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {

@@ -6,38 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/borch-ai/powerword/pkg/gitutil"
 )
-
-var execCommand = exec.CommandContext
-
-// SetExecCommand sets the execCommand variable in the loop package for mocking in tests.
-func SetExecCommand(f func(context.Context, string, ...string) *exec.Cmd) {
-	execCommand = f
-}
-
-// runGitCommand executes a git command and captures combined stdout/stderr for detailed error reporting.
-func runGitCommand(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := execCommand(ctx, "git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-
-	outStr := string(out)
-	if strings.Contains(outStr, "warning: GOCOVERDIR not set") {
-		var cleanLines []string
-		for _, line := range strings.Split(outStr, "\n") {
-			if strings.Contains(line, "warning: GOCOVERDIR not set") {
-				continue
-			}
-			cleanLines = append(cleanLines, line)
-		}
-		outStr = strings.Join(cleanLines, "\n")
-	}
-
-	if err != nil {
-		return "", fmt.Errorf("git command %v failed: %w (output: %q)", args, err, strings.TrimSpace(outStr))
-	}
-	return outStr, nil
-}
 
 // WorkspaceSnapshot represents a snapshot of the workspace state before an agent run.
 type WorkspaceSnapshot struct {
@@ -66,30 +37,36 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 	targetDir = dir
 	if targetDir == "" {
 		// Run in current directory to find the top level of the git repo
-		out, err = runGitCommand(ctx, "", "rev-parse", "--show-toplevel")
+		out, err = gitutil.RunGitCommand(ctx, "", "rev-parse", "--show-toplevel")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get git repository root: %w", err)
 		}
 		targetDir = strings.TrimSpace(out)
 	}
 
-	absDir, _ = filepath.Abs(targetDir)
+	absDir, absErr := filepath.Abs(targetDir)
+	if absErr != nil {
+		return nil, fmt.Errorf("failed to get absolute path for target directory: %w", absErr)
+	}
 	targetDir = absDir
 
 	// Check if inside a git repository
-	if _, err = runGitCommand(ctx, targetDir, "rev-parse", "--is-inside-work-tree"); err != nil {
+	inside, err := gitutil.IsInsideWorkTree(ctx, targetDir)
+	if err != nil {
 		return nil, fmt.Errorf("workspace %q is not inside a git repository: %w", targetDir, err)
+	}
+	if !inside {
+		return nil, fmt.Errorf("workspace %q is not inside a git repository", targetDir)
 	}
 
 	// Get original commit hash
-	out, err = runGitCommand(ctx, targetDir, "rev-parse", "HEAD")
+	originalCommit, err := gitutil.GetHeadCommit(ctx, targetDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get original HEAD commit hash: %w", err)
 	}
-	originalCommit := strings.TrimSpace(out)
 
 	// Check if dirty
-	statusOut, err := runGitCommand(ctx, targetDir, "status", "--porcelain")
+	statusOut, err := gitutil.RunGitCommand(ctx, targetDir, "status", "--porcelain")
 	if err != nil {
 		return nil, fmt.Errorf("failed to check git status: %w", err)
 	}
@@ -105,16 +82,17 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 		stashMsg := fmt.Sprintf("powerword-snapshot-%s", originalCommit)
 
 		// Push to stash including untracked files
-		if _, err = runGitCommand(ctx, targetDir, "stash", "push", "-u", "-m", stashMsg); err != nil {
+		if err = gitutil.StashPush(ctx, targetDir, stashMsg); err != nil {
 			return nil, fmt.Errorf("failed to stash uncommitted changes: %w", err)
 		}
 		snap.HasStash = true
 		snap.StashMessage = stashMsg
 
 		// Re-apply stash immediately so the agent can see and modify the changes, preserving index state
-		if _, err = runGitCommand(ctx, targetDir, "stash", "apply", "--index", "stash@{0}"); err != nil {
+		if err = gitutil.StashApply(ctx, targetDir, 0); err != nil {
 			// Clean up stash if apply fails
-			_, _ = runGitCommand(ctx, targetDir, "stash", "drop", "stash@{0}")
+			//nolint:errcheck
+			_ = gitutil.StashDrop(ctx, targetDir, 0)
 			return nil, fmt.Errorf("failed to apply stashed changes: %w", err)
 		}
 	}
@@ -130,12 +108,12 @@ func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
 	}
 
 	// 1. Reset HEAD and hard reset to original commit
-	if _, err := runGitCommand(ctx, s.Dir, "reset", "--hard", s.OriginalCommit); err != nil {
+	if err := gitutil.ResetHard(ctx, s.Dir, s.OriginalCommit); err != nil {
 		return fmt.Errorf("failed to reset to original commit %s: %w", s.OriginalCommit, err)
 	}
 
 	// 2. Clean untracked files/directories
-	if _, err := runGitCommand(ctx, s.Dir, "clean", "-fd"); err != nil {
+	if err := gitutil.Clean(ctx, s.Dir); err != nil {
 		return fmt.Errorf("failed to clean untracked files: %w", err)
 	}
 
@@ -149,7 +127,7 @@ func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
 
 		stashRef := fmt.Sprintf("stash@{%d}", stashIndex)
 		// Pop the stash to restore original uncommitted changes, preserving index state
-		if _, err := runGitCommand(ctx, s.Dir, "stash", "pop", "--index", stashRef); err != nil {
+		if err := gitutil.StashPop(ctx, s.Dir, stashIndex); err != nil {
 			return fmt.Errorf("failed to pop stash %s: %w", stashRef, err)
 		}
 	}
@@ -171,7 +149,7 @@ func (s *WorkspaceSnapshot) CleanUp(ctx context.Context) error {
 		}
 
 		stashRef := fmt.Sprintf("stash@{%d}", stashIndex)
-		if _, err := runGitCommand(ctx, s.Dir, "stash", "drop", stashRef); err != nil {
+		if err := gitutil.StashDrop(ctx, s.Dir, stashIndex); err != nil {
 			return fmt.Errorf("failed to drop stash %s: %w", stashRef, err)
 		}
 	}
@@ -180,7 +158,7 @@ func (s *WorkspaceSnapshot) CleanUp(ctx context.Context) error {
 
 // findStashIndex returns the stash index matching the message.
 func (s *WorkspaceSnapshot) findStashIndex(ctx context.Context) (int, error) {
-	out, err := runGitCommand(ctx, s.Dir, "stash", "list")
+	out, err := gitutil.StashList(ctx, s.Dir)
 	if err != nil {
 		return 0, err
 	}
