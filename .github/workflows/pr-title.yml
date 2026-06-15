@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
+permissions:
+  statuses: write
+  pull-requests: read
+
 jobs:
   pr-title:
     uses: borch-ai/.github/.github/workflows/pr-title.yml@main

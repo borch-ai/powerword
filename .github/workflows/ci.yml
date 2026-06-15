@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   ci:
     uses: borch-ai/.github/.github/workflows/go-ci-standalone.yml@main
