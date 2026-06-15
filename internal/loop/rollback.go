@@ -3,7 +3,6 @@ package loop
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -21,11 +20,6 @@ type WorkspaceSnapshot struct {
 // NewWorkspaceSnapshot creates and returns a snapshot of the current workspace state.
 // If it fails to run git commands, it returns an error.
 func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, error) {
-	// Robustness check: Ensure git executable is in the PATH
-	if _, err := exec.LookPath("git"); err != nil {
-		return nil, fmt.Errorf("git binary not found in PATH: %w", err)
-	}
-
 	var (
 		out       string
 		err       error
@@ -102,11 +96,6 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 
 // Restore rolls back the workspace changes to the snapshot state.
 func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
-	// Robustness check: Ensure git executable is in the PATH
-	if _, err := exec.LookPath("git"); err != nil {
-		return fmt.Errorf("git binary not found in PATH: %w", err)
-	}
-
 	// 1. Reset HEAD and hard reset to original commit
 	if err := gitutil.ResetHard(ctx, s.Dir, s.OriginalCommit); err != nil {
 		return fmt.Errorf("failed to reset to original commit %s: %w", s.OriginalCommit, err)
@@ -138,11 +127,6 @@ func (s *WorkspaceSnapshot) Restore(ctx context.Context) error {
 // CleanUp cleans up the stash if it was created, without restoring it.
 func (s *WorkspaceSnapshot) CleanUp(ctx context.Context) error {
 	if s.HasStash {
-		// Robustness check: Ensure git executable is in the PATH
-		if _, err := exec.LookPath("git"); err != nil {
-			return fmt.Errorf("git binary not found in PATH: %w", err)
-		}
-
 		stashIndex, err := s.findStashIndex(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to find snapshot stash for cleanup: %w", err)

@@ -2,6 +2,7 @@ package gitutil
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -179,7 +180,9 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 	// Mock git command failure
 	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
 		if command == "git" {
-			return exec.CommandContext(ctx, "false")
+			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "HELPER_EXIT_CODE=1")
+			return cmd
 		}
 		return origExec(ctx, command, args...)
 	}
@@ -194,8 +197,13 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 
 	// Test coverage warning filtering with mocked output
 	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		// Return a command that prints GOCOVERDIR warning and exits with non-zero (since it's fake)
-		return exec.CommandContext(ctx, "sh", "-c", "echo 'warning: GOCOVERDIR not set\nactual output'; exit 1")
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
+		cmd.Env = append(os.Environ(),
+			"GO_WANT_HELPER_PROCESS=1",
+			"HELPER_STDOUT=warning: GOCOVERDIR not set\nactual output\n",
+			"HELPER_EXIT_CODE=1",
+		)
+		return cmd
 	}
 
 	_, err = RunGitCommand(ctx, t.TempDir(), "status")
@@ -210,18 +218,10 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 	}
 }
 
-//nolint:errcheck
 func TestGitUtil_GitBinaryNotFound(t *testing.T) {
-	gitBinaryMu.Lock()
-	gitBinaryCached = ""
-	gitBinaryMu.Unlock()
-
 	origPath := os.Getenv("PATH")
 	defer func() {
 		_ = os.Setenv("PATH", origPath)
-		gitBinaryMu.Lock()
-		gitBinaryCached = ""
-		gitBinaryMu.Unlock()
 	}()
 
 	// Temporarily break PATH so git cannot be found
@@ -235,24 +235,19 @@ func TestGitUtil_GitBinaryNotFound(t *testing.T) {
 }
 
 func TestGitUtil_MockedLookPath(t *testing.T) {
-	gitBinaryMu.Lock()
-	gitBinaryCached = ""
-	gitBinaryMu.Unlock()
-
 	origLookPath := LookPath
 	LookPath = func(file string) (string, error) {
 		return "mocked-git", nil
 	}
 	origExec := ExecCommand
 	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "true")
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "HELPER_EXIT_CODE=0")
+		return cmd
 	}
 	defer func() {
 		LookPath = origLookPath
 		ExecCommand = origExec
-		gitBinaryMu.Lock()
-		gitBinaryCached = ""
-		gitBinaryMu.Unlock()
 	}()
 
 	ctx := context.Background()
@@ -260,4 +255,23 @@ func TestGitUtil_MockedLookPath(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success with mocked LookPath, got: %v", err)
 	}
+}
+
+// TestHelperProcess is used to mock command executions cross-platform.
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	if stdout := os.Getenv("HELPER_STDOUT"); stdout != "" {
+		_, _ = os.Stdout.WriteString(stdout)
+	}
+	if stderr := os.Getenv("HELPER_STDERR"); stderr != "" {
+		_, _ = os.Stderr.WriteString(stderr)
+	}
+	if code := os.Getenv("HELPER_EXIT_CODE"); code != "" {
+		var exitCode int
+		_, _ = fmt.Sscanf(code, "%d", &exitCode)
+		os.Exit(exitCode)
+	}
+	os.Exit(0)
 }

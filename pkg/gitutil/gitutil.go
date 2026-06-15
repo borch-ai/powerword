@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"sync"
 )
 
 // ExecCommand is a package-level function variable that defaults to exec.CommandContext.
@@ -16,27 +15,12 @@ var ExecCommand = exec.CommandContext
 // It can be overridden in unit tests to mock PATH lookup.
 var LookPath = exec.LookPath
 
-var (
-	gitBinaryCached string
-	gitBinaryMu     sync.RWMutex
-)
-
 // RunGitCommand executes a git command and captures combined stdout/stderr for detailed error reporting.
 // It filters out coverage warning lines to avoid contaminating output.
 func RunGitCommand(ctx context.Context, dir string, args ...string) (string, error) {
-	// Robustness check: Ensure git executable is in the PATH (using cached lookup)
-	gitBinaryMu.RLock()
-	cached := gitBinaryCached
-	gitBinaryMu.RUnlock()
-
-	if cached == "" {
-		path, err := LookPath("git")
-		if err != nil {
-			return "", fmt.Errorf("git binary not found in PATH: %w", err)
-		}
-		gitBinaryMu.Lock()
-		gitBinaryCached = path
-		gitBinaryMu.Unlock()
+	// Robustness check: Ensure git executable is in the PATH
+	if _, err := LookPath("git"); err != nil {
+		return "", fmt.Errorf("git binary not found in PATH: %w", err)
 	}
 
 	cmd := ExecCommand(ctx, "git", args...)
