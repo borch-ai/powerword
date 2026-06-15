@@ -9,6 +9,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  ci:
+  run:
     uses: borch-ai/.github/.github/workflows/go-ci-standalone.yml@main
     secrets: inherit

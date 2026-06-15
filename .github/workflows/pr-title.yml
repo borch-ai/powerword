@@ -1,4 +1,4 @@
-name: Validate PR Title
+name: PR Title
 
 on:
   pull_request:
@@ -9,6 +9,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  pr-title:
+  check:
     uses: borch-ai/.github/.github/workflows/pr-title.yml@main
     secrets: inherit
