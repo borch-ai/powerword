@@ -33,14 +33,15 @@ Implement a dedicated suite of integration tests (utilizing the `//go:build inte
   * Correct CLI exit codes for success, configuration parsing error, and connection timeouts.
   * Resuming past session state files from a temporary directory using `--session`.
 
-#### [NEW] [mcp_integration_test.go](file://../../internal/mcp/mcp_integration_test.go)
-- Create a test file utilizing the `//go:build integration` tag to test native Go MCP plugin execution.
-- Compile one of the native plugins (e.g. `pw-mcp-fs`) dynamically.
+#### [NEW] [main_integration_test.go](file://../../cmd/pw-mcp-fs/main_integration_test.go)
+- Create a test file utilizing the `//go:build integration` tag to test native Go FS MCP plugin execution.
+- Compile the native plugin dynamically.
 - Spawn the plugin subprocess and establish a real `stdio` MCP transport connection.
-- Verify:
-  * Handshake and schema/capability discovery (`tools/list`).
-  * Executing a basic file-read tool and asserting response payload serialization.
-  * Proper process cleanup and signal handling when transport closes.
+
+#### [NEW] [main_integration_test.go](file://../../cmd/pw-mcp-epub/main_integration_test.go)
+- Create a test file utilizing the `//go:build integration` tag to test native Go EPUB MCP plugin execution.
+- Compile the native plugin dynamically.
+- Spawn the plugin subprocess and establish a real `stdio` MCP transport connection.
 
 ---
 
