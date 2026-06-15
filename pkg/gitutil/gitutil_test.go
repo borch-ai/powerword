@@ -212,8 +212,17 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 
 //nolint:errcheck
 func TestGitUtil_GitBinaryNotFound(t *testing.T) {
+	gitBinaryMu.Lock()
+	gitBinaryCached = ""
+	gitBinaryMu.Unlock()
+
 	origPath := os.Getenv("PATH")
-	defer func() { _ = os.Setenv("PATH", origPath) }()
+	defer func() {
+		_ = os.Setenv("PATH", origPath)
+		gitBinaryMu.Lock()
+		gitBinaryCached = ""
+		gitBinaryMu.Unlock()
+	}()
 
 	// Temporarily break PATH so git cannot be found
 	_ = os.Setenv("PATH", "")
@@ -222,5 +231,33 @@ func TestGitUtil_GitBinaryNotFound(t *testing.T) {
 	_, err := RunGitCommand(ctx, "/tmp", "status")
 	if err == nil || !strings.Contains(err.Error(), "git binary not found in PATH") {
 		t.Errorf("expected git binary not found error, got: %v", err)
+	}
+}
+
+func TestGitUtil_MockedLookPath(t *testing.T) {
+	gitBinaryMu.Lock()
+	gitBinaryCached = ""
+	gitBinaryMu.Unlock()
+
+	origLookPath := LookPath
+	LookPath = func(file string) (string, error) {
+		return "mocked-git", nil
+	}
+	origExec := ExecCommand
+	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "true")
+	}
+	defer func() {
+		LookPath = origLookPath
+		ExecCommand = origExec
+		gitBinaryMu.Lock()
+		gitBinaryCached = ""
+		gitBinaryMu.Unlock()
+	}()
+
+	ctx := context.Background()
+	_, err := RunGitCommand(ctx, "/tmp", "status")
+	if err != nil {
+		t.Errorf("expected success with mocked LookPath, got: %v", err)
 	}
 }

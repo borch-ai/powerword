@@ -135,8 +135,7 @@ func resolveGolangciConfig(configPath string) (string, func(), error) {
 	}
 
 	// Fall back to embedded config with dynamic goimports local prefix
-	// Create the temporary configuration file in the project root to preserve relative path resolution
-	tmpFile, err := os.CreateTemp(".", ".golangci-temp-*.yml")
+	tmpFile, err := os.CreateTemp("", "golangci-temp-*.yml")
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
