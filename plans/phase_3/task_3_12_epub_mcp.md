@@ -77,7 +77,7 @@ Go library implementing EPUB container packaging and file structure layouts.
 
 ### Automated Tests
 - Unit Tests: `go test -race ./cmd/pw-mcp-epub/... ./internal/plugins/epub/...`
-- Integration Tests: `go test -v -tags=integration ./internal/mcp/...` (specifically `TestMCP_EpubPlugin_StdoutStdin` which compiles and runs the plugin binary via stdio transport)
+- Integration Tests: `go test -v -tags=integration ./cmd/pw-mcp-epub/...` (specifically `TestMCP_EpubPlugin_StdoutStdin` which compiles and runs the plugin binary via stdio transport)
 - Coverage Check: `make check-coverage` — ≥91% overall coverage (currently 91.1%)
 
 ### Manual Verification
