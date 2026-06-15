@@ -60,7 +60,7 @@ func main() {
 
 ### `TrendSource` Interface
 
-#### [NEW] [source.go](file://../../internal/trends/source.go)
+#### [NEW] [source.go](file://../../internal/plugins/trends/source.go)
 ```go
 type TrendSource interface {
     Score(ctx context.Context, keyword string, limit int) ([]Candidate, error)
@@ -73,7 +73,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 
 ### Tests
 
-#### [NEW] [trends](file://../../internal/trends)
+#### [NEW] [trends](file://../../internal/plugins/trends)
 - Mock HTTP servers for Amazon and SerpAPI.
 - MCP tool handler tests with mock sources.
 - 91%+ coverage.
@@ -83,7 +83,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 ## Verification Plan
 
 ### Automated Tests
-- `go test -race ./cmd/pw-mcp-trends/... ./internal/trends/...`
+- `go test -race ./cmd/pw-mcp-trends/... ./internal/plugins/trends/...`
 - `make check-coverage` — ≥91%
 
 ### Manual Verification
