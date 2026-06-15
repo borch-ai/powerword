@@ -109,7 +109,13 @@ func appendContent(page *Page, line string, state int) {
 
 func cleanPages(pages []Page) {
 	for i := range pages {
-		pages[i].Text = strings.TrimSpace(pages[i].Text)
+		text := strings.TrimSpace(pages[i].Text)
+		text = strings.ReplaceAll(text, "\r\n", "\n")
+		paragraphs := strings.Split(text, "\n\n")
+		for j := range paragraphs {
+			paragraphs[j] = strings.ReplaceAll(paragraphs[j], "\n", " \\\n")
+		}
+		pages[i].Text = strings.Join(paragraphs, "\n\n")
 		pages[i].Prompt = strings.TrimSpace(pages[i].Prompt)
 	}
 }
