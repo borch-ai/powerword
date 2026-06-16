@@ -572,6 +572,7 @@ func TestLoadConfig_APIKeyFallbacksDotEnv(t *testing.T) {
 	}()
 
 	envContent := `
+POWERWORD_GEMINI_API_KEY=dotenv-powerword-key
 GEMINI_API_KEY=dotenv-gemini-key
 OPENAI_API_KEY=dotenv-openai-key
 ANTHROPIC_API_KEY=dotenv-anthropic-key
@@ -596,8 +597,8 @@ SERP_API_KEY=dotenv-serp-key
 		t.Fatalf("LoadConfig error: %v", err)
 	}
 
-	if cfg.APIKeys.Gemini != "dotenv-gemini-key" {
-		t.Errorf("expected Gemini API key 'dotenv-gemini-key', got '%s'", cfg.APIKeys.Gemini)
+	if cfg.APIKeys.Gemini != "dotenv-powerword-key" {
+		t.Errorf("expected Gemini API key 'dotenv-powerword-key' (POWERWORD_* takes precedence in same source), got '%s'", cfg.APIKeys.Gemini)
 	}
 	if cfg.APIKeys.OpenAI != "dotenv-openai-key" {
 		t.Errorf("expected OpenAI API key 'dotenv-openai-key', got '%s'", cfg.APIKeys.OpenAI)
@@ -609,7 +610,7 @@ SERP_API_KEY=dotenv-serp-key
 		t.Errorf("expected SerpAPI key 'dotenv-serp-key', got '%s'", cfg.Plugins.Trends.SerpAPIKey)
 	}
 
-	// Test OS-level override wins over .env
+	// Test OS-level override wins over .env (including OS-level canonical overriding .env POWERWORD_ key)
 	_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
 	_ = os.Unsetenv("POWERWORD_OPENAI_API_KEY")
 	_ = os.Unsetenv("POWERWORD_ANTHROPIC_API_KEY")

@@ -168,6 +168,25 @@ func loadDotEnv() error {
 
 	return nil
 }
+func hasOSEnvOverride(key string) bool {
+	switch key {
+	case "POWERWORD_GEMINI_API_KEY":
+		return os.Getenv("POWERWORD_GEMINI_API_KEY") != "" ||
+			os.Getenv("GEMINI_API_KEY") != "" ||
+			os.Getenv("GOOGLE_API_KEY") != ""
+	case "POWERWORD_OPENAI_API_KEY":
+		return os.Getenv("POWERWORD_OPENAI_API_KEY") != "" ||
+			os.Getenv("OPENAI_API_KEY") != ""
+	case "POWERWORD_ANTHROPIC_API_KEY":
+		return os.Getenv("POWERWORD_ANTHROPIC_API_KEY") != "" ||
+			os.Getenv("ANTHROPIC_API_KEY") != ""
+	case "POWERWORD_SERP_API_KEY":
+		return os.Getenv("POWERWORD_SERP_API_KEY") != "" ||
+			os.Getenv("SERP_API_KEY") != ""
+	default:
+		return os.Getenv(key) != ""
+	}
+}
 
 func populatePowerwordEnv(v *viper.Viper) error {
 	for _, key := range v.AllKeys() {
@@ -175,8 +194,8 @@ func populatePowerwordEnv(v *viper.Viper) error {
 		if !strings.HasPrefix(upperKey, "POWERWORD_") {
 			continue
 		}
-		// Never overwrite already present environment variables
-		if os.Getenv(upperKey) != "" {
+		// Never overwrite already present environment variables or their overrides
+		if hasOSEnvOverride(upperKey) {
 			continue
 		}
 
@@ -194,8 +213,8 @@ func populateAliases(v *viper.Viper) error {
 		if val == "" {
 			continue
 		}
-		// Set the target variable only if neither the alias nor the target is already set in the OS environment
-		if os.Getenv(a.alias) == "" && os.Getenv(a.target) == "" {
+		// Set the target variable only if neither the alias nor the target (or its other overrides) is already set in the OS environment
+		if !hasOSEnvOverride(a.target) {
 			if err := os.Setenv(a.target, val); err != nil {
 				return fmt.Errorf("failed to set environment variable %s from alias %s: %w", a.target, a.alias, err)
 			}
