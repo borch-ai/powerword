@@ -56,13 +56,6 @@ plugins.trends.serp_api_key:
 
 ---
 
-## User Review Required
-
-> [!NOTE]
-> Fallback resolution expands configuration options by allowing standard provider-specific environment variables without breaking existing configurations that rely on the `POWERWORD_` prefix.
-
----
-
 ## Proposed Changes
 
 ### `pkg/config/config.go`
