@@ -121,6 +121,25 @@ func init() {
 	}
 }
 
+type envAlias struct {
+	alias  string
+	target string
+}
+
+// aliases is an ordered list of canonical provider env var aliases.
+// Precedence is determined by order: aliases appearing earlier (e.g. GEMINI_API_KEY)
+// take precedence over aliases appearing later (e.g. GOOGLE_API_KEY).
+// When an alias is found in .env, the target POWERWORD_ var is set from the alias
+// value only if neither the alias var nor the target is already set in the OS
+// environment, preserving the OS-wins precedence rule.
+var aliases = []envAlias{
+	{alias: "GEMINI_API_KEY", target: "POWERWORD_GEMINI_API_KEY"},
+	{alias: "GOOGLE_API_KEY", target: "POWERWORD_GEMINI_API_KEY"},
+	{alias: "OPENAI_API_KEY", target: "POWERWORD_OPENAI_API_KEY"},
+	{alias: "ANTHROPIC_API_KEY", target: "POWERWORD_ANTHROPIC_API_KEY"},
+	{alias: "SERP_API_KEY", target: "POWERWORD_SERP_API_KEY"},
+}
+
 // loadDotEnv reads the local .env file if it exists and pushes the keys into the process environment
 // so that BindEnv can pick them up. It only loads POWERWORD_ prefixed variables and does not overwrite
 // existing environment variables.
@@ -139,6 +158,18 @@ func loadDotEnv() error {
 		return fmt.Errorf("failed to read .env file: %w", err)
 	}
 
+	if err := populatePowerwordEnv(v); err != nil {
+		return err
+	}
+
+	if err := populateAliases(v); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func populatePowerwordEnv(v *viper.Viper) error {
 	for _, key := range v.AllKeys() {
 		upperKey := strings.ToUpper(key)
 		if !strings.HasPrefix(upperKey, "POWERWORD_") {
@@ -154,7 +185,22 @@ func loadDotEnv() error {
 			return fmt.Errorf("failed to set environment variable %s: %w", upperKey, err)
 		}
 	}
+	return nil
+}
 
+func populateAliases(v *viper.Viper) error {
+	for _, a := range aliases {
+		val := v.GetString(a.alias)
+		if val == "" {
+			continue
+		}
+		// Set the target variable only if neither the alias nor the target is already set in the OS environment
+		if os.Getenv(a.alias) == "" && os.Getenv(a.target) == "" {
+			if err := os.Setenv(a.target, val); err != nil {
+				return fmt.Errorf("failed to set environment variable %s from alias %s: %w", a.target, a.alias, err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -230,9 +276,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 	// Environment variable overrides
 	// Explicitly bind env vars to mapstructure path
-	bindEnv(v, "api_keys.gemini", "POWERWORD_GEMINI_API_KEY")
-	bindEnv(v, "api_keys.openai", "POWERWORD_OPENAI_API_KEY")
-	bindEnv(v, "api_keys.anthropic", "POWERWORD_ANTHROPIC_API_KEY")
+	bindEnv(v, "api_keys.gemini", "POWERWORD_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
+	bindEnv(v, "api_keys.openai", "POWERWORD_OPENAI_API_KEY", "OPENAI_API_KEY")
+	bindEnv(v, "api_keys.anthropic", "POWERWORD_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY")
 	bindEnv(v, "model", "POWERWORD_MODEL")
 	bindEnv(v, "verbose", "POWERWORD_VERBOSE")
 	bindEnv(v, "max_loop_iterations", "POWERWORD_MAX_LOOP_ITERATIONS")
@@ -274,7 +320,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.viral.video_backend", "POWERWORD_VIRAL_VIDEO_BACKEND")
 	bindEnv(v, "plugins.viral.video_api_key", "POWERWORD_VIRAL_VIDEO_API_KEY")
 	bindEnv(v, "plugins.viral.ffmpeg_path", "POWERWORD_VIRAL_FFMPEG_PATH")
-	bindEnv(v, "plugins.trends.serp_api_key", "POWERWORD_SERP_API_KEY")
+	bindEnv(v, "plugins.trends.serp_api_key", "POWERWORD_SERP_API_KEY", "SERP_API_KEY")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
