@@ -11,14 +11,26 @@ import (
 
 func clearEnv() func() {
 	orig := os.Environ()
+	hasPrefixOrMatch := func(name string) bool {
+		if strings.HasPrefix(name, "POWERWORD_") {
+			return true
+		}
+		switch name {
+		case "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "SERP_API_KEY":
+			return true
+		}
+		return false
+	}
 	for _, env := range orig {
-		if strings.HasPrefix(env, "POWERWORD_") {
-			_ = os.Unsetenv(strings.SplitN(env, "=", 2)[0])
+		name := strings.SplitN(env, "=", 2)[0]
+		if hasPrefixOrMatch(name) {
+			_ = os.Unsetenv(name)
 		}
 	}
 	return func() {
 		for _, env := range orig {
-			if strings.HasPrefix(env, "POWERWORD_") {
+			name := strings.SplitN(env, "=", 2)[0]
+			if hasPrefixOrMatch(name) {
 				kv := strings.SplitN(env, "=", 2)
 				if len(kv) == 2 {
 					_ = os.Setenv(kv[0], kv[1])
@@ -465,5 +477,150 @@ gemini = "key"
 	}
 	if cfg3.EnableCritic {
 		t.Error("expected EnableCritic to be false when POWERWORD_DISABLE_CRITIC env is true")
+	}
+}
+
+func TestLoadConfig_APIKeyFallbacks(t *testing.T) {
+	defer clearEnv()()
+	tmpDir := t.TempDir()
+
+	tomlContent := `
+[api_keys]
+gemini = "gemini-toml-key"
+`
+	cfgFilePath := filepath.Join(tmpDir, "config.toml")
+	if errWrite := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write temp config: %v", errWrite)
+	}
+
+	// Scenario 1: OS-level GEMINI_API_KEY set, no POWERWORD_* set
+	t.Setenv("GEMINI_API_KEY", "gemini-canonical-val")
+	cfg, err := LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.APIKeys.Gemini != "gemini-canonical-val" {
+		t.Errorf("expected Gemini key to be 'gemini-canonical-val', got '%s'", cfg.APIKeys.Gemini)
+	}
+
+	// Scenario 2: OS-level POWERWORD_GEMINI_API_KEY set alongside GEMINI_API_KEY
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "gemini-powerword-val")
+	cfg, err = LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.APIKeys.Gemini != "gemini-powerword-val" {
+		t.Errorf("expected Gemini key to be 'gemini-powerword-val' (POWERWORD_ prefix wins), got '%s'", cfg.APIKeys.Gemini)
+	}
+
+	// Scenario 3: OS-level GOOGLE_API_KEY set, neither GEMINI_API_KEY nor POWERWORD_GEMINI_API_KEY set
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "")
+	t.Setenv("GEMINI_API_KEY", "")
+	t.Setenv("GOOGLE_API_KEY", "google-canonical-val")
+	cfg, err = LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.APIKeys.Gemini != "google-canonical-val" {
+		t.Errorf("expected Gemini key to be 'google-canonical-val', got '%s'", cfg.APIKeys.Gemini)
+	}
+
+	// Scenario 4: OS-level ANTHROPIC_API_KEY set
+	t.Setenv("ANTHROPIC_API_KEY", "anthropic-canonical-val")
+	cfg, err = LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.APIKeys.Anthropic != "anthropic-canonical-val" {
+		t.Errorf("expected Anthropic key to be 'anthropic-canonical-val', got '%s'", cfg.APIKeys.Anthropic)
+	}
+
+	// Scenario 5: OS-level OPENAI_API_KEY set
+	t.Setenv("OPENAI_API_KEY", "openai-canonical-val")
+	cfg, err = LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.APIKeys.OpenAI != "openai-canonical-val" {
+		t.Errorf("expected OpenAI key to be 'openai-canonical-val', got '%s'", cfg.APIKeys.OpenAI)
+	}
+
+	// Scenario 6: OS-level SERP_API_KEY set
+	t.Setenv("SERP_API_KEY", "serp-canonical-val")
+	cfg, err = LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.Plugins.Trends.SerpAPIKey != "serp-canonical-val" {
+		t.Errorf("expected SerpAPI key to be 'serp-canonical-val', got '%s'", cfg.Plugins.Trends.SerpAPIKey)
+	}
+}
+
+func TestLoadConfig_APIKeyFallbacksDotEnv(t *testing.T) {
+	defer clearEnv()()
+	origWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	if errChdir := os.Chdir(tmpDir); errChdir != nil {
+		t.Fatalf("failed to change directory: %v", errChdir)
+	}
+	defer func() {
+		_ = os.Chdir(origWd)
+	}()
+
+	envContent := `
+POWERWORD_GEMINI_API_KEY=dotenv-powerword-key
+GEMINI_API_KEY=dotenv-gemini-key
+OPENAI_API_KEY=dotenv-openai-key
+ANTHROPIC_API_KEY=dotenv-anthropic-key
+SERP_API_KEY=dotenv-serp-key
+`
+	if errWrite := os.WriteFile(".env", []byte(envContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write .env: %v", errWrite)
+	}
+
+	// Preset none of them in OS env
+	_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
+	_ = os.Unsetenv("POWERWORD_OPENAI_API_KEY")
+	_ = os.Unsetenv("POWERWORD_ANTHROPIC_API_KEY")
+	_ = os.Unsetenv("POWERWORD_SERP_API_KEY")
+	_ = os.Unsetenv("GEMINI_API_KEY")
+	_ = os.Unsetenv("OPENAI_API_KEY")
+	_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	_ = os.Unsetenv("SERP_API_KEY")
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+
+	if cfg.APIKeys.Gemini != "dotenv-powerword-key" {
+		t.Errorf("expected Gemini API key 'dotenv-powerword-key' (POWERWORD_* takes precedence in same source), got '%s'", cfg.APIKeys.Gemini)
+	}
+	if cfg.APIKeys.OpenAI != "dotenv-openai-key" {
+		t.Errorf("expected OpenAI API key 'dotenv-openai-key', got '%s'", cfg.APIKeys.OpenAI)
+	}
+	if cfg.APIKeys.Anthropic != "dotenv-anthropic-key" {
+		t.Errorf("expected Anthropic API key 'dotenv-anthropic-key', got '%s'", cfg.APIKeys.Anthropic)
+	}
+	if cfg.Plugins.Trends.SerpAPIKey != "dotenv-serp-key" {
+		t.Errorf("expected SerpAPI key 'dotenv-serp-key', got '%s'", cfg.Plugins.Trends.SerpAPIKey)
+	}
+
+	// Test OS-level override wins over .env (including OS-level canonical overriding .env POWERWORD_ key)
+	_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
+	_ = os.Unsetenv("POWERWORD_OPENAI_API_KEY")
+	_ = os.Unsetenv("POWERWORD_ANTHROPIC_API_KEY")
+	_ = os.Unsetenv("POWERWORD_SERP_API_KEY")
+	t.Setenv("GEMINI_API_KEY", "os-gemini-override")
+	cfg, err = LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.APIKeys.Gemini != "os-gemini-override" {
+		t.Errorf("expected OS environment variable to override .env, got '%s'", cfg.APIKeys.Gemini)
 	}
 }

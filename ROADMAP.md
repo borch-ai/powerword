@@ -248,7 +248,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.20: Shared Git Utility Package (`pkg/gitutil`)**
     *   Extract the Git command execution logic from internal rollback utilities into a reusable, public package `pkg/gitutil` for use across sibling projects.
     *   [Implementation Plan](plans/phase_6/task_6_20_shared_git_utility.md)
-*   [ ] **Task 6.21: Provider API Key Fallback Resolution**
+*   [x] **Task 6.21: Provider API Key Fallback Resolution**
     *   Add fallback resolution to `LoadConfig` so that canonical provider env var names (`GEMINI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SERP_API_KEY`) are recognised when the `POWERWORD_`-prefixed variant is not set. Eliminates the need to set separate keys per tool in the Borch-AI stack — one key covers the whole stack. `POWERWORD_*` vars retain highest precedence.
     *   [Implementation Plan](plans/phase_6/task_6_21_api_key_fallback_resolution.md)
 
