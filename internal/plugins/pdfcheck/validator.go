@@ -267,6 +267,13 @@ func parseInputDefaults(input ValidatePDFInput) (float64, int, bool, bool, bool)
 func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*ValidatePDFResult, error) {
 	bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale := parseInputDefaults(input)
 
+	if input.MinGutterInches != nil && *input.MinGutterInches < 0 {
+		return nil, fmt.Errorf("min_gutter_inches must be non-negative")
+	}
+	if input.MinMarginInches != nil && *input.MinMarginInches < 0 {
+		return nil, fmt.Errorf("min_margin_inches must be non-negative")
+	}
+
 	f, err := os.Open(input.PDFPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open PDF file %s: %w", input.PDFPath, err)

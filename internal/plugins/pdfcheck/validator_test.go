@@ -1087,3 +1087,36 @@ func assertMarginErrors(t *testing.T, res *ValidatePDFResult, expectedErrors []s
 func floatPtr(f float64) *float64 {
 	return &f
 }
+
+func TestValidatePDFPreflight_NegativeMargins(t *testing.T) {
+	pdfBytes := createMinimalPDFBytes()
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "test.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp PDF: %v", err)
+	}
+
+	negVal := -0.5
+
+	inputGutter := ValidatePDFInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		MinGutterInches:      &negVal,
+	}
+	_, err := ValidatePDFPreflight(context.Background(), inputGutter)
+	if err == nil || !strings.Contains(err.Error(), "min_gutter_inches must be non-negative") {
+		t.Errorf("expected error for negative min_gutter_inches, got: %v", err)
+	}
+
+	inputMargin := ValidatePDFInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		MinMarginInches:      &negVal,
+	}
+	_, err = ValidatePDFPreflight(context.Background(), inputMargin)
+	if err == nil || !strings.Contains(err.Error(), "min_margin_inches must be non-negative") {
+		t.Errorf("expected error for negative min_margin_inches, got: %v", err)
+	}
+}
