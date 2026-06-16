@@ -97,7 +97,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.12: EPUB Publication Builder (`pw-mcp-epub`)**
     *   Implement a native Go MCP server that compiles parodic manuscripts and illustration assets into spec-compliant EPUB digital publications. Primary consumer: Pithos (`digital-export`).
     *   [Implementation Plan](plans/phase_3/task_3_12_epub_mcp.md)
-*   [ ] **Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
+*   [x] **Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)**
     *   Implement a native Go MCP server to perform deep validation of compiled PDF book geometry, bleed limits, embedded fonts, and image resolution (minimum 300 DPI) against Amazon KDP paperback ingest rules. Primary consumer: Pithos (`assemble`).
     *   [Implementation Plan](plans/phase_3/task_3_13_pdfcheck_mcp.md)
 *   [x] **Task 3.14: Typst Verse Line Break Formatting (`pw-mcp-typst`)**
@@ -109,6 +109,18 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)**
     *   Extend the `pw-mcp-viral` toolset with a slideshow generator tool (`viral_stitch_slideshow`) that compiles sequences of paired images and audio narration segments into a single unified MP4 video trailer using ffmpeg.
     *   [Implementation Plan](plans/phase_3/task_3_16_viral_slideshow.md)
+*   [ ] **Task 3.17: Grayscale PDF Preflight Checker (`pw-mcp-pdfcheck`)**
+    *   Extend the `pw-mcp-pdfcheck` toolset with grayscale enforcement to verify that manuscripts intended for black-and-white print editions only contain grayscale elements (no RGB or CMYK coordinates/color profiles).
+    *   [Implementation Plan](plans/phase_3/task_3_17_pdfcheck_grayscale.md)
+*   [ ] **Task 3.18: Gutter & Safe-Zone Margin Analyzer (`pw-mcp-pdfcheck`)**
+    *   Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` to verify that text and structural elements do not run too close to the binding gutter or outer page trim boundaries.
+    *   [Implementation Plan](plans/phase_3/task_3_18_pdfcheck_margins.md)
+*   [ ] **Task 3.19: Spine Cover Wrap & Barcode Layout Checker (`pw-mcp-pdfcheck`)**
+    *   Implement cover wrap geometry checking and back cover barcode detection in `pw-mcp-pdfcheck` to verify that compiled book covers have the exact KDP-compliant dimensions and contain a readable barcode.
+    *   [Implementation Plan](plans/phase_3/task_3_19_pdfcheck_cover_barcode.md)
+*   [ ] **Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)**
+    *   Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to check that print-ready PDF files do not exceed maximum ink density limits (e.g. 240% for KDP paperbacks), preventing smudging and press tearing.
+    *   [Implementation Plan](plans/phase_3/task_3_20_pdfcheck_ink_coverage.md)
 
 ---
 

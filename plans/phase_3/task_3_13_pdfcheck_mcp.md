@@ -1,9 +1,9 @@
 # plan: Task 3.13: Print-Ready PDF Preflight Inspector (`pw-mcp-pdfcheck`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-16
+**Unit Test Coverage:** 91.1%
 
 Implement `pw-mcp-pdfcheck`, a native Go MCP server that performs preflight validation checks on compiled PDF book manuscripts to ensure compliance with Amazon KDP paperback requirements. Primary consumer: the Pithos `assemble` pipeline.
 
