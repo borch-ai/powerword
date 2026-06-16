@@ -92,6 +92,14 @@ const validatePDFSchema = `{
 		"enforce_grayscale": {
 			"type": "boolean",
 			"description": "Optional enforcement that all elements and images use grayscale color spaces. Defaults to false."
+		},
+		"min_gutter_inches": {
+			"type": "number",
+			"description": "Optional minimum inside gutter margin in inches."
+		},
+		"min_margin_inches": {
+			"type": "number",
+			"description": "Optional minimum top, bottom, and outer margin in inches."
 		}
 	},
 	"required": ["pdf_path", "expected_width_inches", "expected_height_inches"]

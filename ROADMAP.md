@@ -88,7 +88,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.9: Google Doc MCP Plugin (GDoc)**
     *   Implement a native Go MCP server to create, read, and update Google Docs to export manuscripts for editing and import them back.
     *   [Implementation Plan](plans/phase_3/task_3_9_gdoc_mcp.md)
-*   [ ] **Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)**
+*   [x] **Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)**
     *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine (Task 2.2). Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface. Blocks Kiln Task 2.2.
     *   [Implementation Plan](plans/phase_3/task_3_10_trends_mcp.md)
 *   [x] **Task 3.11: Typst PDF Layout Plugin (`pw-mcp-typst`)**
@@ -109,10 +109,10 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)**
     *   Extend the `pw-mcp-viral` toolset with a slideshow generator tool (`viral_stitch_slideshow`) that compiles sequences of paired images and audio narration segments into a single unified MP4 video trailer using ffmpeg.
     *   [Implementation Plan](plans/phase_3/task_3_16_viral_slideshow.md)
-*   [ ] **Task 3.17: Grayscale PDF Preflight Checker (`pw-mcp-pdfcheck`)**
+*   [x] **Task 3.17: Grayscale PDF Preflight Checker (`pw-mcp-pdfcheck`)**
     *   Extend the `pw-mcp-pdfcheck` toolset with grayscale enforcement to verify that manuscripts intended for black-and-white print editions only contain grayscale elements (no RGB or CMYK coordinates/color profiles).
     *   [Implementation Plan](plans/phase_3/task_3_17_pdfcheck_grayscale.md)
-*   [ ] **Task 3.18: Gutter & Safe-Zone Margin Analyzer (`pw-mcp-pdfcheck`)**
+*   [x] **Task 3.18: Gutter & Safe-Zone Margin Analyzer (`pw-mcp-pdfcheck`)**
     *   Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` to verify that text and structural elements do not run too close to the binding gutter or outer page trim boundaries.
     *   [Implementation Plan](plans/phase_3/task_3_18_pdfcheck_margins.md)
 *   [ ] **Task 3.19: Spine Cover Wrap & Barcode Layout Checker (`pw-mcp-pdfcheck`)**
@@ -221,7 +221,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.11: Generalized MCP Critic Server**
     *   Refactor the existing Powerword Local Critic subsystem into a standalone, generalized Model Context Protocol (MCP) server (pw-mcp-critic) to be shared across projects.
     *   [Implementation Plan](plans/phase_6/task_6_11_critic_mcp.md)
-*   [ ] **Task 6.12: Standalone Linter Suite (CLI, `pw-mcp-linter`)**
+*   [x] **Task 6.12: Standalone Linter Suite (CLI, `pw-mcp-linter`)**
     *   Promote `internal/linter` to `pkg/linter` (public). Add `powerword lint-plans` and `powerword lint-go` subcommands. Build `pw-mcp-linter` as a standalone MCP server exposing a `lint_plans` tool that returns structured JSON errors, allowing autonomous agents to run cheap pre-flight plan checks.
     *   [Implementation Plan](plans/phase_6/task_6_12_standalone_plan_linter.md)
 *   [ ] **Task 6.13: Isolated Execution via Git Worktrees**
@@ -242,7 +242,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.18: Speculative — Pithos Pipeline MCP Server (`pw-mcp-pithos`)**
     *   Wrap the Pithos book production pipeline behind a formal MCP server, enabling Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration). Not to be built until Pithos `deploy` is fully implemented.
     *   [Implementation Plan](plans/phase_6/task_6_18_pithos_mcp_server.md)
-*   [ ] **Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)**
+*   [x] **Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)**
     *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.
     *   [Implementation Plan](plans/phase_6/task_6_19_trends_mcp.md)
 *   [x] **Task 6.20: Shared Git Utility Package (`pkg/gitutil`)**
