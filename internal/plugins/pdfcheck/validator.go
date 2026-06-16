@@ -23,6 +23,7 @@ type ValidatePDFInput struct {
 	MinDPI               *int     `json:"min_dpi,omitempty"`                // default: 300
 	EnforceEmbeddedFonts *bool    `json:"enforce_embedded_fonts,omitempty"` // default: true
 	EnforceCMYK          *bool    `json:"enforce_cmyk,omitempty"`           // default: false
+	EnforceGrayscale     *bool    `json:"enforce_grayscale,omitempty"`      // default: false
 }
 
 // ValidatePDFResult represents the JSON response output for the validate_pdf tool.
@@ -220,7 +221,7 @@ func checkFonts(ctx context.Context, pdfPath string, enforceFonts bool, res *Val
 }
 
 // checkImages executes pdfimages and updates verification results.
-func checkImages(ctx context.Context, pdfPath string, minDPI int, enforceCMYK bool, res *ValidatePDFResult) {
+func checkImages(ctx context.Context, pdfPath string, minDPI int, enforceCMYK bool, enforceGrayscale bool, res *ValidatePDFResult) {
 	_, lookImagesErr := execLookPath("pdfimages")
 	if lookImagesErr != nil {
 		res.Warnings = append(res.Warnings, "pdfimages utility not found on host. Skipping image resolution and color space checks.")
@@ -232,7 +233,7 @@ func checkImages(ctx context.Context, pdfPath string, minDPI int, enforceCMYK bo
 		res.Errors = append(res.Errors, fmt.Sprintf("Failed to run pdfimages: %v (output: %s)", cmdErr, string(outputBytes)))
 		return
 	}
-	parsePDFImagesOutput(string(outputBytes), minDPI, enforceCMYK, res)
+	parsePDFImagesOutput(string(outputBytes), minDPI, enforceCMYK, enforceGrayscale, res)
 }
 
 // ValidatePDFPreflight performs the validation of PDF geometry, fonts, images, and colors.
@@ -255,6 +256,11 @@ func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*Validat
 	enforceCMYK := false
 	if input.EnforceCMYK != nil {
 		enforceCMYK = *input.EnforceCMYK
+	}
+
+	enforceGrayscale := false
+	if input.EnforceGrayscale != nil {
+		enforceGrayscale = *input.EnforceGrayscale
 	}
 
 	f, err := os.Open(input.PDFPath)
@@ -295,7 +301,16 @@ func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*Validat
 	checkFonts(ctx, input.PDFPath, enforceFonts, res)
 
 	// Image resolution and color space analysis
-	checkImages(ctx, input.PDFPath, minDPI, enforceCMYK, res)
+	checkImages(ctx, input.PDFPath, minDPI, enforceCMYK, enforceGrayscale, res)
+
+	// Content stream vector/text operator analysis
+	if enforceGrayscale {
+		for i := 1; i <= numPages; i++ {
+			p := r.Page(i)
+			opErrs := auditPageOperators(p, i)
+			res.Errors = append(res.Errors, opErrs...)
+		}
+	}
 
 	res.Valid = (len(res.Errors) == 0)
 	return res, nil
@@ -331,7 +346,7 @@ func parsePDFFontsOutput(output string, enforceFonts bool, res *ValidatePDFResul
 	}
 }
 
-func parsePDFImagesOutput(output string, minDPI int, enforceCMYK bool, res *ValidatePDFResult) {
+func parsePDFImagesOutput(output string, minDPI int, enforceCMYK bool, enforceGrayscale bool, res *ValidatePDFResult) {
 	lines := strings.Split(output, "\n")
 	if len(lines) == 0 {
 		return
@@ -348,27 +363,157 @@ func parsePDFImagesOutput(output string, minDPI int, enforceCMYK bool, res *Vali
 			continue
 		}
 
-		pageStr := fields[0]
-		colorStr := fields[len(fields)-11]
-		xDpiStr := fields[len(fields)-4]
-		yDpiStr := fields[len(fields)-3]
+		validateImageRow(fields, minDPI, enforceCMYK, enforceGrayscale, res)
+	}
+}
 
-		xDpi, xErr := strconv.Atoi(xDpiStr)
-		yDpi, yErr := strconv.Atoi(yDpiStr)
+func validateImageRow(fields []string, minDPI int, enforceCMYK, enforceGrayscale bool, res *ValidatePDFResult) {
+	pageStr := fields[0]
+	colorStr := fields[len(fields)-11]
+	xDpiStr := fields[len(fields)-4]
+	yDpiStr := fields[len(fields)-3]
 
-		if xErr == nil && yErr == nil {
-			if xDpi < minDPI || yDpi < minDPI {
-				res.Errors = append(res.Errors, fmt.Sprintf("Page %s image resolution %d x %d DPI is below minimum of %d DPI", pageStr, xDpi, yDpi, minDPI))
-			}
-		} else {
-			res.Warnings = append(res.Warnings, fmt.Sprintf("Page %s image has unparseable DPI resolution: %s x %s", pageStr, xDpiStr, yDpiStr))
+	xDpi, xErr := strconv.Atoi(xDpiStr)
+	yDpi, yErr := strconv.Atoi(yDpiStr)
+
+	if xErr == nil && yErr == nil {
+		if xDpi < minDPI || yDpi < minDPI {
+			res.Errors = append(res.Errors, fmt.Sprintf("Page %s image resolution %d x %d DPI is below minimum of %d DPI", pageStr, xDpi, yDpi, minDPI))
 		}
+	} else {
+		res.Warnings = append(res.Warnings, fmt.Sprintf("Page %s image has unparseable DPI resolution: %s x %s", pageStr, xDpiStr, yDpiStr))
+	}
 
-		if enforceCMYK {
-			lowerColor := strings.ToLower(colorStr)
-			if strings.Contains(lowerColor, "rgb") {
-				res.Errors = append(res.Errors, fmt.Sprintf("Page %s image has RGB color space (%s), CMYK is required", pageStr, colorStr))
-			}
+	if enforceCMYK {
+		lowerColor := strings.ToLower(colorStr)
+		if strings.Contains(lowerColor, "rgb") {
+			res.Errors = append(res.Errors, fmt.Sprintf("Page %s image has RGB color space (%s), CMYK is required", pageStr, colorStr))
 		}
 	}
+
+	if enforceGrayscale {
+		lowerColor := strings.ToLower(colorStr)
+		if lowerColor != "gray" && lowerColor != "mono" {
+			res.Errors = append(res.Errors, fmt.Sprintf("Page %s image has non-grayscale color space (%s), grayscale is required", pageStr, colorStr))
+		}
+	}
+}
+
+// getPageContentsStreams returns all contents streams for a page.
+func getPageContentsStreams(p pdf.Page) []pdf.Value {
+	contents := p.V.Key("Contents")
+	if contents.Kind() == pdf.Array {
+		var streams []pdf.Value
+		for i := 0; i < contents.Len(); i++ {
+			streams = append(streams, contents.Index(i))
+		}
+		return streams
+	}
+	if contents.Kind() == pdf.Stream {
+		return []pdf.Value{contents}
+	}
+	return nil
+}
+
+// auditPageOperators inspects content streams of a page to ensure only grayscale operators are used.
+func auditPageOperators(p pdf.Page, pageNum int) []string {
+	var errs []string
+	streams := getPageContentsStreams(p)
+	for _, strm := range streams {
+		pdf.Interpret(strm, func(stk *pdf.Stack, op string) {
+			// Pop all arguments to keep the stack clean and inspect them.
+			n := stk.Len()
+			args := make([]pdf.Value, n)
+			for i := n - 1; i >= 0; i-- {
+				args[i] = stk.Pop()
+			}
+
+			switch op {
+			case "rg", "RG":
+				errs = append(errs, fmt.Sprintf("Page %d has RGB vector/text color setting operator (%s)", pageNum, op))
+			case "k", "K":
+				errs = append(errs, fmt.Sprintf("Page %d has CMYK vector/text color setting operator (%s)", pageNum, op))
+			case "cs", "CS":
+				if len(args) > 0 {
+					name := args[0].Name()
+					if isNonGrayColorspace(name, p) {
+						errs = append(errs, fmt.Sprintf("Page %d sets non-grayscale color space (%s)", pageNum, name))
+					}
+				}
+			}
+		})
+	}
+	return errs
+}
+
+// isNonGrayColorspace returns true if the colorspace name is non-grayscale.
+func isNonGrayColorspace(name string, p pdf.Page) bool {
+	lower := strings.ToLower(name)
+	if lower == "devicegray" || lower == "calgray" {
+		return false
+	}
+	if lower == "devicergb" || lower == "devicecmyk" || lower == "calrgb" || lower == "lab" {
+		return true
+	}
+
+	// Resolve custom color space from resources
+	csRes := p.Resources().Key("ColorSpace").Key(name)
+	if csRes.IsNull() {
+		return false
+	}
+
+	return isNonGrayColorspaceValue(csRes, p)
+}
+
+// isNonGrayColorspaceValue checks a colorspace value for grayscale status.
+func isNonGrayColorspaceValue(val pdf.Value, p pdf.Page) bool {
+	if val.Kind() == pdf.Name {
+		return isNonGrayColorspaceName(val, p)
+	}
+	if val.Kind() == pdf.Array {
+		return isNonGrayColorspaceArray(val, p)
+	}
+	return false
+}
+
+func isNonGrayColorspaceName(val pdf.Value, p pdf.Page) bool {
+	name := val.Name()
+	lower := strings.ToLower(name)
+	if lower == "devicegray" || lower == "calgray" {
+		return false
+	}
+	if lower == "devicergb" || lower == "devicecmyk" || lower == "calrgb" || lower == "lab" {
+		return true
+	}
+	// Resolve custom color space from resources
+	csRes := p.Resources().Key("ColorSpace").Key(name)
+	if csRes.IsNull() {
+		return false
+	}
+	return isNonGrayColorspaceValue(csRes, p)
+}
+
+func isNonGrayColorspaceArray(val pdf.Value, p pdf.Page) bool {
+	if val.Len() == 0 {
+		return false
+	}
+	family := val.Index(0).Name()
+	lowerFamily := strings.ToLower(family)
+	if lowerFamily == "devicegray" || lowerFamily == "calgray" {
+		return false
+	}
+	if lowerFamily == "devicergb" || lowerFamily == "devicecmyk" || lowerFamily == "calrgb" || lowerFamily == "lab" {
+		return true
+	}
+	if lowerFamily == "iccbased" && val.Len() > 1 {
+		// ICCBased stream is the second element, look at N components
+		nComp := val.Index(1).Key("N").Int64()
+		return nComp > 1
+	}
+	if lowerFamily == "indexed" && val.Len() > 1 {
+		// Base color space is the second element
+		baseCS := val.Index(1)
+		return isNonGrayColorspaceValue(baseCS, p)
+	}
+	return true
 }
