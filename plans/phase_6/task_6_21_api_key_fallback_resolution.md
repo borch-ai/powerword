@@ -1,9 +1,16 @@
 # plan: Task 6.21: Provider API Key Fallback Resolution
 
 **Status:** Open
-**Go Version:** 1.26+
+**Go Version:** 1.26.4
 **Date Completed:** —
 **Unit Test Coverage:** —
+
+---
+
+## User Review Required
+
+> [!NOTE]
+> No breaking changes. Existing POWERWORD_* env vars retain highest precedence. Fully backward-compatible.
 
 ---
 
@@ -79,8 +86,9 @@ The current `loadDotEnv()` only processes `POWERWORD_`-prefixed keys from `.env`
 
 ```go
 // aliasMap maps canonical provider env var names to their POWERWORD_ equivalents.
-// When a canonical name is found in .env and the POWERWORD_ var is not already
-// set in the OS environment, the POWERWORD_ var is set from the canonical value.
+// When a canonical name is found in .env, the POWERWORD_ var is set from the canonical
+// value only if neither the canonical var nor the POWERWORD_ target is already set
+// in the OS environment, preserving the OS-wins precedence rule.
 var aliasMap = map[string]string{
     "GEMINI_API_KEY":    "POWERWORD_GEMINI_API_KEY",
     "GOOGLE_API_KEY":    "POWERWORD_GEMINI_API_KEY",
