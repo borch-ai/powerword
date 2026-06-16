@@ -103,12 +103,14 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 		Name:        "validate_pdf",
 		Description: "Performs preflight validation checks on a compiled PDF book manuscript to ensure KDP paperback compliance.",
 		InputSchema: json.RawMessage(validatePDFSchema),
-	}, handleValidatePDF)
+	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return handleValidatePDF(ctx, req, workspaceRoot)
+	})
 
 	return srv, nil
 }
 
-func handleValidatePDF(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleValidatePDF(ctx context.Context, req *mcp.CallToolRequest, workspaceRoot string) (*mcp.CallToolResult, error) {
 	var args pdfcheck.ValidatePDFInput
 	if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 		return nil, err
@@ -119,6 +121,10 @@ func handleValidatePDF(ctx context.Context, req *mcp.CallToolRequest) (*mcp.Call
 			IsError: true,
 			Content: []mcp.Content{&mcp.TextContent{Text: "pdf_path parameter is required"}},
 		}, nil
+	}
+
+	if !filepath.IsAbs(args.PDFPath) {
+		args.PDFPath = filepath.Join(workspaceRoot, args.PDFPath)
 	}
 
 	if args.ExpectedWidthInches <= 0 || args.ExpectedHeightInches <= 0 {

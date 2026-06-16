@@ -57,6 +57,7 @@ func createMultipageMismatchPDFBytes() []byte {
 }
 
 func TestValidatePDFPreflight_Success(t *testing.T) {
+	defer mockLookPathSuccess()()
 	pdfBytes := createMinimalPDFBytes()
 	tempDir := t.TempDir()
 	pdfPath := filepath.Join(tempDir, "test.pdf")
@@ -114,6 +115,7 @@ func TestValidatePDFPreflight_Success(t *testing.T) {
 }
 
 func TestValidatePDFPreflight_Errors(t *testing.T) {
+	defer mockLookPathSuccess()()
 	pdfBytes := createMinimalPDFBytes()
 	tempDir := t.TempDir()
 	pdfPath := filepath.Join(tempDir, "test.pdf")
@@ -171,8 +173,11 @@ func TestValidatePDFPreflight_Errors(t *testing.T) {
 }
 
 func TestValidatePDFPreflight_MissingTools(t *testing.T) {
-	// Temporarily clear PATH so that LookPath fails to find pdffonts and pdfimages
-	t.Setenv("PATH", "")
+	oldLookPath := execLookPath
+	defer func() { execLookPath = oldLookPath }()
+	execLookPath = func(file string) (string, error) {
+		return "", fmt.Errorf("tool not found")
+	}
 
 	pdfBytes := createMinimalPDFBytes()
 	tempDir := t.TempDir()
@@ -226,6 +231,7 @@ func TestValidatePDFPreflight_MissingTools(t *testing.T) {
 }
 
 func TestValidatePDFPreflight_SizeMismatchBetweenPages(t *testing.T) {
+	defer mockLookPathSuccess()()
 	pdfBytes := createMultipageMismatchPDFBytes()
 	tempDir := t.TempDir()
 	pdfPath := filepath.Join(tempDir, "test_mismatch.pdf")
@@ -298,6 +304,7 @@ func TestValidatePDFPreflight_InvalidPath(t *testing.T) {
 }
 
 func TestValidatePDFPreflight_ToolErrors(t *testing.T) {
+	defer mockLookPathSuccess()()
 	pdfBytes := createMinimalPDFBytes()
 	tempDir := t.TempDir()
 	pdfPath := filepath.Join(tempDir, "test.pdf")
@@ -390,6 +397,7 @@ func createCropBoxPDFBytes() []byte {
 }
 
 func TestValidatePDFPreflight_CropBox(t *testing.T) {
+	defer mockLookPathSuccess()()
 	pdfBytes := createCropBoxPDFBytes()
 	tempDir := t.TempDir()
 	pdfPath := filepath.Join(tempDir, "cropbox.pdf")
@@ -419,6 +427,7 @@ func TestValidatePDFPreflight_CropBox(t *testing.T) {
 }
 
 func TestValidatePDFPreflight_NoBleed(t *testing.T) {
+	defer mockLookPathSuccess()()
 	pdfBytes := createMinimalPDFBytes()
 	tempDir := t.TempDir()
 	pdfPath := filepath.Join(tempDir, "test.pdf")
@@ -455,6 +464,7 @@ func TestValidatePDFPreflight_NoBleed(t *testing.T) {
 }
 
 func TestValidator_EdgeCases(t *testing.T) {
+	defer mockLookPathSuccess()()
 	// 1. Very small PDF size (<10 bytes) in ValidatePDFPreflight
 	tempDir := t.TempDir()
 	tinyPath := filepath.Join(tempDir, "tiny.pdf")
@@ -545,4 +555,14 @@ func assertHasError(t *testing.T, errors []string, substr string) {
 		}
 	}
 	t.Errorf("expected error containing %q, but got none. Errors: %v", substr, errors)
+}
+
+func mockLookPathSuccess() func() {
+	oldLookPath := execLookPath
+	execLookPath = func(file string) (string, error) {
+		return "/mocked/path/to/" + file, nil
+	}
+	return func() {
+		execLookPath = oldLookPath
+	}
 }

@@ -60,6 +60,7 @@ func assertResponse(t *testing.T, res *mcp.CallToolResult, wantError bool, wantS
 
 func startTestServer(t *testing.T, workspaceRoot string) (*mcp.ClientSession, context.Context, func()) {
 	t.Helper()
+	t.Setenv("PATH", "")
 	cfg := &config.Config{}
 	srv, err := setupServer(workspaceRoot, cfg)
 	if err != nil {

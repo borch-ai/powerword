@@ -36,6 +36,7 @@ type ValidatePDFResult struct {
 
 // Package-level function variable to allow unit-test mocking of external subprocess runs.
 var execCommand = exec.CommandContext
+var execLookPath = exec.LookPath
 
 // findInherited walks the Page dictionary tree ancestors via 'Parent' nodes to resolve inherited values.
 func findInherited(v pdf.Value, key string) pdf.Value {
@@ -204,7 +205,7 @@ func validateDimensions(r *pdf.Reader, input ValidatePDFInput, bleed float64) (s
 
 // checkFonts executes pdffonts and updates verification results.
 func checkFonts(ctx context.Context, pdfPath string, enforceFonts bool, res *ValidatePDFResult) {
-	_, lookFontsErr := exec.LookPath("pdffonts")
+	_, lookFontsErr := execLookPath("pdffonts")
 	if lookFontsErr != nil {
 		res.Warnings = append(res.Warnings, "pdffonts utility not found on host. Skipping font embedding checks.")
 		return
@@ -220,7 +221,7 @@ func checkFonts(ctx context.Context, pdfPath string, enforceFonts bool, res *Val
 
 // checkImages executes pdfimages and updates verification results.
 func checkImages(ctx context.Context, pdfPath string, minDPI int, enforceCMYK bool, res *ValidatePDFResult) {
-	_, lookImagesErr := exec.LookPath("pdfimages")
+	_, lookImagesErr := execLookPath("pdfimages")
 	if lookImagesErr != nil {
 		res.Warnings = append(res.Warnings, "pdfimages utility not found on host. Skipping image resolution and color space checks.")
 		return

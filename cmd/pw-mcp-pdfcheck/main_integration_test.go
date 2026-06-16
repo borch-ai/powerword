@@ -81,7 +81,7 @@ func TestMCP_PdfcheckPlugin_StdoutStdin(t *testing.T) {
 	// Setup server config
 	srvCfg := config.ServerConfig{
 		Command: pluginPath,
-		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir},
+		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir, "PATH="},
 	}
 
 	// Create and start ServerProcess
