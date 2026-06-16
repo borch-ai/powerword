@@ -7,6 +7,11 @@
 
 ---
 
+## User Review Required
+
+> [!NOTE]
+> No breaking changes. Existing POWERWORD_* env vars retain highest precedence. Fully backward-compatible.
+
 ## Problem
 
 Every tool in the Borch-AI stack (Powerword, Pithos, Kiln) ultimately routes LLM calls through Powerword. The stack-wide credential vars are therefore `POWERWORD_GEMINI_API_KEY`, `POWERWORD_ANTHROPIC_API_KEY`, and `POWERWORD_OPENAI_API_KEY`.
@@ -48,6 +53,13 @@ plugins.trends.serp_api_key:
 ```
 
 **OS-level env vars always take precedence over `.env` file values.** The fallback chain applies equally to both sources.
+
+---
+
+## User Review Required
+
+> [!NOTE]
+> Fallback resolution expands configuration options by allowing standard provider-specific environment variables without breaking existing configurations that rely on the `POWERWORD_` prefix.
 
 ---
 

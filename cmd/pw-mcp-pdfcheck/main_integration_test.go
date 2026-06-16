@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -161,5 +162,108 @@ func TestMCP_PdfcheckPlugin_StdoutStdin(t *testing.T) {
 	}
 	if resp.Dimensions != "6.000 x 9.000 in" {
 		t.Errorf("expected dimensions '6.000 x 9.000 in', got %q", resp.Dimensions)
+	}
+}
+
+func TestMCP_PdfcheckPlugin_Grayscale(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	workspaceDir, err := os.MkdirTemp("", "pw-pdfcheck-workspace-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// Create a PDF with RGB operator inside
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+	obj3 := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Contents 4 0 R >>\nendobj\n"
+	contentsStr := "1 0 0 rg\n"
+	obj4 := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(contentsStr), contentsStr)
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	offXref := off4 + len(obj4)
+
+	xref := "xref\n0 5\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n", offXref)
+	pdfBytes := []byte(header + obj1 + obj2 + obj3 + obj4 + xref + trailer)
+
+	pdfPath := filepath.Join(workspaceDir, "color.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir, "PATH="},
+	}
+
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-pdfcheck", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() {
+		_ = sp.GracefulShutdown(1 * time.Second)
+	}()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	args := map[string]interface{}{
+		"pdf_path":               pdfPath,
+		"expected_width_inches":  6.0,
+		"expected_height_inches": 9.0,
+		"enforce_grayscale":      true,
+	}
+	result, err := client.CallTool(ctx, "validate_pdf", args)
+	if err != nil {
+		t.Fatalf("failed to call validate_pdf tool: %v", err)
+	}
+
+	if result.IsError {
+		t.Fatalf("tool execution returned error: %v", result)
+	}
+
+	var contentStr string
+	if txt, ok := result.Content[0].(*sdkMcp.TextContent); ok {
+		contentStr = txt.Text
+	} else {
+		contentStr = fmt.Sprint(result.Content[0])
+	}
+
+	type validationResponse struct {
+		Valid  bool     `json:"valid"`
+		Errors []string `json:"errors"`
+	}
+
+	var resp validationResponse
+	if err := json.Unmarshal([]byte(contentStr), &resp); err != nil {
+		t.Fatalf("failed to unmarshal validation verdict: %v, raw content: %s", err, contentStr)
+	}
+
+	if resp.Valid {
+		t.Error("expected validation to be invalid because it contains RGB operator")
+	}
+
+	foundRGBError := false
+	for _, e := range resp.Errors {
+		if strings.Contains(e, "RGB vector/text color setting operator (rg)") {
+			foundRGBError = true
+		}
+	}
+	if !foundRGBError {
+		t.Errorf("expected RGB vector/text color setting error, got errors: %v", resp.Errors)
 	}
 }

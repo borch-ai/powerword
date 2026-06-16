@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"rsc.io/pdf"
 )
 
 // createMinimalPDFBytes returns the byte array of a minimal PDF with 1 page of 432x648pt (6"x9")
@@ -365,7 +367,7 @@ func TestParsePDFImagesOutput_UnparseableDPI(t *testing.T) {
 
 	// Simulate output with non-integer values for DPI columns
 	out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n--------------------------------------------------------------------------------------------\n   1     0 image    1200   1800 cmyk     4   8  jpeg   no        12  0   abc   xyz  84.5K  1.3%\n"
-	parsePDFImagesOutput(out, 300, false, &res)
+	parsePDFImagesOutput(out, 300, false, false, &res)
 
 	if len(res.Warnings) != 1 {
 		t.Fatalf("expected 1 warning for unparseable DPI, got: %v", res.Warnings)
@@ -496,7 +498,7 @@ func TestValidator_EdgeCases(t *testing.T) {
 	// 68 spaces + "150   150   84.5K"
 	pdfimagesOutputMissingHeaders := "some random headers for images\n-------------------------\n" +
 		"1 0 image 100 100 rgb 3 8 jpeg no 12 0 150 150 100B 1%"
-	parsePDFImagesOutput(pdfimagesOutputMissingHeaders, 300, true, &res2)
+	parsePDFImagesOutput(pdfimagesOutputMissingHeaders, 300, true, false, &res2)
 	if len(res2.Errors) < 1 {
 		t.Error("expected at least 1 image error for low DPI fallback")
 	}
@@ -504,7 +506,7 @@ func TestValidator_EdgeCases(t *testing.T) {
 	// 4. pdfimages line shorter than xDpiStart
 	var res3 ValidatePDFResult
 	pdfimagesShortLine := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n---------------------------\nshort line"
-	parsePDFImagesOutput(pdfimagesShortLine, 300, false, &res3)
+	parsePDFImagesOutput(pdfimagesShortLine, 300, false, false, &res3)
 	if len(res3.Errors) != 0 || len(res3.Warnings) != 0 {
 		t.Error("expected short line to be skipped with no errors/warnings")
 	}
@@ -564,5 +566,358 @@ func mockLookPathSuccess() func() {
 	}
 	return func() {
 		execLookPath = oldLookPath
+	}
+}
+
+func createPDFWithContentsBytes(contentsStr string) []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+	obj3 := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Contents 4 0 R >>\nendobj\n"
+	obj4 := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(contentsStr), contentsStr)
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	offXref := off4 + len(obj4)
+
+	xref := "xref\n0 5\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n", offXref)
+
+	return []byte(header + obj1 + obj2 + obj3 + obj4 + xref + trailer)
+}
+
+func TestValidatePDFPreflight_EnforceGrayscale(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if strings.Contains(command, "pdffonts") {
+			return exec.CommandContext(ctx, "echo", "")
+		}
+		if strings.Contains(command, "pdfimages") {
+			// Mocking images: one is gray, one is rgb
+			out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+				"--------------------------------------------------------------------------------------------\n" +
+				"   1     0 image    100    100 gray     1   8  jpeg   no        12  0   300   300  10K   10%\n" +
+				"   1     1 image    100    100 rgb      3   8  jpeg   no        13  0   300   300  10K   10%\n"
+			return exec.CommandContext(ctx, "echo", out)
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "test.pdf")
+	if err := os.WriteFile(pdfPath, createMinimalPDFBytes(), 0600); err != nil {
+		t.Fatalf("failed to write temp PDF: %v", err)
+	}
+
+	enforceGrayscale := true
+	input := ValidatePDFInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		EnforceGrayscale:     &enforceGrayscale,
+	}
+
+	res, err := ValidatePDFPreflight(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected PDF to be invalid because it contains an RGB image")
+	}
+	assertHasError(t, res.Errors, "has non-grayscale color space (rgb)")
+}
+
+func TestValidatePDFPreflight_EnforceGrayscale_Operators(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	// Mock pdfimages returning only gray images so image check passes
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if strings.Contains(command, "pdfimages") {
+			out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+				"--------------------------------------------------------------------------------------------\n" +
+				"   1     0 image    100    100 gray     1   8  jpeg   no        12  0   300   300  10K   10%\n"
+			return exec.CommandContext(ctx, "echo", out)
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	tests := []struct {
+		name        string
+		contents    string
+		expectError string
+	}{
+		{
+			name:        "valid gray operator",
+			contents:    "0.5 g\n0.2 G\n",
+			expectError: "",
+		},
+		{
+			name:        "invalid rg operator",
+			contents:    "1 0 0 rg\n",
+			expectError: "RGB vector/text color setting operator (rg)",
+		},
+		{
+			name:        "invalid RG operator",
+			contents:    "0.5 0.5 0.5 RG\n",
+			expectError: "RGB vector/text color setting operator (RG)",
+		},
+		{
+			name:        "invalid k operator",
+			contents:    "0 0 0 1 k\n",
+			expectError: "CMYK vector/text color setting operator (k)",
+		},
+		{
+			name:        "invalid cs colorspace",
+			contents:    "/DeviceRGB cs\n",
+			expectError: "sets non-grayscale color space (DeviceRGB)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			pdfPath := filepath.Join(tempDir, "test.pdf")
+			pdfBytes := createPDFWithContentsBytes(tt.contents)
+			if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+				t.Fatalf("failed to write temp PDF: %v", err)
+			}
+
+			enforceGrayscale := true
+			input := ValidatePDFInput{
+				PDFPath:              pdfPath,
+				ExpectedWidthInches:  6.0,
+				ExpectedHeightInches: 9.0,
+				EnforceGrayscale:     &enforceGrayscale,
+			}
+
+			res, err := ValidatePDFPreflight(context.Background(), input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.expectError != "" {
+				if res.Valid {
+					t.Errorf("expected PDF to be invalid, contents: %q", tt.contents)
+				}
+				assertHasError(t, res.Errors, tt.expectError)
+			} else if !res.Valid {
+				t.Errorf("expected PDF to be valid, got errors: %v", res.Errors)
+			}
+		})
+	}
+}
+
+func createComplexColorspacePDFBytes() []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+
+	// Page with resources /ColorSpace
+	obj3 := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Contents 4 0 R\n" +
+		"  /Resources <<\n" +
+		"    /ColorSpace <<\n" +
+		"      /CS1 /DeviceRGB\n" +
+		"      /CS2 [ /ICCBased 5 0 R ]\n" +
+		"      /CS3 [ /Indexed /DeviceRGB 15 7 0 R ]\n" +
+		"      /CS4 [ /Indexed [ /ICCBased 5 0 R ] 15 7 0 R ]\n" +
+		"      /CS5 /DeviceGray\n" +
+		"      /CS6 [ /DeviceGray ]\n" +
+		"      /CS7 [ /CalGray ]\n" +
+		"      /CS8 [ /DeviceCMYK ]\n" +
+		"      /CS9 [ /CalRGB ]\n" +
+		"      /CS10 [ /Lab ]\n" +
+		"      /CS11 [ /ICCBased 6 0 R ]\n" +
+		"    >>\n" +
+		"  >>\n" +
+		">> \nendobj\n"
+
+	// Contents stream
+	obj4 := "4 0 obj\n<< /Length 1 >>\nstream\n \nendstream\nendobj\n"
+
+	// ICCBased color space stream with N = 3 (RGB)
+	obj5 := "5 0 obj\n<< /Length 0 /N 3 >>\nstream\n\nendstream\nendobj\n"
+
+	// ICCBased color space stream with N = 1 (Gray)
+	obj6 := "6 0 obj\n<< /Length 0 /N 1 >>\nstream\n\nendstream\nendobj\n"
+
+	// Indexed lookup table string
+	obj7 := "7 0 obj\n(some_lookup_data)\nendobj\n"
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	off5 := off4 + len(obj4)
+	off6 := off5 + len(obj5)
+	off7 := off6 + len(obj6)
+	offXref := off7 + len(obj7)
+
+	xref := "xref\n0 8\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4) +
+		fmt.Sprintf("%010d 00000 n \n", off5) +
+		fmt.Sprintf("%010d 00000 n \n", off6) +
+		fmt.Sprintf("%010d 00000 n \n", off7)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n", offXref)
+
+	return []byte(header + obj1 + obj2 + obj3 + obj4 + obj5 + obj6 + obj7 + xref + trailer)
+}
+
+func createPDFWithMultiContentsBytes(contentsStr1, contentsStr2 string) []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+	obj3 := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Contents [4 0 R 5 0 R] >>\nendobj\n"
+	obj4 := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(contentsStr1), contentsStr1)
+	obj5 := fmt.Sprintf("5 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(contentsStr2), contentsStr2)
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	off5 := off4 + len(obj4)
+	offXref := off5 + len(obj5)
+
+	xref := "xref\n0 6\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4) +
+		fmt.Sprintf("%010d 00000 n \n", off5)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n", offXref)
+
+	return []byte(header + obj1 + obj2 + obj3 + obj4 + obj5 + xref + trailer)
+}
+
+func TestIsNonGrayColorspace_Detailed(t *testing.T) {
+	pdfBytes := createComplexColorspacePDFBytes()
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "complex.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp PDF: %v", err)
+	}
+
+	//nolint:gosec // pdfPath is constructed using t.TempDir() in tests
+	f, err := os.Open(pdfPath)
+	if err != nil {
+		t.Fatalf("failed to open PDF: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	fi, err := f.Stat()
+	if err != nil {
+		t.Fatalf("failed to stat PDF: %v", err)
+	}
+
+	safeR, safeSize := newSafeReaderAt(f, fi.Size())
+	r, err := pdf.NewReader(safeR, safeSize)
+	if err != nil {
+		t.Fatalf("failed to parse PDF: %v", err)
+	}
+
+	p := r.Page(1)
+
+	// Test direct names
+	if !isNonGrayColorspace("DeviceRGB", p) {
+		t.Error("expected DeviceRGB to be non-gray")
+	}
+	if !isNonGrayColorspace("DeviceCMYK", p) {
+		t.Error("expected DeviceCMYK to be non-gray")
+	}
+	if isNonGrayColorspace("DeviceGray", p) {
+		t.Error("expected DeviceGray to be gray")
+	}
+	if isNonGrayColorspace("CalGray", p) {
+		t.Error("expected CalGray to be gray")
+	}
+
+	// Test resolved resource color spaces
+	if !isNonGrayColorspace("CS1", p) {
+		t.Error("expected CS1 (DeviceRGB) to be non-gray")
+	}
+	if !isNonGrayColorspace("CS2", p) {
+		t.Error("expected CS2 (ICCBased N=3) to be non-gray")
+	}
+	if !isNonGrayColorspace("CS3", p) {
+		t.Error("expected CS3 (Indexed DeviceRGB) to be non-gray")
+	}
+	if !isNonGrayColorspace("CS4", p) {
+		t.Error("expected CS4 (Indexed ICCBased N=3) to be non-gray")
+	}
+	if isNonGrayColorspace("CS5", p) {
+		t.Error("expected CS5 (DeviceGray name) to be gray")
+	}
+	if isNonGrayColorspace("CS6", p) {
+		t.Error("expected CS6 (DeviceGray array) to be gray")
+	}
+	if isNonGrayColorspace("CS7", p) {
+		t.Error("expected CS7 (CalGray array) to be gray")
+	}
+	if !isNonGrayColorspace("CS8", p) {
+		t.Error("expected CS8 (DeviceCMYK array) to be non-gray")
+	}
+	if !isNonGrayColorspace("CS9", p) {
+		t.Error("expected CS9 (CalRGB array) to be non-gray")
+	}
+	if !isNonGrayColorspace("CS10", p) {
+		t.Error("expected CS10 (Lab array) to be non-gray")
+	}
+	if isNonGrayColorspace("CS11", p) {
+		t.Error("expected CS11 (ICCBased N=1) to be gray")
+	}
+
+	// Nonexistent CS
+	if isNonGrayColorspace("CS_NONEXISTENT", p) {
+		t.Error("expected CS_NONEXISTENT to be gray/fallback false")
+	}
+}
+
+func TestGetPageContentsStreams_Array(t *testing.T) {
+	pdfBytes := createPDFWithMultiContentsBytes("1 0 0 rg\n", "0 g\n")
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "multi_contents.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp PDF: %v", err)
+	}
+
+	//nolint:gosec // pdfPath is constructed using t.TempDir() in tests
+	f, err := os.Open(pdfPath)
+	if err != nil {
+		t.Fatalf("failed to open PDF: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	fi, err := f.Stat()
+	if err != nil {
+		t.Fatalf("failed to stat PDF: %v", err)
+	}
+
+	safeR, safeSize := newSafeReaderAt(f, fi.Size())
+	r, err := pdf.NewReader(safeR, safeSize)
+	if err != nil {
+		t.Fatalf("failed to parse PDF: %v", err)
+	}
+
+	p := r.Page(1)
+	streams := getPageContentsStreams(p)
+	if len(streams) != 2 {
+		t.Errorf("expected 2 streams, got %d", len(streams))
 	}
 }

@@ -88,6 +88,10 @@ const validatePDFSchema = `{
 		"enforce_cmyk": {
 			"type": "boolean",
 			"description": "Optional enforcement that all images use CMYK color space. Defaults to false."
+		},
+		"enforce_grayscale": {
+			"type": "boolean",
+			"description": "Optional enforcement that all elements and images use grayscale color spaces. Defaults to false."
 		}
 	},
 	"required": ["pdf_path", "expected_width_inches", "expected_height_inches"]
