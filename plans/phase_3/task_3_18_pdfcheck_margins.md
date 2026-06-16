@@ -1,9 +1,9 @@
 # plan: Task 3.18: Gutter & Safe-Zone Margin Analyzer (`pw-mcp-pdfcheck`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-16
+**Unit Test Coverage:** 91.10% (overall repository check-coverage)
 
 Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` to verify that text and structural elements do not run too close to the binding gutter or outer page trim boundaries.
 

@@ -921,3 +921,202 @@ func TestGetPageContentsStreams_Array(t *testing.T) {
 		t.Errorf("expected 2 streams, got %d", len(streams))
 	}
 }
+
+func createMultipagePDFWithTextBytes(page1Contents, page2Contents string) []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>\nendobj\n"
+	// Page 1 (Right page, odd)
+	obj3 := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Contents 5 0 R\n" +
+		"  /Resources <<\n" +
+		"    /Font <<\n" +
+		"      /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n" +
+		"    >>\n" +
+		"  >>\n" +
+		">> \nendobj\n"
+	// Page 2 (Left page, even)
+	obj4 := "4 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Contents 6 0 R\n" +
+		"  /Resources <<\n" +
+		"    /Font <<\n" +
+		"      /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\n" +
+		"    >>\n" +
+		"  >>\n" +
+		">> \nendobj\n"
+	// Contents Page 1
+	obj5 := fmt.Sprintf("5 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(page1Contents), page1Contents)
+	// Contents Page 2
+	obj6 := fmt.Sprintf("6 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(page2Contents), page2Contents)
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	off5 := off4 + len(obj4)
+	off6 := off5 + len(obj5)
+	offXref := off6 + len(obj6)
+
+	xref := "xref\n0 7\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4) +
+		fmt.Sprintf("%010d 00000 n \n", off5) +
+		fmt.Sprintf("%010d 00000 n \n", off6)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n", offXref)
+
+	return []byte(header + obj1 + obj2 + obj3 + obj4 + obj5 + obj6 + xref + trailer)
+}
+
+func TestValidatePDFPreflight_Margins(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	tests := []struct {
+		name          string
+		page1Contents string
+		page2Contents string
+		minGutter     *float64
+		minMargin     *float64
+		expectErrors  []string
+	}{
+		{
+			name:          "perfectly safe margins",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			minGutter:     floatPtr(0.5),  // 36pt
+			minMargin:     floatPtr(0.25), // 18pt
+			expectErrors:  nil,
+		},
+		{
+			name:          "bottom margin violation page 1",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 100 10 Tm (Bottom Violator) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			minGutter:     floatPtr(0.5),
+			minMargin:     floatPtr(0.25),
+			expectErrors:  []string{"Page 1 text \"B\" at Y=10.00 pt is within bottom margin"},
+		},
+		{
+			name:          "top margin violation page 2",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 100 640 Tm (Top Violator) Tj ET\n",
+			minGutter:     floatPtr(0.5),
+			minMargin:     floatPtr(0.25),
+			expectErrors:  []string{"Page 2 text \"T\" at Y=650.00 pt is within top margin"}, // Y=640 + 10pt FontSize
+		},
+		{
+			name:          "right page inside gutter violation (left edge)",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 10 100 Tm (Gutter Violator) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			minGutter:     floatPtr(0.5),
+			minMargin:     floatPtr(0.25),
+			expectErrors:  []string{"Page 1 text \"G\" at X=10.00 pt is within inside gutter"},
+		},
+		{
+			name:          "right page outer margin violation (right edge)",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 420 100 Tm (Outer Violator) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			minGutter:     floatPtr(0.5),
+			minMargin:     floatPtr(0.25),
+			expectErrors:  []string{"Page 1 text \"O\" at X=420.00 pt is within outer margin"},
+		},
+		{
+			name:          "left page inside gutter violation (right edge)",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 410 100 Tm (Gutter Violator) Tj ET\n",
+			minGutter:     floatPtr(0.5),
+			minMargin:     floatPtr(0.25),
+			expectErrors:  []string{"Page 2 text \"G\" at X=410.00 pt is within inside gutter"},
+		},
+		{
+			name:          "left page outer margin violation (left edge)",
+			page1Contents: "BT /F1 10 Tf 1 0 0 1 100 100 Tm (Safe Text) Tj ET\n",
+			page2Contents: "BT /F1 10 Tf 1 0 0 1 10 100 Tm (Outer Violator) Tj ET\n",
+			minGutter:     floatPtr(0.5),
+			minMargin:     floatPtr(0.25),
+			expectErrors:  []string{"Page 2 text \"O\" at X=10.00 pt is within outer margin"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			pdfPath := filepath.Join(tempDir, "test.pdf")
+			pdfBytes := createMultipagePDFWithTextBytes(tt.page1Contents, tt.page2Contents)
+			if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+				t.Fatalf("failed to write temp PDF: %v", err)
+			}
+
+			input := ValidatePDFInput{
+				PDFPath:              pdfPath,
+				ExpectedWidthInches:  6.0,
+				ExpectedHeightInches: 9.0,
+				MinGutterInches:      tt.minGutter,
+				MinMarginInches:      tt.minMargin,
+			}
+
+			res, err := ValidatePDFPreflight(context.Background(), input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(tt.expectErrors) > 0 {
+				assertMarginErrors(t, res, tt.expectErrors)
+			} else if !res.Valid {
+				t.Errorf("expected PDF to be valid, got errors: %v", res.Errors)
+			}
+		})
+	}
+}
+
+func assertMarginErrors(t *testing.T, res *ValidatePDFResult, expectedErrors []string) {
+	t.Helper()
+	if res.Valid {
+		t.Error("expected PDF to be invalid, but got valid")
+	}
+	for _, expectedSubstr := range expectedErrors {
+		assertHasError(t, res.Errors, expectedSubstr)
+	}
+}
+
+func floatPtr(f float64) *float64 {
+	return &f
+}
+
+func TestValidatePDFPreflight_NegativeMargins(t *testing.T) {
+	pdfBytes := createMinimalPDFBytes()
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "test.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp PDF: %v", err)
+	}
+
+	negVal := -0.5
+
+	inputGutter := ValidatePDFInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		MinGutterInches:      &negVal,
+	}
+	_, err := ValidatePDFPreflight(context.Background(), inputGutter)
+	if err == nil || !strings.Contains(err.Error(), "min_gutter_inches must be non-negative") {
+		t.Errorf("expected error for negative min_gutter_inches, got: %v", err)
+	}
+
+	inputMargin := ValidatePDFInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		MinMarginInches:      &negVal,
+	}
+	_, err = ValidatePDFPreflight(context.Background(), inputMargin)
+	if err == nil || !strings.Contains(err.Error(), "min_margin_inches must be non-negative") {
+		t.Errorf("expected error for negative min_margin_inches, got: %v", err)
+	}
+}

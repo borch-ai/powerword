@@ -92,6 +92,16 @@ const validatePDFSchema = `{
 		"enforce_grayscale": {
 			"type": "boolean",
 			"description": "Optional enforcement that all elements and images use grayscale color spaces. Defaults to false."
+		},
+		"min_gutter_inches": {
+			"type": "number",
+			"minimum": 0,
+			"description": "Optional minimum inside gutter margin in inches."
+		},
+		"min_margin_inches": {
+			"type": "number",
+			"minimum": 0,
+			"description": "Optional minimum top, bottom, and outer margin in inches."
 		}
 	},
 	"required": ["pdf_path", "expected_width_inches", "expected_height_inches"]
@@ -135,6 +145,20 @@ func handleValidatePDF(ctx context.Context, req *mcp.CallToolRequest, workspaceR
 		return &mcp.CallToolResult{
 			IsError: true,
 			Content: []mcp.Content{&mcp.TextContent{Text: "expected_width_inches and expected_height_inches parameters must be positive"}},
+		}, nil
+	}
+
+	if args.MinGutterInches != nil && *args.MinGutterInches < 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "min_gutter_inches parameter must be non-negative"}},
+		}, nil
+	}
+
+	if args.MinMarginInches != nil && *args.MinMarginInches < 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "min_margin_inches parameter must be non-negative"}},
 		}, nil
 	}
 

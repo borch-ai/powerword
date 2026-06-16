@@ -24,6 +24,8 @@ type ValidatePDFInput struct {
 	EnforceEmbeddedFonts *bool    `json:"enforce_embedded_fonts,omitempty"` // default: true
 	EnforceCMYK          *bool    `json:"enforce_cmyk,omitempty"`           // default: false
 	EnforceGrayscale     *bool    `json:"enforce_grayscale,omitempty"`      // default: false
+	MinGutterInches      *float64 `json:"min_gutter_inches,omitempty"`
+	MinMarginInches      *float64 `json:"min_margin_inches,omitempty"`
 }
 
 // ValidatePDFResult represents the JSON response output for the validate_pdf tool.
@@ -236,31 +238,40 @@ func checkImages(ctx context.Context, pdfPath string, minDPI int, enforceCMYK bo
 	parsePDFImagesOutput(string(outputBytes), minDPI, enforceCMYK, enforceGrayscale, res)
 }
 
-// ValidatePDFPreflight performs the validation of PDF geometry, fonts, images, and colors.
-func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*ValidatePDFResult, error) {
+// parseInputDefaults resolves and sets default values for input validation arguments.
+func parseInputDefaults(input ValidatePDFInput) (float64, int, bool, bool, bool) {
 	bleed := 0.125
 	if input.BleedInches != nil {
 		bleed = *input.BleedInches
 	}
-
 	minDPI := 300
 	if input.MinDPI != nil {
 		minDPI = *input.MinDPI
 	}
-
 	enforceFonts := true
 	if input.EnforceEmbeddedFonts != nil {
 		enforceFonts = *input.EnforceEmbeddedFonts
 	}
-
 	enforceCMYK := false
 	if input.EnforceCMYK != nil {
 		enforceCMYK = *input.EnforceCMYK
 	}
-
 	enforceGrayscale := false
 	if input.EnforceGrayscale != nil {
 		enforceGrayscale = *input.EnforceGrayscale
+	}
+	return bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale
+}
+
+// ValidatePDFPreflight performs the validation of PDF geometry, fonts, images, and colors.
+func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*ValidatePDFResult, error) {
+	bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale := parseInputDefaults(input)
+
+	if input.MinGutterInches != nil && *input.MinGutterInches < 0 {
+		return nil, fmt.Errorf("min_gutter_inches must be non-negative")
+	}
+	if input.MinMarginInches != nil && *input.MinMarginInches < 0 {
+		return nil, fmt.Errorf("min_margin_inches must be non-negative")
 	}
 
 	f, err := os.Open(input.PDFPath)
@@ -312,8 +323,76 @@ func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*Validat
 		}
 	}
 
+	// Text safe-zone margins analysis
+	var gutterPts, marginPts float64
+	if input.MinGutterInches != nil {
+		gutterPts = *input.MinGutterInches * 72.0
+	}
+	if input.MinMarginInches != nil {
+		marginPts = *input.MinMarginInches * 72.0
+	}
+
+	if gutterPts > 0 || marginPts > 0 {
+		for i := 1; i <= numPages; i++ {
+			p := r.Page(i)
+			marginErrs := validateTextSafeZones(p, i, gutterPts, marginPts)
+			res.Errors = append(res.Errors, marginErrs...)
+		}
+	}
+
 	res.Valid = (len(res.Errors) == 0)
 	return res, nil
+}
+
+// checkHorizontalMargins asserts that a text element is placed safely within margins and inside gutters horizontally.
+func checkHorizontalMargins(t pdf.Text, w float64, isLeftPage bool, gutterPts, marginPts float64, pageNum int) []string {
+	var errs []string
+	if isLeftPage && gutterPts > 0 && t.X+t.W > w-gutterPts {
+		errs = append(errs, fmt.Sprintf("Page %d text %q at X=%.2f pt is within inside gutter (min: %.2f pt)", pageNum, t.S, t.X+t.W, gutterPts))
+	}
+	if isLeftPage && marginPts > 0 && t.X < marginPts {
+		errs = append(errs, fmt.Sprintf("Page %d text %q at X=%.2f pt is within outer margin (min: %.2f pt)", pageNum, t.S, t.X, marginPts))
+	}
+	if !isLeftPage && gutterPts > 0 && t.X < gutterPts {
+		errs = append(errs, fmt.Sprintf("Page %d text %q at X=%.2f pt is within inside gutter (min: %.2f pt)", pageNum, t.S, t.X, gutterPts))
+	}
+	if !isLeftPage && marginPts > 0 && t.X+t.W > w-marginPts {
+		errs = append(errs, fmt.Sprintf("Page %d text %q at X=%.2f pt is within outer margin (min: %.2f pt)", pageNum, t.S, t.X+t.W, marginPts))
+	}
+	return errs
+}
+
+// validateTextSafeZones extracts all text elements from the page and asserts they fall inside the safe margins and gutters.
+func validateTextSafeZones(page pdf.Page, pageNum int, gutterPts, marginPts float64) []string {
+	var errs []string
+	w, h, pErr := getPageDimensions(page)
+	if pErr != nil {
+		return []string{fmt.Sprintf("Page %d: failed to get dimensions for margin checks: %v", pageNum, pErr)}
+	}
+
+	content := page.Content()
+	isLeftPage := pageNum%2 == 0 // Page 1 is Right page (odd), Page 2 is Left page (even)
+
+	for _, t := range content.Text {
+		if strings.TrimSpace(t.S) == "" {
+			continue
+		}
+
+		// Vertical margin checks
+		if marginPts > 0 {
+			if t.Y < marginPts {
+				errs = append(errs, fmt.Sprintf("Page %d text %q at Y=%.2f pt is within bottom margin (min: %.2f pt)", pageNum, t.S, t.Y, marginPts))
+			}
+			if t.Y+t.FontSize > h-marginPts {
+				errs = append(errs, fmt.Sprintf("Page %d text %q at Y=%.2f pt is within top margin (min: %.2f pt)", pageNum, t.S, t.Y+t.FontSize, marginPts))
+			}
+		}
+
+		// Horizontal margin and gutter checks
+		hErrs := checkHorizontalMargins(t, w, isLeftPage, gutterPts, marginPts, pageNum)
+		errs = append(errs, hErrs...)
+	}
+	return errs
 }
 
 func parsePDFFontsOutput(output string, enforceFonts bool, res *ValidatePDFResult) {
