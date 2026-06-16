@@ -85,16 +85,23 @@ bindEnv(v, "plugins.trends.serp_api_key", "POWERWORD_SERP_API_KEY", "SERP_API_KE
 The current `loadDotEnv()` only processes `POWERWORD_`-prefixed keys from `.env`. Extend it to also process the canonical provider names and map them into the `POWERWORD_*` namespace when not already set:
 
 ```go
-// aliasMap maps canonical provider env var names to their POWERWORD_ equivalents.
-// When a canonical name is found in .env, the POWERWORD_ var is set from the canonical
-// value only if neither the canonical var nor the POWERWORD_ target is already set
-// in the OS environment, preserving the OS-wins precedence rule.
-var aliasMap = map[string]string{
-    "GEMINI_API_KEY":    "POWERWORD_GEMINI_API_KEY",
-    "GOOGLE_API_KEY":    "POWERWORD_GEMINI_API_KEY",
-    "OPENAI_API_KEY":    "POWERWORD_OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY": "POWERWORD_ANTHROPIC_API_KEY",
-    "SERP_API_KEY":      "POWERWORD_SERP_API_KEY",
+type envAlias struct {
+    alias  string
+    target string
+}
+
+// aliases is an ordered list of canonical provider env var aliases.
+// Precedence is determined by order: aliases appearing earlier (e.g. GEMINI_API_KEY)
+// take precedence over aliases appearing later (e.g. GOOGLE_API_KEY).
+// When an alias is found in .env, the target POWERWORD_ var is set from the alias
+// value only if neither the alias var nor the target is already set in the OS
+// environment, preserving the OS-wins precedence rule.
+var aliases = []envAlias{
+    {alias: "GEMINI_API_KEY", target: "POWERWORD_GEMINI_API_KEY"},
+    {alias: "GOOGLE_API_KEY", target: "POWERWORD_GEMINI_API_KEY"},
+    {alias: "OPENAI_API_KEY", target: "POWERWORD_OPENAI_API_KEY"},
+    {alias: "ANTHROPIC_API_KEY", target: "POWERWORD_ANTHROPIC_API_KEY"},
+    {alias: "SERP_API_KEY", target: "POWERWORD_SERP_API_KEY"},
 }
 ```
 
