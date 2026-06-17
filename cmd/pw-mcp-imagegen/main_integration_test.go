@@ -5,6 +5,7 @@ package main_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
@@ -188,6 +189,142 @@ backend = "openai"
 	}
 	if !strings.Contains(resStr, "Successfully generated image") {
 		t.Errorf("expected output to indicate success, got: %q", resStr)
+	}
+
+	// Check that generated image file exists and is not empty
+	imgFiles, err := filepath.Glob(filepath.Join(workspaceDir, "generated_images", "*.png"))
+	if err != nil || len(imgFiles) == 0 {
+		t.Fatalf("no generated image files found: %v", err)
+	}
+
+	info, err := os.Stat(imgFiles[0])
+	if err != nil {
+		t.Fatalf("stat generated image file failed: %v", err)
+	}
+	if info.Size() < 50 {
+		t.Errorf("generated image size too small: %d bytes", info.Size())
+	}
+}
+
+func TestMCP_ImageGenPlugin_MidjourneyCrefAndCw(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pngBytes := createTinyPNG(t)
+
+	var receivedPrompt string
+
+	// Mock server for Midjourney backend
+	var mockServer *httptest.Server
+	mockServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/api/midjourney") {
+			w.Header().Set("Content-Type", "application/json")
+			if r.Method == "POST" {
+				var req struct {
+					Prompt string `json:"prompt"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+					receivedPrompt = req.Prompt
+				}
+				// Return a status URL pointing to GET status endpoint
+				resp := fmt.Sprintf(`{"id": "mj-task-123", "status": "pending", "status_url": "%s/api/midjourney/status/mj-task-123"}`, mockServer.URL)
+				_, _ = w.Write([]byte(resp))
+				return
+			}
+			if r.Method == "GET" && strings.Contains(r.URL.Path, "/status/") {
+				resp := fmt.Sprintf(`{"status": "completed", "image_url": "%s/image.png"}`, mockServer.URL)
+				_, _ = w.Write([]byte(resp))
+				return
+			}
+			return
+		}
+
+		if strings.Contains(r.URL.Path, "/image.png") {
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(pngBytes)
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	// Create temp workspace directory
+	workspaceDir, err := os.MkdirTemp("", "pw-imagegen-workspace-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// Write mock powerword.toml setting Midjourney backend
+	cfgTOML := fmt.Sprintf(`
+[plugins.imagegen]
+backend = "midjourney"
+midjourney_api_url = "%s/api/midjourney"
+midjourney_polling_interval = "1ms"
+midjourney_polling_timeout = "1s"
+`, mockServer.URL)
+	if err := os.WriteFile(filepath.Join(workspaceDir, "powerword.toml"), []byte(cfgTOML), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Setup server config
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env: []string{
+			"POWERWORD_WORKSPACE_ROOT=" + workspaceDir,
+		},
+	}
+
+	// Create and start ServerProcess
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-imagegen", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() {
+		_ = sp.GracefulShutdown(1 * time.Second)
+	}()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	// 1. Register style profile
+	argsRegister := map[string]interface{}{
+		"style_id":    "retro_profile",
+		"prompt_seed": "1980s retro style",
+		"sref_url":    "http://example.com/sref.png",
+	}
+	resultReg, err := client.CallTool(ctx, "imagegen_register_style", argsRegister)
+	if err != nil {
+		t.Fatalf("failed to call imagegen_register_style tool: %v", err)
+	}
+	if resultReg.IsError {
+		t.Fatalf("tool execution imagegen_register_style returned error: %v", resultReg)
+	}
+
+	// 2. CallTool to generate image with cref and cw parameters
+	argsGen := map[string]interface{}{
+		"prompt":           "A futuristic car",
+		"size":             "1024x1024",
+		"style_id":         "retro_profile",
+		"cref_url":         "http://example.com/cref.png",
+		"character_weight": 75,
+	}
+	resultGen, err := client.CallTool(ctx, "imagegen_generate", argsGen)
+	if err != nil {
+		t.Fatalf("failed to call imagegen_generate tool: %v", err)
+	}
+	if resultGen.IsError {
+		resStrErr, _ := mcp.FormatToolResult(resultGen)
+		t.Fatalf("tool execution imagegen_generate returned error: %s (raw result: %+v)", resStrErr, resultGen)
+	}
+
+	// Assert that prompt constructed includes sref, cref, and cw parameters
+	expectedPrompt := "A futuristic car, in the style of 1980s retro style --sref http://example.com/sref.png --cref http://example.com/cref.png --cw 75"
+	if receivedPrompt != expectedPrompt {
+		t.Errorf("expected constructed prompt to be %q, got: %q", expectedPrompt, receivedPrompt)
 	}
 
 	// Check that generated image file exists and is not empty

@@ -251,7 +251,7 @@ func TestImageGenService_EndToEnd(t *testing.T) {
 	}
 
 	// Generate image
-	filePath, err := service.GenerateImage(context.Background(), "a retro computer", "1024x1024", "vintage")
+	filePath, err := service.GenerateImage(context.Background(), "a retro computer", "1024x1024", "vintage", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage failed: %v", err)
 	}
@@ -462,7 +462,7 @@ func TestImageGenService_Errors(t *testing.T) {
 		},
 	}
 	service := NewImageGenService(tmpDir, cfg)
-	_, err := service.GenerateImage(context.Background(), "prompt", "1024x1024", "non-existent")
+	_, err := service.GenerateImage(context.Background(), "prompt", "1024x1024", "non-existent", "", nil)
 	if err == nil {
 		t.Error("expected error for non-existent style, got nil")
 	}
@@ -474,7 +474,7 @@ func TestImageGenService_Errors(t *testing.T) {
 		},
 	}
 	serviceNoKey := NewImageGenService(tmpDir, cfgNoKey)
-	_, err = serviceNoKey.GenerateImage(context.Background(), "prompt", "1024x1024", "")
+	_, err = serviceNoKey.GenerateImage(context.Background(), "prompt", "1024x1024", "", "", nil)
 	if err == nil {
 		t.Error("expected error for missing openai API key, got nil")
 	}
@@ -486,7 +486,7 @@ func TestImageGenService_Errors(t *testing.T) {
 		},
 	}
 	serviceNoMJURL := NewImageGenService(tmpDir, cfgNoMJURL)
-	_, err = serviceNoMJURL.GenerateImage(context.Background(), "prompt", "1024x1024", "")
+	_, err = serviceNoMJURL.GenerateImage(context.Background(), "prompt", "1024x1024", "", "", nil)
 	if err == nil {
 		t.Error("expected error for missing midjourney url, got nil")
 	}
@@ -498,7 +498,7 @@ func TestImageGenService_Errors(t *testing.T) {
 		},
 	}
 	serviceBadBackend := NewImageGenService(tmpDir, cfgBadBackend)
-	_, err = serviceBadBackend.GenerateImage(context.Background(), "prompt", "1024x1024", "")
+	_, err = serviceBadBackend.GenerateImage(context.Background(), "prompt", "1024x1024", "", "", nil)
 	if err == nil {
 		t.Error("expected error for unknown backend, got nil")
 	}
@@ -629,7 +629,7 @@ func TestImageGenService_Midjourney(t *testing.T) {
 		t.Fatalf("failed to register style: %v", err)
 	}
 
-	filePath, err := service.GenerateImage(context.Background(), "a fancy castle", "1024x1024", "mj-style")
+	filePath, err := service.GenerateImage(context.Background(), "a fancy castle", "1024x1024", "mj-style", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage with Midjourney service failed: %v", err)
 	}
@@ -718,7 +718,7 @@ func TestImageGenService_OpenAIKeyFromPlugin(t *testing.T) {
 	}
 
 	service := NewImageGenService(tmpDir, cfg)
-	filePath, err := service.GenerateImage(context.Background(), "a retro computer", "1024x1024", "")
+	filePath, err := service.GenerateImage(context.Background(), "a retro computer", "1024x1024", "", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage failed: %v", err)
 	}
@@ -904,7 +904,7 @@ func TestImageGenService_Google(t *testing.T) {
 	}
 
 	service := NewImageGenService(tmpDir, cfg)
-	filePath, err := service.GenerateImage(context.Background(), "a green garden", "1024x1024", "")
+	filePath, err := service.GenerateImage(context.Background(), "a green garden", "1024x1024", "", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage with Google service failed: %v", err)
 	}
@@ -1117,7 +1117,7 @@ func TestImageGenService_Veo(t *testing.T) {
 	}
 
 	service := NewImageGenService(tmpDir, cfg)
-	filePath, err := service.GenerateImage(context.Background(), "a fancy video", "1024x1024", "")
+	filePath, err := service.GenerateImage(context.Background(), "a fancy video", "1024x1024", "", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage with Veo service failed: %v", err)
 	}
@@ -1252,7 +1252,7 @@ func TestImageGenService_VeoErrors(t *testing.T) {
 		},
 	}
 	serviceNoKey := NewImageGenService(tmpDir, cfgNoKey)
-	_, err := serviceNoKey.GenerateImage(context.Background(), "prompt", "1024x1024", "")
+	_, err := serviceNoKey.GenerateImage(context.Background(), "prompt", "1024x1024", "", "", nil)
 	if err == nil {
 		t.Error("expected error for missing google key in runVeo, got nil")
 	}
@@ -1267,5 +1267,116 @@ func TestImageGenService_VeoErrors(t *testing.T) {
 		},
 	}
 	serviceCustom := NewImageGenService(tmpDir, cfgCustom)
-	_, _ = serviceCustom.GenerateImage(context.Background(), "prompt", "1024x1024", "")
+	_, _ = serviceCustom.GenerateImage(context.Background(), "prompt", "1024x1024", "", "", nil)
+}
+
+func TestImageGenService_MidjourneyCrefAndCw(t *testing.T) {
+	imageContent := []byte("fake-image-bytes")
+
+	downloadServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(imageContent)
+	}))
+	defer downloadServer.Close()
+
+	var receivedPrompt string
+	mjServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			var payload struct {
+				Prompt string `json:"prompt"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+				receivedPrompt = payload.Prompt
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"mj-task-789"}`))
+			return
+		}
+		if r.Method == "GET" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprintf(w, `{"status":"completed","image_url":"%s/mj.png"}`, downloadServer.URL)
+			return
+		}
+	}))
+	defer mjServer.Close()
+
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			ImageGen: config.ImageGenConfig{
+				Backend:                   "midjourney",
+				MidjourneyAPIURL:          mjServer.URL,
+				MidjourneyPollingInterval: "1ms",
+				MidjourneyPollingTimeout:  "1s",
+			},
+		},
+	}
+
+	service := NewImageGenService(tmpDir, cfg)
+
+	// Register a style with sref URL only
+	style := StyleProfile{
+		StyleID: "mj-style",
+		SrefURL: "http://example.com/sref.png",
+	}
+	if err := service.StyleStore().Register(style); err != nil {
+		t.Fatalf("failed to register style: %v", err)
+	}
+
+	cwVal := 50
+	filePath, err := service.GenerateImage(context.Background(), "a fancy castle", "1024x1024", "mj-style", "http://example.com/cref.png", &cwVal)
+	if err != nil {
+		t.Fatalf("GenerateImage with Midjourney service failed: %v", err)
+	}
+
+	if !strings.HasPrefix(filePath, tmpDir) {
+		t.Errorf("expected path to start with %s, got %s", tmpDir, filePath)
+	}
+
+	expectedPrompt := "a fancy castle --sref http://example.com/sref.png --cref http://example.com/cref.png --cw 50"
+	if receivedPrompt != expectedPrompt {
+		t.Errorf("expected Midjourney prompt %q, got %q", expectedPrompt, receivedPrompt)
+	}
+}
+
+func TestImageGenService_MidjourneyCrefAndCw_Validation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			ImageGen: config.ImageGenConfig{
+				Backend:          "midjourney",
+				MidjourneyAPIURL: "http://example.com/api/midjourney",
+			},
+		},
+	}
+
+	service := NewImageGenService(tmpDir, cfg)
+
+	// Test 1: Invalid cref URL (relative URL)
+	_, err := service.GenerateImage(context.Background(), "castle", "1024x1024", "", "/local/path.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid cref_url") {
+		t.Errorf("expected error containing 'invalid cref_url', got %v", err)
+	}
+
+	// Test 2: Invalid cref URL (bad scheme)
+	_, err = service.GenerateImage(context.Background(), "castle", "1024x1024", "", "ftp://example.com/cref.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid cref_url") {
+		t.Errorf("expected error containing 'invalid cref_url', got %v", err)
+	}
+
+	// Test 3: Invalid character weight (too low)
+	cwLow := -1
+	_, err = service.GenerateImage(context.Background(), "castle", "1024x1024", "", "http://example.com/cref.png", &cwLow)
+	if err == nil || !strings.Contains(err.Error(), "invalid character_weight") {
+		t.Errorf("expected error containing 'invalid character_weight', got %v", err)
+	}
+
+	// Test 4: Invalid character weight (too high)
+	cwHigh := 101
+	_, err = service.GenerateImage(context.Background(), "castle", "1024x1024", "", "http://example.com/cref.png", &cwHigh)
+	if err == nil || !strings.Contains(err.Error(), "invalid character_weight") {
+		t.Errorf("expected error containing 'invalid character_weight', got %v", err)
+	}
 }

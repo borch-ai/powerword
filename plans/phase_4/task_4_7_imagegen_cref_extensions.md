@@ -1,6 +1,9 @@
 # plan: Task 4.7: MCP ImageGen Cref Extensions
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed (Issue #TBD)
+**Go Version:** 1.26.4
+**Date Completed:** 2026-06-17
+**Unit Test Coverage:** 91.0%
 
 This task extends the native image generation MCP server (`pw-mcp-imagegen`) to support character reference (`--cref`) and character weight (`--cw`) parameters. 
 
@@ -18,24 +21,24 @@ Rather than compiling heavy storage SDKs directly into `pw-mcp-imagegen`, the `i
 ### ImageGen Component
 
 #### [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
-- [ ] Update `GenerateImage` method signature to accept optional `crefURL` (string) and `characterWeight` (integer pointer) arguments.
-- [ ] In `runMidjourney`, check if `crefURL` is not empty. If so, append ` --cref <crefURL>` to the prompt.
-- [ ] In `runMidjourney`, check if `characterWeight` is not nil. If so, append ` --cw <characterWeight>` to the prompt.
+- [x] Update `GenerateImage` method signature to accept optional `crefURL` (string) and `characterWeight` (integer pointer) arguments.
+- [x] In `runMidjourney`, check if `crefURL` is not empty. If so, append ` --cref <crefURL>` to the prompt.
+- [x] In `runMidjourney`, check if `characterWeight` is not nil. If so, append ` --cw <characterWeight>` to the prompt.
 
 #### [MODIFY] [main.go](file://../../cmd/pw-mcp-imagegen/main.go)
-- [ ] Extend the input schema of the `imagegen_generate` MCP tool:
+- [x] Extend the input schema of the `imagegen_generate` MCP tool:
   *   Add `cref_url` (optional string, representing a public image URL).
   *   Add `character_weight` (optional integer, min 0, max 100).
-- [ ] In `handleGenerate`, parse the new arguments from request parameters and pass them to `ImageGenService.GenerateImage`.
+- [x] In `handleGenerate`, parse the new arguments from request parameters and pass them to `ImageGenService.GenerateImage`.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- [ ] Add tests in `imagegen_test.go` to verify that `cref_url` and `character_weight` are parsed correctly, and that Midjourney prompt formatting includes the correct flags.
-- [ ] Assert the package test coverage meets or exceeds 91%.
+- [x] Add tests in `imagegen_test.go` to verify that `cref_url` and `character_weight` are parsed correctly, and that Midjourney prompt formatting includes the correct flags.
+- [x] Assert the package test coverage meets or exceeds 91%.
 
 ### Manual Verification
-- [ ] Run `pw-mcp-imagegen` locally and call `imagegen_generate` with a remote image URL as the `cref_url` parameter. Verify that the final prompt passed to Midjourney includes the generated `--cref` URL and `--cw` parameter.
+- [x] Run `pw-mcp-imagegen` locally and call `imagegen_generate` with a remote image URL as the `cref_url` parameter. Verify that the final prompt passed to Midjourney includes the generated `--cref` URL and `--cw` parameter.
 

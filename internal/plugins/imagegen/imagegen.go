@@ -784,13 +784,26 @@ func (s *ImageGenService) runOpenAI(ctx context.Context, finalPrompt, size strin
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
-func (s *ImageGenService) runMidjourney(ctx context.Context, finalPrompt, size, srefURL string) (string, error) {
+func (s *ImageGenService) runMidjourney(ctx context.Context, finalPrompt, size, srefURL string, crefURL string, characterWeight *int) (string, error) {
 	apiURL := s.cfg.Plugins.ImageGen.MidjourneyAPIURL
 	if apiURL == "" {
 		return "", fmt.Errorf("midjourney API URL is not configured (set plugins.imagegen.midjourney_api_url)")
 	}
 	if srefURL != "" {
 		finalPrompt = fmt.Sprintf("%s --sref %s", finalPrompt, srefURL)
+	}
+	if crefURL != "" {
+		u, err := url.Parse(crefURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			return "", fmt.Errorf("invalid cref_url: must be a valid HTTP or HTTPS URL")
+		}
+		finalPrompt = fmt.Sprintf("%s --cref %s", finalPrompt, crefURL)
+	}
+	if characterWeight != nil {
+		if *characterWeight < 0 || *characterWeight > 100 {
+			return "", fmt.Errorf("invalid character_weight: must be between 0 and 100")
+		}
+		finalPrompt = fmt.Sprintf("%s --cw %d", finalPrompt, *characterWeight)
 	}
 	client, newErr := NewMidjourneyBackend(
 		apiURL,
@@ -841,7 +854,7 @@ func (s *ImageGenService) runVeo(ctx context.Context, finalPrompt, size string) 
 }
 
 // GenerateImage generates and downloads the image to workspaceRoot/generated_images/
-func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size string, styleID string) (string, error) {
+func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size string, styleID string, crefURL string, characterWeight *int) (string, error) {
 	finalPrompt, srefURL, err := s.resolvePrompt(prompt, styleID)
 	if err != nil {
 		return "", err
@@ -863,7 +876,7 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 			return "", err
 		}
 	case "midjourney":
-		imageURL, err = s.runMidjourney(ctx, finalPrompt, size, srefURL)
+		imageURL, err = s.runMidjourney(ctx, finalPrompt, size, srefURL, crefURL, characterWeight)
 		if err != nil {
 			return "", err
 		}
