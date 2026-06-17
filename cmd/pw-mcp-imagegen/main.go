@@ -81,6 +81,16 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 				"style_id": {
 					"type": "string",
 					"description": "ID of a registered style profile to apply"
+				},
+				"cref_url": {
+					"type": "string",
+					"description": "Optional remote public URL for character reference style matching"
+				},
+				"character_weight": {
+					"type": "integer",
+					"minimum": 0,
+					"maximum": 100,
+					"description": "Optional character weight parameter (0-100)"
 				}
 			},
 			"required": ["prompt"]
@@ -125,15 +135,17 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 func handleGenerate(service *imagegen.ImageGenService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args struct {
-			Prompt  string `json:"prompt"`
-			Size    string `json:"size"`
-			StyleID string `json:"style_id"`
+			Prompt          string `json:"prompt"`
+			Size            string `json:"size"`
+			StyleID         string `json:"style_id"`
+			CrefURL         string `json:"cref_url"`
+			CharacterWeight *int   `json:"character_weight"`
 		}
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return nil, err
 		}
 
-		filePath, err := service.GenerateImage(ctx, args.Prompt, args.Size, args.StyleID)
+		filePath, err := service.GenerateImage(ctx, args.Prompt, args.Size, args.StyleID, args.CrefURL, args.CharacterWeight)
 		if err != nil {
 			return &mcp.CallToolResult{
 				IsError: true,
