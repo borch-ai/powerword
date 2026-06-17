@@ -95,6 +95,14 @@ type TrendsConfig struct {
 	SerpAPIKey string `mapstructure:"serp_api_key"`
 }
 
+// CloudConfig holds parameters for the Cloud plugin (AWS/GCP orchestration & storage).
+type CloudConfig struct {
+	Provider        string `mapstructure:"provider"`         // "gcs", "s3", or "noop"/"mock"
+	Bucket          string `mapstructure:"bucket"`           // storage bucket name
+	CredentialsPath string `mapstructure:"credentials_path"` // path to service account JSON or AWS credentials
+	Region          string `mapstructure:"region"`           // AWS Region (e.g. us-east-1)
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
@@ -102,6 +110,7 @@ type PluginsConfig struct {
 	SEO      SEOConfig      `mapstructure:"seo"`
 	Viral    ViralConfig    `mapstructure:"viral"`
 	Trends   TrendsConfig   `mapstructure:"trends"`
+	Cloud    CloudConfig    `mapstructure:"cloud"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -281,6 +290,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.viral.video_backend", "mock")
 	v.SetDefault("plugins.viral.ffmpeg_path", "ffmpeg")
 	v.SetDefault("plugins.trends.serp_api_key", "")
+	v.SetDefault("plugins.cloud.provider", "noop")
 
 	// Read config files in order
 	readErr := readConfigFile(v, configFilesToTry, cfgFile)
@@ -340,6 +350,10 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.viral.video_api_key", "POWERWORD_VIRAL_VIDEO_API_KEY")
 	bindEnv(v, "plugins.viral.ffmpeg_path", "POWERWORD_VIRAL_FFMPEG_PATH")
 	bindEnv(v, "plugins.trends.serp_api_key", "POWERWORD_SERP_API_KEY", "SERP_API_KEY")
+	bindEnv(v, "plugins.cloud.provider", "POWERWORD_CLOUD_PROVIDER")
+	bindEnv(v, "plugins.cloud.bucket", "POWERWORD_CLOUD_BUCKET")
+	bindEnv(v, "plugins.cloud.credentials_path", "POWERWORD_CLOUD_CREDENTIALS_PATH")
+	bindEnv(v, "plugins.cloud.region", "POWERWORD_CLOUD_REGION")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {

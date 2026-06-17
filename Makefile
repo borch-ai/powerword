@@ -26,6 +26,7 @@ PDFCHECK_PLUGIN=pw-mcp-pdfcheck
 CRITIC_PLUGIN=pw-mcp-critic
 TYPST_PLUGIN=pw-mcp-typst
 LINTER_PLUGIN=pw-mcp-linter
+CLOUD_PLUGIN=pw-mcp-cloud
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -50,6 +51,7 @@ build:
 	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOBUILD) -o bin/$(PDFCHECK_PLUGIN) ./cmd/$(PDFCHECK_PLUGIN); fi
 	@if [ -d cmd/$(TYPST_PLUGIN) ]; then $(GOBUILD) -o bin/$(TYPST_PLUGIN) ./cmd/$(TYPST_PLUGIN); fi
 	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOBUILD) -o bin/$(LINTER_PLUGIN) ./cmd/$(LINTER_PLUGIN); fi
+	@if [ -d cmd/$(CLOUD_PLUGIN) ]; then $(GOBUILD) -o bin/$(CLOUD_PLUGIN) ./cmd/$(CLOUD_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -67,6 +69,7 @@ install:
 	@if [ -d cmd/$(PDFCHECK_PLUGIN) ]; then $(GOCMD) install ./cmd/$(PDFCHECK_PLUGIN); fi
 	@if [ -d cmd/$(TYPST_PLUGIN) ]; then $(GOCMD) install ./cmd/$(TYPST_PLUGIN); fi
 	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOCMD) install ./cmd/$(LINTER_PLUGIN); fi
+	@if [ -d cmd/$(CLOUD_PLUGIN) ]; then $(GOCMD) install ./cmd/$(CLOUD_PLUGIN); fi
 
 
 install-hooks:
