@@ -273,6 +273,18 @@ func TestCloud_MCP_UploadFile(t *testing.T) {
 		t.Fatalf("CallTool cloud_upload_file error call failed: %v", err)
 	}
 	assertResponse(t, errRes, true, "local_path parameter is required")
+
+	// Test 3: Error Call (relative local_path)
+	relRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_upload_file",
+		Arguments: json.RawMessage(`{
+			"local_path": "relative/path/file.txt"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("CallTool cloud_upload_file error call failed: %v", err)
+	}
+	assertResponse(t, relRes, true, "local_path must be an absolute path")
 }
 
 func TestCloud_MCP_UnmarshalErrors(t *testing.T) {

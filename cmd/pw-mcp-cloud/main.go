@@ -301,6 +301,13 @@ func handleUploadFile(svc *cloud.CloudService) func(context.Context, *mcp.CallTo
 			}, nil
 		}
 
+		if !filepath.IsAbs(args.LocalPath) {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "local_path must be an absolute path"}},
+			}, nil
+		}
+
 		url, err := svc.UploadFile(ctx, args.LocalPath)
 		if err != nil {
 			return &mcp.CallToolResult{

@@ -28,6 +28,12 @@ func NewUploader(cfg *config.Config) Uploader {
 	if cfg == nil {
 		return &NoOpUploader{}
 	}
+	credPath := cfg.Plugins.Cloud.CredentialsPath
+	if credPath != "" {
+		if _, err := os.Stat(credPath); err != nil {
+			return &NoOpUploader{}
+		}
+	}
 	provider := strings.ToLower(cfg.Plugins.Cloud.Provider)
 	switch provider {
 	case "gcs", "gcp":
@@ -94,7 +100,13 @@ func (u *GoogleStorageUploader) UploadFile(ctx context.Context, localPath string
 	// Try setting object ACL to public-read.
 	// Gracefully swallow Uniform Bucket-Level Access (UBLA) errors where ACL operations are forbidden.
 	acl := obj.ACL()
-	_ = acl.Set(ctx, storage.AllUsers, storage.RoleReader)
+	if err := acl.Set(ctx, storage.AllUsers, storage.RoleReader); err != nil {
+		errStr := err.Error()
+		if !strings.Contains(strings.ToLower(errStr), "uniform bucket-level access") &&
+			!strings.Contains(errStr, "Cannot use ACL API") {
+			return "", fmt.Errorf("failed to set GCS object ACL to public-read: %w", err)
+		}
+	}
 
 	mockEndpoint := os.Getenv("POWERWORD_CLOUD_MOCK_ENDPOINT")
 	if mockEndpoint != "" {
@@ -157,11 +169,17 @@ func (u *S3Uploader) UploadFile(ctx context.Context, localPath string) (string, 
 	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, objectName), nil
 }
 
+var randRead = rand.Read
+
 // generateObjectPath helper creates a unique path for the object to prevent collision.
 func generateObjectPath(localPath string) string {
 	fileName := filepath.Base(localPath)
 	randomBytes := make([]byte, 8)
-	_, _ = rand.Read(randomBytes)
-	randomToken := fmt.Sprintf("%x-%d", randomBytes, time.Now().Unix())
+	var randomToken string
+	if _, err := randRead(randomBytes); err != nil {
+		randomToken = fmt.Sprintf("fallback-%d-%d", time.Now().Unix(), time.Now().UnixNano())
+	} else {
+		randomToken = fmt.Sprintf("%x-%d", randomBytes, time.Now().Unix())
+	}
 	return fmt.Sprintf("uploads/%s-%s", randomToken, fileName)
 }

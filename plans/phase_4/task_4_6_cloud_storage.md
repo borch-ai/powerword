@@ -3,7 +3,7 @@
 **Status:** Completed
 **Go Version:** 1.26.4
 **Date Completed:** 2026-06-17
-**Unit Test Coverage:** 91.82% (overall codebase)
+**Unit Test Coverage:** 91.00% (overall codebase)
 
 This task implements a cloud storage upload capability within the native `pw-mcp-cloud` MCP server. Rather than importing a library directly, downstream services (such as Pithos and Kiln) will invoke the `cloud_upload_file` MCP tool to upload local assets and retrieve public URLs.
 
