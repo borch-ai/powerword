@@ -3,7 +3,6 @@ package cloud
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -353,7 +352,7 @@ func TestCheckBucket(t *testing.T) {
 func TestRealClientsWithMockHTTP(t *testing.T) {
 	// 1. Start a mock server to capture GCP and AWS SDK calls
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("--- MOCK REQUEST: %s %s?%s\n", r.Method, r.URL.Path, r.URL.RawQuery)
+		t.Logf("--- MOCK REQUEST: %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
 		w.Header().Set("Content-Type", "application/json")
 
 		// GCP Compute GCE List
