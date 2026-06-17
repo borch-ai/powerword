@@ -136,14 +136,14 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.3: Telemetry, Token Metrics & Cost Accounting**
     *   Implement usage accounting to track input, output, and cached tokens consumed during loops. Calculate and display cost metrics on execution exit.
     *   [Implementation Plan](plans/phase_4/task_4_3_telemetry_cost.md)
-*   [ ] **Task 4.4: Cloud Orchestrator Plugin (AWS/GCP)**
+*   [x] **Task 4.4: Cloud Orchestrator Plugin (AWS/GCP)**
     *   Create a lightweight native Go MCP server (`pw-mcp-cloud`) to parse cloud console resource metadata (EC2/GCE states, CloudWatch logs, storage buckets) to query deployment status.
     *   [Implementation Plan](plans/phase_4/task_4_4_cloud_mcp.md)
 *   [x] **Task 4.5: Shareable Telemetry Subpackage Refactor**
     *   Refactor the telemetry and token cost accounting logic from `internal/llm/telemetry.go` to a dependency-free public package `pkg/telemetry`.
     *   Change the module name of `powerword` to `github.com/borch-ai/powerword` so it is importable.
     *   [Implementation Plan](plans/phase_4/task_4_5_telemetry_refactor.md)
-*   [ ] **Task 4.6: Cloud Storage Subsystem**
+*   [x] **Task 4.6: Cloud Storage Subsystem**
     *   Implement a cloud storage uploader engine within `pw-mcp-cloud` and expose it as a `cloud_upload_file` MCP tool supporting Firebase/GCS and S3 uploads.
     *   [Implementation Plan](plans/phase_4/task_4_6_cloud_storage.md)
 *   [ ] **Task 4.7: MCP ImageGen Cref Extensions**

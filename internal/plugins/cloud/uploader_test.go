@@ -1,0 +1,168 @@
+package cloud
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/borch-ai/powerword/pkg/config"
+)
+
+func TestNewUploader(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		wantType string
+	}{
+		{"noop provider", "noop", "*cloud.NoOpUploader"},
+		{"empty provider", "", "*cloud.NoOpUploader"},
+		{"gcs provider", "gcs", "*cloud.GoogleStorageUploader"},
+		{"gcp provider", "gcp", "*cloud.GoogleStorageUploader"},
+		{"s3 provider", "s3", "*cloud.S3Uploader"},
+		{"aws provider", "aws", "*cloud.S3Uploader"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Plugins.Cloud.Provider = tt.provider
+			u := NewUploader(cfg)
+			gotType := fmt.Sprintf("%T", u)
+			if gotType != tt.wantType {
+				t.Errorf("NewUploader(%q) type = %s; want %s", tt.provider, gotType, tt.wantType)
+			}
+		})
+	}
+}
+
+func TestNoOpUploader_UploadFile(t *testing.T) {
+	u := &NoOpUploader{}
+	_, err := u.UploadFile(context.Background(), "some/file.txt")
+	if err == nil {
+		t.Error("expected NoOpUploader to return an error, got nil")
+	}
+}
+
+func TestRealUploadersWithMockHTTP(t *testing.T) {
+	tempDir := t.TempDir()
+	testFilePath := filepath.Join(tempDir, "test.png")
+	if err := os.WriteFile(testFilePath, []byte("fake image content"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	s3Uploaded := false
+	gcsUploaded := false
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("--- MOCK UPLOADER REQUEST: %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+
+		// AWS S3 PutObject (PUT request to /<bucket>/<key>)
+		if r.Method == "PUT" && strings.Contains(r.URL.Path, "/test-bucket/uploads/") {
+			s3Uploaded = true
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// GCP GCS Upload (POST to resumable upload URL or JSON API endpoint)
+		if r.Method == "POST" && (strings.Contains(r.URL.Path, "/b/test-bucket/o") || strings.Contains(r.URL.Path, "/upload/storage/v1/b/test-bucket/o")) {
+			gcsUploaded = true
+			resp := `{
+				"kind": "storage#object",
+				"name": "uploads/mocked-object-name",
+				"bucket": "test-bucket"
+			}`
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(resp))
+			return
+		}
+
+		// GCP GCS ACL Set (PUT to /b/test-bucket/o/<objectName>/acl/...)
+		if r.Method == "PUT" && strings.Contains(r.URL.Path, "/acl") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	t.Setenv("POWERWORD_CLOUD_MOCK_ENDPOINT", server.URL)
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "test-project-123")
+
+	cfg := &config.Config{}
+	cfg.Plugins.Cloud.Region = "us-east-1"
+	cfg.Plugins.Cloud.Bucket = "test-bucket"
+
+	ctx := context.Background()
+
+	// 1. Test GCS Uploader
+	cfg.Plugins.Cloud.Provider = "gcs"
+	gcsUploader := NewUploader(cfg)
+	urlGCS, err := gcsUploader.UploadFile(ctx, testFilePath)
+	if err != nil {
+		t.Fatalf("GoogleStorageUploader.UploadFile failed: %v", err)
+	}
+	if !gcsUploaded {
+		t.Error("expected GCS mock upload to be triggered")
+	}
+	if !strings.Contains(urlGCS, "test-bucket/uploads/") {
+		t.Errorf("unexpected GCS upload URL: %s", urlGCS)
+	}
+
+	// 2. Test S3 Uploader
+	cfg.Plugins.Cloud.Provider = "s3"
+	s3Uploader := NewUploader(cfg)
+	urlS3, err := s3Uploader.UploadFile(ctx, testFilePath)
+	if err != nil {
+		t.Fatalf("S3Uploader.UploadFile failed: %v", err)
+	}
+	if !s3Uploaded {
+		t.Error("expected S3 mock upload to be triggered")
+	}
+	if !strings.Contains(urlS3, "test-bucket/uploads/") {
+		t.Errorf("unexpected S3 upload URL: %s", urlS3)
+	}
+}
+
+func TestUploadFileErrors(t *testing.T) {
+	ctx := context.Background()
+
+	// 1. Missing GCS bucket name
+	cfgGCS := &config.Config{}
+	cfgGCS.Plugins.Cloud.Provider = "gcs"
+	gcsUploader := NewUploader(cfgGCS)
+	_, err := gcsUploader.UploadFile(ctx, "nonexistent.png")
+	if err == nil || !strings.Contains(err.Error(), "bucket name is not configured") {
+		t.Errorf("expected missing bucket error, got: %v", err)
+	}
+
+	// 2. Missing S3 bucket name
+	cfgS3 := &config.Config{}
+	cfgS3.Plugins.Cloud.Provider = "s3"
+	s3Uploader := NewUploader(cfgS3)
+	_, err = s3Uploader.UploadFile(ctx, "nonexistent.png")
+	if err == nil || !strings.Contains(err.Error(), "bucket name is not configured") {
+		t.Errorf("expected missing bucket error, got: %v", err)
+	}
+
+	// 3. Local file does not exist (GCS)
+	cfgGCS.Plugins.Cloud.Bucket = "test-bucket"
+	_, err = gcsUploader.UploadFile(ctx, "nonexistent.png")
+	if err == nil || !strings.Contains(err.Error(), "failed to open local file") {
+		t.Errorf("expected file not found error, got: %v", err)
+	}
+
+	// 4. Local file does not exist (S3)
+	cfgS3.Plugins.Cloud.Bucket = "test-bucket"
+	_, err = s3Uploader.UploadFile(ctx, "nonexistent.png")
+	if err == nil || !strings.Contains(err.Error(), "failed to open local file") {
+		t.Errorf("expected file not found error, got: %v", err)
+	}
+}

@@ -93,6 +93,7 @@ region = "us-east-1"
 	foundListInstances := false
 	foundGetLogs := false
 	foundCheckBucket := false
+	foundUploadFile := false
 	for _, tool := range tools {
 		if tool.Name == "cloud_list_instances" {
 			foundListInstances = true
@@ -102,6 +103,9 @@ region = "us-east-1"
 		}
 		if tool.Name == "cloud_check_bucket" {
 			foundCheckBucket = true
+		}
+		if tool.Name == "cloud_upload_file" {
+			foundUploadFile = true
 		}
 	}
 
@@ -113,6 +117,9 @@ region = "us-east-1"
 	}
 	if !foundCheckBucket {
 		t.Errorf("expected to find 'cloud_check_bucket' tool, got tools: %+v", tools)
+	}
+	if !foundUploadFile {
+		t.Errorf("expected to find 'cloud_upload_file' tool, got tools: %+v", tools)
 	}
 
 	// 2. CallTool to check bucket (which calls noop/mock backend)
@@ -134,5 +141,25 @@ region = "us-east-1"
 	}
 	if !strings.Contains(resStr, "test-integration-bucket") || !strings.Contains(resStr, "noop") {
 		t.Errorf("expected output to contain bucket name and provider, got: %q", resStr)
+	}
+
+	// 3. CallTool to upload file (which hits the default 'noop' provider error pathway)
+	uploadArgs := map[string]interface{}{
+		"local_path": "/tmp/dummy.txt",
+	}
+	uploadResult, err := client.CallTool(ctx, "cloud_upload_file", uploadArgs)
+	if err != nil {
+		t.Fatalf("failed to call cloud_upload_file tool: %v", err)
+	}
+	if !uploadResult.IsError {
+		t.Fatal("expected cloud_upload_file with noop provider to fail, but it succeeded")
+	}
+
+	uploadResStr, err := mcp.FormatToolResult(uploadResult)
+	if err != nil {
+		t.Fatalf("failed to format tool result: %v", err)
+	}
+	if !strings.Contains(uploadResStr, "cloud storage uploader is not configured") {
+		t.Errorf("expected output to contain 'cloud storage uploader is not configured', got: %q", uploadResStr)
 	}
 }

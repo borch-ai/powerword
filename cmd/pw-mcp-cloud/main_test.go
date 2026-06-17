@@ -224,6 +224,57 @@ func TestCloud_MCP_CheckBucket(t *testing.T) {
 	assertResponse(t, res, false, "my-s3-bucket")
 }
 
+type mockMainUploader struct {
+	UploadFileFunc func(ctx context.Context, localPath string) (string, error)
+}
+
+func (m *mockMainUploader) UploadFile(ctx context.Context, localPath string) (string, error) {
+	if m.UploadFileFunc != nil {
+		return m.UploadFileFunc(ctx, localPath)
+	}
+	return "", nil
+}
+
+func TestCloud_MCP_UploadFile(t *testing.T) {
+	cfg := &config.Config{}
+	svc := cloud.NewCloudService(cfg, nil, nil, nil, nil, nil, nil)
+	mu := &mockMainUploader{
+		UploadFileFunc: func(ctx context.Context, localPath string) (string, error) {
+			if localPath != "/absolute/path/file.txt" {
+				return "", fmt.Errorf("unexpected localPath: %s", localPath)
+			}
+			return "https://my-bucket-url.com/file.txt", nil
+		},
+	}
+	svc.SetUploader(mu)
+
+	tempDir := t.TempDir()
+	session, ctx, cleanup := startTestServer(t, tempDir, svc)
+	defer cleanup()
+
+	// Test 1: UploadFile Success
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_upload_file",
+		Arguments: json.RawMessage(`{
+			"local_path": "/absolute/path/file.txt"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("CallTool cloud_upload_file failed: %v", err)
+	}
+	assertResponse(t, res, false, "https://my-bucket-url.com/file.txt")
+
+	// Test 2: Error Call (missing local_path)
+	errRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "cloud_upload_file",
+		Arguments: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("CallTool cloud_upload_file error call failed: %v", err)
+	}
+	assertResponse(t, errRes, true, "local_path parameter is required")
+}
+
 func TestCloud_MCP_UnmarshalErrors(t *testing.T) {
 	tempDir := t.TempDir()
 	session, ctx, cleanup := startTestServer(t, tempDir, nil)
@@ -247,6 +298,14 @@ func TestCloud_MCP_UnmarshalErrors(t *testing.T) {
 
 	_, err = session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "cloud_check_bucket",
+		Arguments: json.RawMessage(`{invalid_json}`),
+	})
+	if err == nil {
+		t.Error("expected JSON unmarshal error")
+	}
+
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "cloud_upload_file",
 		Arguments: json.RawMessage(`{invalid_json}`),
 	})
 	if err == nil {
