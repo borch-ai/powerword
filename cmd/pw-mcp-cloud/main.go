@@ -127,6 +127,17 @@ const (
 			}
 		}
 	}`
+
+	uploadFileSchema = `{
+		"type": "object",
+		"properties": {
+			"local_path": {
+				"type": "string",
+				"description": "The absolute path of the local file to upload."
+			}
+		},
+		"required": ["local_path"]
+	}`
 )
 
 func setupServer(workspaceRoot string, cfg *config.Config, svc *cloud.CloudService) (*mcp.Server, error) {
@@ -157,6 +168,12 @@ func setupServer(workspaceRoot string, cfg *config.Config, svc *cloud.CloudServi
 		Description: "Verifies public bucket configuration and checks basic object metadata.",
 		InputSchema: json.RawMessage(checkBucketSchema),
 	}, handleCheckBucket(cloudService))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "cloud_upload_file",
+		Description: "Uploads a local file to the configured cloud storage bucket.",
+		InputSchema: json.RawMessage(uploadFileSchema),
+	}, handleUploadFile(cloudService))
 
 	return srv, nil
 }
@@ -264,6 +281,43 @@ func handleCheckBucket(svc *cloud.CloudService) func(context.Context, *mcp.CallT
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		}, nil
+	}
+}
+
+func handleUploadFile(svc *cloud.CloudService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			LocalPath string `json:"local_path"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+
+		if args.LocalPath == "" {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "local_path parameter is required"}},
+			}, nil
+		}
+
+		if !filepath.IsAbs(args.LocalPath) {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "local_path must be an absolute path"}},
+			}, nil
+		}
+
+		url, err := svc.UploadFile(ctx, args.LocalPath)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to upload file: %v", err)}},
+			}, nil
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: url}},
 		}, nil
 	}
 }

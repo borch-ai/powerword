@@ -754,3 +754,41 @@ func TestCloudServiceCornerCases(t *testing.T) {
 		t.Errorf("expected unsupported provider error, got: %v", err)
 	}
 }
+
+type mockUploader struct {
+	UploadFileFunc func(ctx context.Context, localPath string) (string, error)
+}
+
+func (m *mockUploader) UploadFile(ctx context.Context, localPath string) (string, error) {
+	if m.UploadFileFunc != nil {
+		return m.UploadFileFunc(ctx, localPath)
+	}
+	return "", nil
+}
+
+func TestCloudService_UploadFile(t *testing.T) {
+	cfg := &config.Config{}
+	svc := NewCloudService(cfg, nil, nil, nil, nil, nil, nil)
+
+	// Test default uploader exists (it should be NoOpUploader by default config)
+	_, err := svc.UploadFile(context.Background(), "path.png")
+	if err == nil || !strings.Contains(err.Error(), "cloud storage uploader is not configured") {
+		t.Errorf("expected NoOpUploader error, got: %v", err)
+	}
+
+	// Test SetUploader & mock upload success
+	mu := &mockUploader{
+		UploadFileFunc: func(ctx context.Context, localPath string) (string, error) {
+			return "https://public-url.com/file.png", nil
+		},
+	}
+	svc.SetUploader(mu)
+
+	got, err := svc.UploadFile(context.Background(), "path.png")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "https://public-url.com/file.png" {
+		t.Errorf("expected public URL, got: %s", got)
+	}
+}

@@ -382,6 +382,7 @@ type CloudService struct {
 	gcpLogClient GCPLogClient
 	s3Client     S3Client
 	gcsClient    GCSClient
+	uploader     Uploader
 }
 
 // NewCloudService constructs a CloudService, injecting mocks if passed, or defaulting to real clients.
@@ -414,8 +415,24 @@ func NewCloudService(cfg *config.Config, ec2 EC2Client, gce GCEClient, cw CWLogs
 	if s.gcsClient == nil {
 		s.gcsClient = &realGCSClient{cfg: cfg}
 	}
+	if s.uploader == nil {
+		s.uploader = NewUploader(cfg)
+	}
 
 	return s
+}
+
+// SetUploader allows overriding the default uploader (useful for unit tests).
+func (s *CloudService) SetUploader(u Uploader) {
+	s.uploader = u
+}
+
+// UploadFile uploads the local file using the configured uploader.
+func (s *CloudService) UploadFile(ctx context.Context, localPath string) (string, error) {
+	if s.uploader == nil {
+		return "", fmt.Errorf("uploader is not initialized")
+	}
+	return s.uploader.UploadFile(ctx, localPath)
 }
 
 // ListInstances queries and normalizes instances based on target provider.
