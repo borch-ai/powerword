@@ -1,8 +1,11 @@
 # plan: Task 5.7: Multi-Language Coverage Plugin (LCOV & Cobertura)
 
-**Status:** Open
+**Status:** Completed
+**Go Version:** 1.26.4
+**Date Completed:** 2026-06-18
+**Unit Test Coverage:** 91.10% (overall repository check-coverage threshold met)
 
-Extend Powerword's coverage checking capabilities to support SvelteKit/TypeScript (Vitest LCOV format) and Python (Cobertura XML format). This will be implemented as a standalone MCP server `pw-mcp-coverage` that can parse multi-language coverage reports, enabling automated quality checks for repositories like Knurl.
+Extend Powerword's coverage checking capabilities to support SvelteKit/TypeScript (Vitest LCOV format) and Python (Cobertura XML format). This is implemented as a standalone MCP server `pw-mcp-coverage` that can parse multi-language coverage reports, enabling automated quality checks for repositories like Knurl.
 
 ## User Review Required
 
@@ -22,7 +25,7 @@ Extend Powerword's coverage checking capabilities to support SvelteKit/TypeScrip
 #### [NEW] [main.go](file://../../cmd/pw-mcp-coverage/main.go)
 - Create the standard CLI wrapper to initialize and run the stdio-based MCP server.
 
-#### [NEW] [server.go](file://../../internal/mcp/critic/server.go)
+#### [NEW] [server.go](file://../../internal/mcp/coverage/server.go)
 - Implement the MCP server utilizing the `modelcontextprotocol/go-sdk`.
 - Register the `check_coverage` tool.
 - Implement parsing drivers for:
