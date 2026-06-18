@@ -106,7 +106,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.15: Typst Mixed Layout Templates (`pw-mcp-typst`)**
     *   Extend `pw-mcp-typst` compile tools to support left-hand text, right-hand image, and other layout styles instead of only full-bleed backgrounds.
     *   [Implementation Plan](plans/phase_3/task_3_15_typst_mixed_layouts.md)
-*   [ ] **Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)**
+*   [x] **Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)**
     *   Extend the `pw-mcp-viral` toolset with a slideshow generator tool (`viral_stitch_slideshow`) that compiles sequences of paired images and audio narration segments into a single unified MP4 video trailer using ffmpeg.
     *   [Implementation Plan](plans/phase_3/task_3_16_viral_slideshow.md)
 *   [x] **Task 3.17: Grayscale PDF Preflight Checker (`pw-mcp-pdfcheck`)**
@@ -115,7 +115,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.18: Gutter & Safe-Zone Margin Analyzer (`pw-mcp-pdfcheck`)**
     *   Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` to verify that text and structural elements do not run too close to the binding gutter or outer page trim boundaries.
     *   [Implementation Plan](plans/phase_3/task_3_18_pdfcheck_margins.md)
-*   [ ] **Task 3.19: Spine Cover Wrap & Barcode Layout Checker (`pw-mcp-pdfcheck`)**
+*   [x] **Task 3.19: Spine Cover Wrap & Barcode Layout Checker (`pw-mcp-pdfcheck`)**
     *   Implement cover wrap geometry checking and back cover barcode detection in `pw-mcp-pdfcheck` to verify that compiled book covers have the exact KDP-compliant dimensions and contain a readable barcode.
     *   [Implementation Plan](plans/phase_3/task_3_19_pdfcheck_cover_barcode.md)
 *   [ ] **Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)**
