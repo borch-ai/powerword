@@ -1,9 +1,9 @@
 # plan: Task 3.19: Spine Cover Wrap & Barcode Layout Checker (`pw-mcp-pdfcheck`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-18
+**Unit Test Coverage:** 91.2% (overall statement coverage)
 
 Implement cover wrap geometry checking and back cover barcode detection in `pw-mcp-pdfcheck` to verify that compiled book covers have the exact KDP-compliant dimensions (front cover, spine width, back cover, and bleeds) and contain a readable barcode.
 

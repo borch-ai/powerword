@@ -1,6 +1,7 @@
 package pdfcheck
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -1118,5 +1119,708 @@ func TestValidatePDFPreflight_NegativeMargins(t *testing.T) {
 	_, err = ValidatePDFPreflight(context.Background(), inputMargin)
 	if err == nil || !strings.Contains(err.Error(), "min_margin_inches must be non-negative") {
 		t.Errorf("expected error for negative min_margin_inches, got: %v", err)
+	}
+}
+
+func createCoverPDFBytes(widthPt, heightPt float64, contentsStr string, hasImage bool) []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+
+	var obj3 string
+	if hasImage {
+		obj3 = fmt.Sprintf("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.1f %.1f] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>\nendobj\n", widthPt, heightPt)
+	} else {
+		obj3 = fmt.Sprintf("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.1f %.1f] /Contents 4 0 R >>\nendobj\n", widthPt, heightPt)
+	}
+
+	obj4 := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(contentsStr), contentsStr)
+
+	var pdfStr string
+	if hasImage {
+		obj5 := "5 0 obj\n<< /Type /XObject /Subtype /Image /Width 100 /Height 100 >>\nstream\n\nendstream\nendobj\n"
+		header := "%PDF-1.4\n"
+		off1 := len(header)
+		off2 := off1 + len(obj1)
+		off3 := off2 + len(obj2)
+		off4 := off3 + len(obj3)
+		off5 := off4 + len(obj4)
+		offXref := off5 + len(obj5)
+
+		xref := "xref\n0 6\n0000000000 65535 f \n" +
+			fmt.Sprintf("%010d 00000 n \n", off1) +
+			fmt.Sprintf("%010d 00000 n \n", off2) +
+			fmt.Sprintf("%010d 00000 n \n", off3) +
+			fmt.Sprintf("%010d 00000 n \n", off4) +
+			fmt.Sprintf("%010d 00000 n \n", off5)
+
+		trailer := fmt.Sprintf("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offXref)
+		pdfStr = header + obj1 + obj2 + obj3 + obj4 + obj5 + xref + trailer
+	} else {
+		header := "%PDF-1.4\n"
+		off1 := len(header)
+		off2 := off1 + len(obj1)
+		off3 := off2 + len(obj2)
+		off4 := off3 + len(obj3)
+		offXref := off4 + len(obj4)
+
+		xref := "xref\n0 5\n0000000000 65535 f \n" +
+			fmt.Sprintf("%010d 00000 n \n", off1) +
+			fmt.Sprintf("%010d 00000 n \n", off2) +
+			fmt.Sprintf("%010d 00000 n \n", off3) +
+			fmt.Sprintf("%010d 00000 n \n", off4)
+
+		trailer := fmt.Sprintf("trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offXref)
+		pdfStr = header + obj1 + obj2 + obj3 + obj4 + xref + trailer
+	}
+
+	return []byte(pdfStr)
+}
+
+func TestValidateCoverPDF_Success(t *testing.T) {
+	defer MockExecLookPath(func(file string) (string, error) {
+		return "/mocked/path/to/" + file, nil
+	})()
+	defer MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "pdfimages" {
+			if len(args) > 0 && args[0] == "-list" {
+				out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+					"--------------------------------------------------------------------------------------------\n" +
+					"   1     0 image     100   100 gray     1   8  png    no         5  0   300   300   10K   10%\n"
+				return exec.CommandContext(ctx, "echo", out)
+			}
+			if len(args) > 0 && args[0] == "-png" {
+				prefix := args[len(args)-1]
+				targetFile := prefix + "-000.png"
+				//nolint:gosec
+				return exec.CommandContext(ctx, "sh", "-c", "echo dummy > "+targetFile)
+			}
+		}
+		if command == "zbarimg" {
+			return exec.CommandContext(ctx, "echo", "9781234567890")
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	})()
+
+	// 200 page B&W book: spine = 200 * 0.002252 = 0.4504 in
+	// expected width = 6.0*2 + 0.4504 + 0.125*2 = 12.7004 in (914.43 pt)
+	// expected height = 9.0 + 0.125*2 = 9.25 in (666.00 pt)
+	// Image drawn at X=50 pt (left half of page, back cover)
+	contents := "q\n100 0 0 100 50 100 cm\n/Im1 Do\nQ\n"
+	pdfBytes := createCoverPDFBytes(914.43, 666.00, contents, true)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+		ExpectedISBN:         "9781234567890",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if !res.Valid {
+		t.Errorf("expected cover to be valid, got errors: %v", res.Errors)
+	}
+	if len(res.Errors) != 0 {
+		t.Errorf("expected 0 errors, got: %v", res.Errors)
+	}
+}
+
+func TestValidateCoverPDF_GeometryMismatch(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	// Dimensions are incorrect for a 200 page book
+	contents := "q\n100 0 0 100 50 100 cm\n/Im1 Do\nQ\n"
+	pdfBytes := createCoverPDFBytes(800.0, 500.0, contents, true)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_mismatch.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected validation to fail due to geometry mismatch")
+	}
+
+	assertHasError(t, res.Errors, "Cover width mismatch")
+	assertHasError(t, res.Errors, "Cover height mismatch")
+}
+
+func TestValidateCoverPDF_PageCountMismatch(t *testing.T) {
+	pdfBytes := createMultipageMismatchPDFBytes() // 2 pages
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_multipage.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected validation to fail for multipage cover PDF")
+	}
+	assertHasError(t, res.Errors, "Cover PDF must have exactly 1 page")
+}
+
+func TestValidateCoverPDF_NoImages(t *testing.T) {
+	// Cover has no images
+	pdfBytes := createCoverPDFBytes(914.43, 666.00, "q\nQ\n", false)
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_no_images.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected validation to fail because no barcode image exists")
+	}
+	assertHasError(t, res.Errors, "No barcode image found on the back cover")
+}
+
+func TestValidateCoverPDF_MissingToolsFallback(t *testing.T) {
+	// Mock look path to return tool not found error
+	oldLookPath := execLookPath
+	defer func() { execLookPath = oldLookPath }()
+	execLookPath = func(file string) (string, error) {
+		return "", fmt.Errorf("tool not found")
+	}
+
+	contents := "q\n100 0 0 50 50 100 cm\n/Im1 Do\nQ\n" // wImg = 100, hImg = 50 (w > h)
+	pdfBytes := createCoverPDFBytes(914.43, 666.00, contents, true)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_fallback.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if !res.Valid {
+		t.Errorf("expected fallback path to pass since aspect ratio checks out, got errors: %v", res.Errors)
+	}
+
+	hasZbarWarn := false
+	for _, w := range res.Warnings {
+		if strings.Contains(w, "zbarimg utility not found") {
+			hasZbarWarn = true
+			break
+		}
+	}
+	if !hasZbarWarn {
+		t.Error("expected warning about missing zbarimg")
+	}
+}
+
+func TestValidateCoverPDF_MissingToolsFallback_Fail(t *testing.T) {
+	oldLookPath := execLookPath
+	defer func() { execLookPath = oldLookPath }()
+	execLookPath = func(file string) (string, error) {
+		return "", fmt.Errorf("tool not found")
+	}
+
+	contents := "q\n50 0 0 100 50 100 cm\n/Im1 Do\nQ\n" // wImg = 50, hImg = 100 (w < h, fails barcode aspect ratio check)
+	pdfBytes := createCoverPDFBytes(914.43, 666.00, contents, true)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_fallback_fail.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected fallback path to fail due to wrong aspect ratio of back cover image")
+	}
+	assertHasError(t, res.Errors, "No barcode-like image (width > height) found on the back cover")
+}
+
+func TestValidateCoverPDF_BarcodeOnFront(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "pdfimages" {
+			if len(args) > 0 && args[0] == "-list" {
+				out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+					"--------------------------------------------------------------------------------------------\n" +
+					"   1     0 image     100   100 gray     1   8  png    no         5  0   300   300   10K   10%\n"
+				return exec.CommandContext(ctx, "echo", out)
+			}
+			if len(args) > 0 && args[0] == "-png" {
+				prefix := args[len(args)-1]
+				targetFile := prefix + "-000.png"
+				//nolint:gosec
+				return exec.CommandContext(ctx, "sh", "-c", "echo dummy > "+targetFile)
+			}
+		}
+		if command == "zbarimg" {
+			return exec.CommandContext(ctx, "echo", "9781234567890")
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	// 200 page B&W book: spine = 0.4504 in
+	// expected width = 12.7004 in (914.43 pt). Center is 457.2 pt.
+	// Image drawn at X=600 pt (right half of page, front cover)
+	contents := "q\n100 0 0 100 600 100 cm\n/Im1 Do\nQ\n"
+	pdfBytes := createCoverPDFBytes(914.43, 666.00, contents, true)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_front.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected validation to fail because barcode is on the front cover")
+	}
+	assertHasError(t, res.Errors, "No barcode image found on the back cover")
+}
+
+func TestValidateCoverPDF_InvalidPaperType(t *testing.T) {
+	input := ValidateCoverInput{
+		PDFPath:              "dummy.pdf",
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "invalid_paper",
+	}
+	_, err := ValidateCoverPDF(context.Background(), input)
+	if err == nil || !strings.Contains(err.Error(), "invalid paper type") {
+		t.Errorf("expected error for invalid paper type, got: %v", err)
+	}
+}
+
+func TestValidateCoverPDF_ISBNMismatch(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "pdfimages" {
+			if len(args) > 0 && args[0] == "-list" {
+				out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+					"--------------------------------------------------------------------------------------------\n" +
+					"   1     0 image     100   100 gray     1   8  png    no         5  0   300   300   10K   10%\n"
+				return exec.CommandContext(ctx, "echo", out)
+			}
+			if len(args) > 0 && args[0] == "-png" {
+				prefix := args[len(args)-1]
+				targetFile := prefix + "-000.png"
+				//nolint:gosec
+				return exec.CommandContext(ctx, "sh", "-c", "echo dummy > "+targetFile)
+			}
+		}
+		if command == "zbarimg" {
+			return exec.CommandContext(ctx, "echo", "9781111111111") // different ISBN
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	contents := "q\n100 0 0 100 50 100 cm\n/Im1 Do\nQ\n"
+	pdfBytes := createCoverPDFBytes(914.43, 666.00, contents, true)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatalf("failed to write temp cover PDF: %v", err)
+	}
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+		ExpectedISBN:         "9781234567890", // mismatch expected ISBN
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("ValidateCoverPDF returned unexpected error: %v", err)
+	}
+
+	if res.Valid {
+		t.Error("expected validation to fail due to ISBN mismatch")
+	}
+	assertHasError(t, res.Errors, "Barcode ISBN mismatch")
+}
+
+func TestValidateCoverPDF_CreamAndColorPaper(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "pdfimages" {
+			if len(args) > 0 && args[0] == "-list" {
+				out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+					"--------------------------------------------------------------------------------------------\n" +
+					"   1     0 image     100   100 gray     1   8  png    no         5  0   300   300   10K   10%\n"
+				return exec.CommandContext(ctx, "echo", out)
+			}
+			if len(args) > 0 && args[0] == "-png" {
+				prefix := args[len(args)-1]
+				targetFile := prefix + "-000.png"
+				//nolint:gosec
+				return exec.CommandContext(ctx, "sh", "-c", "echo dummy > "+targetFile)
+			}
+		}
+		if command == "zbarimg" {
+			return exec.CommandContext(ctx, "echo", "9781234567890")
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	// 1. Cream paper: spine = 200 * 0.0025 = 0.50 in
+	// expected width = 6.0*2 + 0.50 + 0.125*2 = 12.75 in (918.0 pt)
+	contents := "q\n100 0 0 100 50 100 cm\n/Im1 Do\nQ\n"
+	creamPdf := createCoverPDFBytes(918.00, 666.00, contents, true)
+
+	tempDir := t.TempDir()
+	creamPath := filepath.Join(tempDir, "cream.pdf")
+	_ = os.WriteFile(creamPath, creamPdf, 0600)
+
+	res, err := ValidateCoverPDF(context.Background(), ValidateCoverInput{
+		PDFPath:              creamPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "cream",
+	})
+	if err != nil {
+		t.Fatalf("cream error: %v", err)
+	}
+	if !res.Valid {
+		t.Errorf("expected valid cream cover, got errors: %v", res.Errors)
+	}
+
+	// 2. Color paper: spine = 200 * 0.002347 = 0.4694 in
+	// expected width = 6.0*2 + 0.4694 + 0.125*2 = 12.7194 in (915.80 pt)
+	colorPdf := createCoverPDFBytes(915.80, 666.00, contents, true)
+	colorPath := filepath.Join(tempDir, "color.pdf")
+	_ = os.WriteFile(colorPath, colorPdf, 0600)
+
+	resColor, err := ValidateCoverPDF(context.Background(), ValidateCoverInput{
+		PDFPath:              colorPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "color",
+	})
+	if err != nil {
+		t.Fatalf("color error: %v", err)
+	}
+	if !resColor.Valid {
+		t.Errorf("expected valid color cover, got errors: %v", resColor.Errors)
+	}
+}
+
+func TestValidator_CoverHelpers_EdgeCases(t *testing.T) {
+	// 1. getFloat with a non-numeric type
+	valNull := pdf.Value{}
+	if getFloat(valNull) != 0 {
+		t.Error("expected getFloat(null) to be 0")
+	}
+
+	// 2. getObjectID with nonexistent XObject name
+	pdfBytes := createMinimalPDFBytes()
+	safeR, safeSize := newSafeReaderAt(bytes.NewReader(pdfBytes), int64(len(pdfBytes)))
+	r, err := pdf.NewReader(safeR, safeSize)
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+	p := r.Page(1)
+	if _, ok := getObjectID(p, "NonexistentName"); ok {
+		t.Error("expected getObjectID to return false for nonexistent XObject")
+	}
+}
+
+func createCoverPDFBytesTwoImages(widthPt, heightPt float64, contentsStr string) []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+	obj3 := fmt.Sprintf("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.1f %.1f] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R /Im2 6 0 R >> >> >>\nendobj\n", widthPt, heightPt)
+	obj4 := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(contentsStr), contentsStr)
+	obj5 := "5 0 obj\n<< /Type /XObject /Subtype /Image /Width 100 /Height 100 >>\nstream\n\nendstream\nendobj\n"
+	obj6 := "6 0 obj\n<< /Type /XObject /Subtype /Image /Width 100 /Height 100 >>\nstream\n\nendstream\nendobj\n"
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	off5 := off4 + len(obj4)
+	off6 := off5 + len(obj5)
+	offXref := off6 + len(obj6)
+
+	xref := "xref\n0 7\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4) +
+		fmt.Sprintf("%010d 00000 n \n", off5) +
+		fmt.Sprintf("%010d 00000 n \n", off6)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offXref)
+	return []byte(header + obj1 + obj2 + obj3 + obj4 + obj5 + obj6 + xref + trailer)
+}
+
+func createPDFWithCustomColorSpace() []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+	obj3 := "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Resources << /ColorSpace << /MyCS /DeviceRGB /MyGray /DeviceGray >> >> /CustomKey /MyCS /CustomKeyGray /MyGray /CustomKeyNonexistent /MyNonexistent /CustomArrayEmpty [ ] /CustomArrayGray [ /DeviceGray ] /CustomArrayIndexed [ /Indexed /DeviceRGB ] /CustomArraySeparation [ /Separation /DeviceCMYK ] >>\nendobj\n"
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	offXref := off3 + len(obj3)
+
+	xref := "xref\n0 4\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n%d\n%%EOF\n", offXref)
+	return []byte(header + obj1 + obj2 + obj3 + xref + trailer)
+}
+
+func TestValidateCoverPDF_BarcodeOnlyOnFrontWithBackImage(t *testing.T) {
+	defer mockLookPathSuccess()()
+	oldExecCommand := execCommand
+	defer func() { execCommand = oldExecCommand }()
+
+	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "pdfimages" {
+			if len(args) > 0 && args[0] == "-list" {
+				out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+					"--------------------------------------------------------------------------------------------\n" +
+					"   1     0 image     100   100 gray     1   8  png    no         5  0   300   300   10K   10%\n" +
+					"   1     1 image     100   100 gray     1   8  png    no         6  0   300   300   10K   10%\n"
+				return exec.CommandContext(ctx, "echo", out)
+			}
+			if len(args) > 0 && args[0] == "-png" {
+				prefix := args[len(args)-1]
+				_ = os.WriteFile(prefix+"-000.png", []byte("dummy"), 0600)
+				_ = os.WriteFile(prefix+"-001.png", []byte("dummy"), 0600)
+				return exec.CommandContext(ctx, "echo", "")
+			}
+		}
+		if command == "zbarimg" {
+			// If it's the second image (prefix-001.png), it is on the front cover and readable.
+			if len(args) > 0 && strings.HasSuffix(args[len(args)-1], "-001.png") {
+				return exec.CommandContext(ctx, "echo", "9781234567890")
+			}
+			// Otherwise (back cover image), it is not a readable barcode.
+			return exec.CommandContext(ctx, "sh", "-c", "exit 1")
+		}
+		return exec.CommandContext(ctx, "echo", "")
+	}
+
+	// 200 page B&W book: spine = 0.4504 in. expected width = 914.43 pt.
+	// We put Im1 at X=50 (back cover), Im2 at X=600 (front cover)
+	contents := "q\n100 0 0 100 50 100 cm\n/Im1 Do\nQ\nq\n100 0 0 100 600 100 cm\n/Im2 Do\nQ\n"
+	pdfBytes := createCoverPDFBytesTwoImages(914.43, 666.00, contents)
+
+	tempDir := t.TempDir()
+	pdfPath := filepath.Join(tempDir, "cover_two.pdf")
+	_ = os.WriteFile(pdfPath, pdfBytes, 0600)
+
+	input := ValidateCoverInput{
+		PDFPath:              pdfPath,
+		ExpectedWidthInches:  6.0,
+		ExpectedHeightInches: 9.0,
+		PageCount:            200,
+		PaperType:            "white",
+	}
+
+	res, err := ValidateCoverPDF(context.Background(), input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Valid {
+		t.Error("expected invalid cover")
+	}
+	assertHasError(t, res.Errors, "Barcode found on front cover (right half of page, value: 9781234567890); barcode must be placed on the back cover")
+}
+
+func TestValidator_Cover_AdditionalCoverage(t *testing.T) {
+	tempDir := t.TempDir()
+	// Test matching img-%d.* (e.g. img-0.png)
+	f0, err := os.Create(filepath.Join(tempDir, "img-0.png"))
+	if err == nil {
+		_ = f0.Close()
+	}
+	if path := findExtractedImageFile(tempDir, 0); path == "" {
+		t.Error("expected findExtractedImageFile to find img-0.png")
+	}
+	// Test matching nothing
+	if path := findExtractedImageFile(tempDir, 999); path != "" {
+		t.Errorf("expected findExtractedImageFile to return empty, got %q", path)
+	}
+
+	// Test parseCoverPDF error cases
+	_, _, err = parseCoverPDF("nonexistent_cover_file_path.pdf")
+	if err == nil {
+		t.Error("expected parseCoverPDF to fail for nonexistent file")
+	}
+	invalidPDFPath := filepath.Join(tempDir, "invalid.pdf")
+	_ = os.WriteFile(invalidPDFPath, []byte("not a pdf"), 0600)
+	_, _, err = parseCoverPDF(invalidPDFPath)
+	if err == nil {
+		t.Error("expected parseCoverPDF to fail for invalid PDF file")
+	}
+
+	// Test isNonGrayColorspaceValue null / non-name / non-array values
+	valNull := pdf.Value{}
+	if isNonGrayColorspaceValue(valNull, pdf.Page{}) {
+		t.Error("expected isNonGrayColorspaceValue(null) to be false")
+	}
+}
+
+func TestValidator_ColorspaceHelpers(t *testing.T) {
+	pdfBytes := createPDFWithCustomColorSpace()
+	safeR, safeSize := newSafeReaderAt(bytes.NewReader(pdfBytes), int64(len(pdfBytes)))
+	r, err := pdf.NewReader(safeR, safeSize)
+	if err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+	p := r.Page(1)
+
+	// CustomKey is /MyCS
+	valMyCS := p.V.Key("CustomKey")
+	if valMyCS.Kind() != pdf.Name {
+		t.Fatalf("expected CustomKey to be Name, got %v", valMyCS.Kind())
+	}
+	if !isNonGrayColorspaceValue(valMyCS, p) {
+		t.Error("expected /MyCS to be non-gray colorspace")
+	}
+
+	// CustomKeyGray is /MyGray
+	valMyGray := p.V.Key("CustomKeyGray")
+	if isNonGrayColorspaceValue(valMyGray, p) {
+		t.Error("expected /MyGray to be gray colorspace")
+	}
+
+	// CustomKeyNonexistent is /MyNonexistent (null from resources)
+	valMyNonexistent := p.V.Key("CustomKeyNonexistent")
+	if isNonGrayColorspaceValue(valMyNonexistent, p) {
+		t.Error("expected nonexistent color space to not be non-gray")
+	}
+
+	// CustomArrayEmpty is [ ]
+	valArrayEmpty := p.V.Key("CustomArrayEmpty")
+	if isNonGrayColorspaceValue(valArrayEmpty, p) {
+		t.Error("expected empty array colorspace to be false")
+	}
+
+	// CustomArrayGray is [ /DeviceGray ]
+	valArrayGray := p.V.Key("CustomArrayGray")
+	if isNonGrayColorspaceValue(valArrayGray, p) {
+		t.Error("expected gray array colorspace to be false")
+	}
+
+	// CustomArrayIndexed is [ /Indexed /DeviceRGB ]
+	valArrayIndexed := p.V.Key("CustomArrayIndexed")
+	if !isNonGrayColorspaceValue(valArrayIndexed, p) {
+		t.Error("expected indexed rgb array to be non-gray")
+	}
+
+	// CustomArraySeparation is [ /Separation /DeviceCMYK ]
+	valArraySeparation := p.V.Key("CustomArraySeparation")
+	if !isNonGrayColorspaceValue(valArraySeparation, p) {
+		t.Error("expected separation cmyk array to be non-gray")
 	}
 }
