@@ -830,12 +830,17 @@ func TestUncoveredBranches(t *testing.T) {
 		t.Error("expected mkdir error in GenerateVideo, got nil")
 	}
 
-	_, err = svcBlocked.StitchTrailer(context.Background(), filepath.Join(tmpDir, "v.mp4"), filepath.Join(tmpDir, "a.mp3"), "", "")
+	vPath := filepath.Join(tmpDir, "v.mp4")
+	aPath := filepath.Join(tmpDir, "a.mp3")
+	_ = os.WriteFile(vPath, []byte("fake"), 0600)
+	_ = os.WriteFile(aPath, []byte("fake"), 0600)
+
+	_, err = svcBlocked.StitchTrailer(context.Background(), vPath, aPath, "", "")
 	if err == nil {
 		t.Error("expected mkdir error in StitchTrailer, got nil")
 	}
 
-	_, err = svcBlocked.StitchSlideshow(context.Background(), []Slide{{ImagePath: filepath.Join(tmpDir, "v.mp4"), AudioPath: filepath.Join(tmpDir, "a.mp3")}}, "", "")
+	_, err = svcBlocked.StitchSlideshow(context.Background(), []Slide{{ImagePath: vPath, AudioPath: aPath}}, "", "")
 	if err == nil {
 		t.Error("expected mkdir error in StitchSlideshow, got nil")
 	}

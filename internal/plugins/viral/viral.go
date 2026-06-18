@@ -435,9 +435,12 @@ func renderSlide(ctx context.Context, ffmpegCmd string, i int, slide Slide, dir 
 		"-loop", "1",
 		"-i", slide.ImagePath,
 		"-i", slide.AudioPath,
+		"-vf", "scale=1024:1024:force_original_aspect_ratio=decrease,pad=1024:1024:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
 		"-c:v", "libx264",
 		"-tune", "stillimage",
 		"-c:a", "aac",
+		"-ar", "44100",
+		"-ac", "2",
 		"-pix_fmt", "yuv420p",
 		"-shortest",
 		tempSegmentPath,
@@ -481,17 +484,17 @@ func validateStitchInputs(slides []Slide, backgroundAudioPath string) error {
 	}
 
 	for i, slide := range slides {
-		if _, err := os.Stat(slide.ImagePath); os.IsNotExist(err) {
-			return fmt.Errorf("image file for slide %d does not exist: %s", i, slide.ImagePath)
+		if _, err := os.Stat(slide.ImagePath); err != nil {
+			return fmt.Errorf("image file for slide %d error: %w", i, err)
 		}
-		if _, err := os.Stat(slide.AudioPath); os.IsNotExist(err) {
-			return fmt.Errorf("audio file for slide %d does not exist: %s", i, slide.AudioPath)
+		if _, err := os.Stat(slide.AudioPath); err != nil {
+			return fmt.Errorf("audio file for slide %d error: %w", i, err)
 		}
 	}
 
 	if backgroundAudioPath != "" {
-		if _, err := os.Stat(backgroundAudioPath); os.IsNotExist(err) {
-			return fmt.Errorf("background audio file does not exist: %s", backgroundAudioPath)
+		if _, err := os.Stat(backgroundAudioPath); err != nil {
+			return fmt.Errorf("background audio file error: %w", err)
 		}
 	}
 	return nil
