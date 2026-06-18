@@ -8,6 +8,8 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -595,4 +597,430 @@ func isNonGrayColorspaceArray(val pdf.Value, p pdf.Page) bool {
 		return isNonGrayColorspaceValue(baseCS, p)
 	}
 	return true
+}
+
+// ValidateCoverInput represents the input parameters for validating a book cover PDF.
+type ValidateCoverInput struct {
+	PDFPath              string   `json:"pdf_path"`
+	ExpectedWidthInches  float64  `json:"expected_width_inches"`
+	ExpectedHeightInches float64  `json:"expected_height_inches"`
+	PageCount            int      `json:"page_count"`
+	PaperType            string   `json:"paper_type"`
+	BleedInches          *float64 `json:"bleed_inches,omitempty"`
+	ExpectedISBN         string   `json:"expected_isbn,omitempty"`
+}
+
+// ValidateCoverPDF performs validation on a compiled book cover PDF.
+func ValidateCoverPDF(ctx context.Context, input ValidateCoverInput) (*ValidatePDFResult, error) {
+	var thickness float64
+	switch strings.ToLower(input.PaperType) {
+	case "white":
+		thickness = 0.002252
+	case "cream":
+		thickness = 0.0025
+	case "color":
+		thickness = 0.002347
+	default:
+		return nil, fmt.Errorf("invalid paper type: %q", input.PaperType)
+	}
+
+	bleed := 0.125
+	if input.BleedInches != nil {
+		bleed = *input.BleedInches
+	}
+
+	r, f, err := parseCoverPDF(input.PDFPath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+
+	numPages := r.NumPage()
+	res := &ValidatePDFResult{
+		PageCount: numPages,
+		Errors:    []string{},
+		Warnings:  []string{},
+	}
+
+	if numPages != 1 {
+		res.Valid = false
+		res.Errors = append(res.Errors, fmt.Sprintf("Cover PDF must have exactly 1 page, got %d", numPages))
+		return res, nil
+	}
+
+	spine := float64(input.PageCount) * thickness
+
+	page := r.Page(1)
+	if err := validateCoverDimensions(page, input, spine, bleed, res); err != nil {
+		return nil, err
+	}
+
+	placements := findImagePlacements(page)
+
+	var backCoverImages []imagePlacement
+	for _, p := range placements {
+		if p.ctm[4] < (input.ExpectedWidthInches+bleed)*72.0 {
+			backCoverImages = append(backCoverImages, p)
+		}
+	}
+
+	if len(backCoverImages) == 0 {
+		res.Errors = append(res.Errors, "No barcode image found on the back cover (left half of page)")
+		res.Valid = false
+		return res, nil
+	}
+
+	_, lookZbarErr := execLookPath("zbarimg")
+	zbarInstalled := (lookZbarErr == nil)
+
+	_, lookImagesErr := execLookPath("pdfimages")
+	pdfimagesInstalled := (lookImagesErr == nil)
+
+	if !zbarInstalled || !pdfimagesInstalled {
+		checkBarcodeFallback(backCoverImages, res, zbarInstalled, pdfimagesInstalled)
+		res.Valid = (len(res.Errors) == 0)
+		return res, nil
+	}
+
+	if err := verifyBarcodeWithTools(ctx, page, input, bleed, placements, res); err != nil {
+		return nil, err
+	}
+
+	res.Valid = (len(res.Errors) == 0)
+	return res, nil
+}
+
+func parseCoverPDF(pdfPath string) (*pdf.Reader, *os.File, error) {
+	//nolint:gosec // pdfPath is validated in input handler
+	f, err := os.Open(pdfPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open cover PDF: %w", err)
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("failed to stat cover PDF: %w", err)
+	}
+
+	safeR, safeSize := newSafeReaderAt(f, fi.Size())
+	r, err := pdf.NewReader(safeR, safeSize)
+	if err != nil {
+		_ = f.Close()
+		return nil, nil, fmt.Errorf("failed to parse cover PDF: %w", err)
+	}
+
+	return r, f, nil
+}
+
+func validateCoverDimensions(page pdf.Page, input ValidateCoverInput, spine, bleed float64, res *ValidatePDFResult) error {
+	wPoints, hPoints, err := getPageDimensions(page)
+	if err != nil {
+		return fmt.Errorf("failed to get cover page dimensions: %w", err)
+	}
+
+	wInches := wPoints / 72.0
+	hInches := hPoints / 72.0
+	res.Dimensions = fmt.Sprintf("%.3f x %.3f in", wInches, hInches)
+
+	expectedW := input.ExpectedWidthInches*2 + spine + bleed*2
+	expectedH := input.ExpectedHeightInches + bleed*2
+
+	if math.Abs(wInches-expectedW) > 0.05 {
+		res.Errors = append(res.Errors, fmt.Sprintf("Cover width mismatch: expected %.3f in (with spine %.4f in and bleed %.3f in), got %.3f in (%.2f pt)", expectedW, spine, bleed, wInches, wPoints))
+	}
+	if math.Abs(hInches-expectedH) > 0.05 {
+		res.Errors = append(res.Errors, fmt.Sprintf("Cover height mismatch: expected %.3f in (with bleed %.3f in), got %.3f in (%.2f pt)", expectedH, bleed, hInches, hPoints))
+	}
+	return nil
+}
+
+func checkBarcodeFallback(backCoverImages []imagePlacement, res *ValidatePDFResult, zbarInstalled, pdfimagesInstalled bool) {
+	if !zbarInstalled {
+		res.Warnings = append(res.Warnings, "zbarimg utility not found on host. Skipping barcode readability checks.")
+	}
+	if !pdfimagesInstalled {
+		res.Warnings = append(res.Warnings, "pdfimages utility not found on host. Skipping image extraction for barcode checks.")
+	}
+
+	foundBarcodeCandidate := false
+	for _, p := range backCoverImages {
+		wImg := p.ctm[0]
+		hImg := p.ctm[3]
+		if wImg > 0 && hImg > 0 && wImg > hImg {
+			foundBarcodeCandidate = true
+			break
+		}
+	}
+	if !foundBarcodeCandidate {
+		res.Errors = append(res.Errors, "No barcode-like image (width > height) found on the back cover")
+	}
+}
+
+func verifyBarcodeWithTools(ctx context.Context, page pdf.Page, input ValidateCoverInput, bleed float64, placements []imagePlacement, res *ValidatePDFResult) error {
+	tempDir, err := os.MkdirTemp("", "cover-barcode-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	objToNum, err := getPDFImageObjects(ctx, input.PDFPath)
+	if err != nil {
+		return err
+	}
+
+	//nolint:gosec
+	extractCmd := execCommand(ctx, "pdfimages", "-png", input.PDFPath, filepath.Join(tempDir, "img"))
+	extractOut, err := extractCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to extract images from PDF: %w (output: %s)", err, string(extractOut))
+	}
+
+	var verifiedBarcode string
+	var foundReadableOnBack bool
+	var foundBarcodeOnFront bool
+	var decodedFrontValue string
+
+	for _, p := range placements {
+		checkSinglePlacementBarcode(ctx, p, tempDir, objToNum, page, input.ExpectedWidthInches, bleed, &foundReadableOnBack, &foundBarcodeOnFront, &verifiedBarcode, &decodedFrontValue)
+	}
+
+	reportBarcodeResults(input.ExpectedISBN, foundReadableOnBack, foundBarcodeOnFront, verifiedBarcode, decodedFrontValue, res)
+	return nil
+}
+
+func checkSinglePlacementBarcode(ctx context.Context, p imagePlacement, tempDir string, objToNum map[int]int, page pdf.Page, expectedW float64, bleed float64, foundReadableOnBack *bool, foundBarcodeOnFront *bool, verifiedBarcode *string, decodedFrontValue *string) {
+	objID, ok := getObjectID(page, p.name)
+	if !ok {
+		return
+	}
+	num, ok := objToNum[objID]
+	if !ok {
+		return
+	}
+
+	imgPath := findExtractedImageFile(tempDir, num)
+	if imgPath == "" {
+		return
+	}
+
+	//nolint:gosec
+	zbarCmd := execCommand(ctx, "zbarimg", "--raw", "-q", imgPath)
+	zbarOut, zbarErr := zbarCmd.CombinedOutput()
+	if zbarErr != nil {
+		return
+	}
+
+	decodedVal := strings.TrimSpace(string(zbarOut))
+	if decodedVal == "" {
+		return
+	}
+
+	isLeftHalf := p.ctm[4] < (expectedW+bleed)*72.0
+	if isLeftHalf {
+		*foundReadableOnBack = true
+		*verifiedBarcode = decodedVal
+	} else {
+		*foundBarcodeOnFront = true
+		*decodedFrontValue = decodedVal
+	}
+}
+
+func getPDFImageObjects(ctx context.Context, pdfPath string) (map[int]int, error) {
+	//nolint:gosec
+	listCmd := execCommand(ctx, "pdfimages", "-list", pdfPath)
+	listOut, err := listCmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list images in PDF: %w (output: %s)", err, string(listOut))
+	}
+
+	objToNum := make(map[int]int)
+	lines := strings.Split(string(listOut), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "-") || strings.HasPrefix(trimmed, "page") {
+			continue
+		}
+		fields := strings.Fields(trimmed)
+		if len(fields) < 11 {
+			continue
+		}
+		num, err1 := strconv.Atoi(fields[1])
+		objID, err2 := strconv.Atoi(fields[len(fields)-6])
+		if err1 == nil && err2 == nil {
+			objToNum[objID] = num
+		}
+	}
+	return objToNum, nil
+}
+
+func findExtractedImageFile(tempDir string, num int) string {
+	matches, _ := filepath.Glob(filepath.Join(tempDir, fmt.Sprintf("img-%03d.*", num)))
+	if len(matches) > 0 {
+		return matches[0]
+	}
+	matches2, _ := filepath.Glob(filepath.Join(tempDir, fmt.Sprintf("img-%d.*", num)))
+	if len(matches2) > 0 {
+		return matches2[0]
+	}
+	return ""
+}
+
+func reportBarcodeResults(expectedISBN string, foundReadableOnBack, foundBarcodeOnFront bool, verifiedBarcode, decodedFrontValue string, res *ValidatePDFResult) {
+	if !foundReadableOnBack {
+		reportMissingBarcode(foundBarcodeOnFront, decodedFrontValue, res)
+		return
+	}
+	if expectedISBN != "" {
+		verifyISBNDigits(expectedISBN, verifiedBarcode, res)
+	}
+}
+
+func reportMissingBarcode(foundBarcodeOnFront bool, decodedFrontValue string, res *ValidatePDFResult) {
+	if foundBarcodeOnFront {
+		res.Errors = append(res.Errors, fmt.Sprintf("Barcode found on front cover (right half of page, value: %s); barcode must be placed on the back cover", decodedFrontValue))
+	} else {
+		res.Errors = append(res.Errors, "No readable barcode found on back cover (left half of page)")
+	}
+}
+
+func verifyISBNDigits(expectedISBN, verifiedBarcode string, res *ValidatePDFResult) {
+	expectedDigits := cleanDigits(expectedISBN)
+	decodedDigits := cleanDigits(verifiedBarcode)
+	if expectedDigits != decodedDigits {
+		res.Errors = append(res.Errors, fmt.Sprintf("Barcode ISBN mismatch: expected %q, got %q", expectedDigits, decodedDigits))
+	}
+}
+
+func getObjectID(page pdf.Page, name string) (int, bool) {
+	xobject := page.Resources().Key("XObject").Key(name)
+	if xobject.IsNull() {
+		return 0, false
+	}
+	val := reflect.ValueOf(xobject)
+	ptrField := val.FieldByName("ptr")
+	if !ptrField.IsValid() {
+		return 0, false
+	}
+	for ptrField.Kind() == reflect.Pointer || ptrField.Kind() == reflect.Interface {
+		if ptrField.IsNil() {
+			return 0, false
+		}
+		ptrField = ptrField.Elem()
+	}
+	if ptrField.Kind() != reflect.Struct {
+		return 0, false
+	}
+	idField := ptrField.FieldByName("id")
+	if !idField.IsValid() {
+		return 0, false
+	}
+	idVal := idField.Uint()
+	if idVal > uint64(math.MaxInt) {
+		return 0, false
+	}
+	return int(idVal), true
+}
+
+func multiply(m1, m2 [6]float64) [6]float64 {
+	return [6]float64{
+		m1[0]*m2[0] + m1[1]*m2[2],
+		m1[0]*m2[1] + m1[1]*m2[3],
+		m1[2]*m2[0] + m1[3]*m2[2],
+		m1[2]*m2[1] + m1[3]*m2[3],
+		m1[4]*m2[0] + m1[5]*m2[2] + m2[4],
+		m1[4]*m2[1] + m1[5]*m2[3] + m2[5],
+	}
+}
+
+type imagePlacement struct {
+	name string
+	ctm  [6]float64
+}
+
+func findImagePlacements(p pdf.Page) []imagePlacement {
+	var placements []imagePlacement
+	var ctmStack [][6]float64
+	currentCTM := [6]float64{1, 0, 0, 1, 0, 0}
+
+	streams := getPageContentsStreams(p)
+	for _, strm := range streams {
+		pdf.Interpret(strm, func(stk *pdf.Stack, op string) {
+			n := stk.Len()
+			args := make([]pdf.Value, n)
+			for i := n - 1; i >= 0; i-- {
+				args[i] = stk.Pop()
+			}
+
+			placements, currentCTM, ctmStack = handlePDFOp(p, op, args, placements, currentCTM, ctmStack)
+		})
+	}
+	return placements
+}
+
+func handlePDFOp(p pdf.Page, op string, args []pdf.Value, placements []imagePlacement, currentCTM [6]float64, ctmStack [][6]float64) ([]imagePlacement, [6]float64, [][6]float64) {
+	switch op {
+	case "q":
+		ctmStack = append(ctmStack, currentCTM)
+	case "Q":
+		if len(ctmStack) > 0 {
+			currentCTM = ctmStack[len(ctmStack)-1]
+			ctmStack = ctmStack[:len(ctmStack)-1]
+		}
+	case "cm":
+		if len(args) == 6 {
+			m := [6]float64{
+				getFloat(args[0]),
+				getFloat(args[1]),
+				getFloat(args[2]),
+				getFloat(args[3]),
+				getFloat(args[4]),
+				getFloat(args[5]),
+			}
+			currentCTM = multiply(m, currentCTM)
+		}
+	case "Do":
+		if len(args) > 0 && args[0].Kind() == pdf.Name {
+			name := args[0].Name()
+			xobj := p.Resources().Key("XObject").Key(name)
+			if !xobj.IsNull() && xobj.Key("Subtype").Name() == "Image" {
+				placements = append(placements, imagePlacement{
+					name: name,
+					ctm:  currentCTM,
+				})
+			}
+		}
+	}
+	return placements, currentCTM, ctmStack
+}
+
+func getFloat(v pdf.Value) float64 {
+	if v.Kind() == pdf.Real || v.Kind() == pdf.Integer {
+		return v.Float64()
+	}
+	return 0
+}
+
+func cleanDigits(s string) string {
+	var sb strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
+}
+
+// MockExecCommand overrides the package-level execCommand and returns a cleanup function.
+func MockExecCommand(fn func(ctx context.Context, name string, arg ...string) *exec.Cmd) func() {
+	old := execCommand
+	execCommand = fn
+	return func() { execCommand = old }
+}
+
+// MockExecLookPath overrides the package-level execLookPath and returns a cleanup function.
+func MockExecLookPath(fn func(file string) (string, error)) func() {
+	old := execLookPath
+	execLookPath = fn
+	return func() { execLookPath = old }
 }

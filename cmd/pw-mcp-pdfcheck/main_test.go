@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/borch-ai/powerword/internal/plugins/pdfcheck"
 	"github.com/borch-ai/powerword/pkg/config"
 )
 
@@ -340,5 +342,160 @@ func TestMainFunction_Error(t *testing.T) {
 	}
 	if exitCode != 1 {
 		t.Errorf("expected exit code 1, got %d", exitCode)
+	}
+}
+
+func createCoverPDFBytesHelper(widthPt, heightPt float64, contentsStr string) []byte {
+	obj1 := "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+	obj2 := "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+	obj3 := fmt.Sprintf("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.1f %.1f] /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>\nendobj\n", widthPt, heightPt)
+	obj4 := fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n", len(contentsStr), contentsStr)
+	obj5 := "5 0 obj\n<< /Type /XObject /Subtype /Image /Width 100 /Height 100 >>\nstream\n\nendstream\nendobj\n"
+
+	header := "%PDF-1.4\n"
+	off1 := len(header)
+	off2 := off1 + len(obj1)
+	off3 := off2 + len(obj2)
+	off4 := off3 + len(obj3)
+	off5 := off4 + len(obj4)
+	offXref := off5 + len(obj5)
+
+	xref := "xref\n0 6\n0000000000 65535 f \n" +
+		fmt.Sprintf("%010d 00000 n \n", off1) +
+		fmt.Sprintf("%010d 00000 n \n", off2) +
+		fmt.Sprintf("%010d 00000 n \n", off3) +
+		fmt.Sprintf("%010d 00000 n \n", off4) +
+		fmt.Sprintf("%010d 00000 n \n", off5)
+
+	trailer := fmt.Sprintf("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", offXref)
+	return []byte(header + obj1 + obj2 + obj3 + obj4 + obj5 + xref + trailer)
+}
+
+func setupValidateCoverMocks() func() {
+	unmockLookPath := pdfcheck.MockExecLookPath(func(file string) (string, error) {
+		return "/mocked/path/to/" + file, nil
+	})
+
+	unmockCommand := pdfcheck.MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command == "pdfimages" {
+			if len(args) > 0 && args[0] == "-list" {
+				out := "page   num  type   width height color comp bpc  enc interp  object ID x-dpi y-dpi   size ratio\n" +
+					"--------------------------------------------------------------------------------------------\n" +
+					"   1     0 image     100   100 gray     1   8  png    no         5  0   300   300   10K   10%\n"
+				return exec.CommandContext(ctx, "/bin/echo", out)
+			}
+			if len(args) > 0 && args[0] == "-png" {
+				prefix := args[len(args)-1]
+				targetFile := prefix + "-000.png"
+				//nolint:gosec
+				return exec.CommandContext(ctx, "/bin/sh", "-c", "echo dummy > "+targetFile)
+			}
+		}
+		if command == "zbarimg" {
+			return exec.CommandContext(ctx, "/bin/echo", "9781234567890")
+		}
+		return exec.CommandContext(ctx, "/bin/echo", "")
+	})
+
+	return func() {
+		unmockCommand()
+		unmockLookPath()
+	}
+}
+
+func TestPdfcheck_MCP_ValidateCoverPDF(t *testing.T) {
+	defer setupValidateCoverMocks()()
+
+	tempDir := t.TempDir()
+
+	// 200 page B&W book: spine = 0.4504 in. Width = 12.7004 in (914.43 pt). Height = 9.25 in (666 pt).
+	// Image drawn at X=50 pt (back cover)
+	contents := "q\n100 0 0 100 50 100 cm\n/Im1 Do\nQ\n"
+	pdfBytes := createCoverPDFBytesHelper(914.43, 666.00, contents)
+	pdfPath := filepath.Join(tempDir, "cover.pdf")
+	_ = os.WriteFile(pdfPath, pdfBytes, 0600)
+
+	session, ctx, cleanup := startTestServer(t, tempDir)
+	defer cleanup()
+
+	tests := []struct {
+		name       string
+		args       string
+		wantError  bool
+		wantSubstr string
+	}{
+		{
+			name: "Success Call",
+			args: fmt.Sprintf(`{
+				"pdf_path": %q,
+				"expected_width_inches": 6.0,
+				"expected_height_inches": 9.0,
+				"page_count": 200,
+				"paper_type": "white",
+				"expected_isbn": "9781234567890"
+			}`, pdfPath),
+			wantError:  false,
+			wantSubstr: `"valid": true`,
+		},
+		{
+			name: "Missing pdf_path",
+			args: `{
+				"expected_width_inches": 6.0,
+				"expected_height_inches": 9.0,
+				"page_count": 200,
+				"paper_type": "white"
+			}`,
+			wantError:  true,
+			wantSubstr: "pdf_path parameter is required",
+		},
+		{
+			name: "Invalid expected dimensions",
+			args: fmt.Sprintf(`{
+				"pdf_path": %q,
+				"expected_width_inches": 0,
+				"expected_height_inches": 9.0,
+				"page_count": 200,
+				"paper_type": "white"
+			}`, pdfPath),
+			wantError:  true,
+			wantSubstr: "parameters must be positive",
+		},
+		{
+			name: "Invalid page count",
+			args: fmt.Sprintf(`{
+				"pdf_path": %q,
+				"expected_width_inches": 6.0,
+				"expected_height_inches": 9.0,
+				"page_count": 0,
+				"paper_type": "white"
+			}`, pdfPath),
+			wantError:  true,
+			wantSubstr: "page_count parameter must be positive",
+		},
+		{
+			name: "Invalid paper type",
+			args: fmt.Sprintf(`{
+				"pdf_path": %q,
+				"expected_width_inches": 6.0,
+				"expected_height_inches": 9.0,
+				"page_count": 200,
+				"paper_type": "invalid"
+			}`, pdfPath),
+			wantError:  true,
+			wantSubstr: "paper_type parameter must be one of",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := session.CallTool(ctx, &mcp.CallToolParams{
+				Name:      "validate_cover_pdf",
+				Arguments: json.RawMessage(tc.args),
+			})
+			if err != nil {
+				t.Fatalf("CallTool failed: %v", err)
+			}
+			assertResponse(t, res, tc.wantError, tc.wantSubstr)
+		})
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -107,6 +108,43 @@ const validatePDFSchema = `{
 	"required": ["pdf_path", "expected_width_inches", "expected_height_inches"]
 }`
 
+const validateCoverPDFSchema = `{
+	"type": "object",
+	"properties": {
+		"pdf_path": {
+			"type": "string",
+			"description": "Absolute or relative path to the target cover PDF file to validate."
+		},
+		"expected_width_inches": {
+			"type": "number",
+			"description": "Expected width of a single interior page in inches (trim width)."
+		},
+		"expected_height_inches": {
+			"type": "number",
+			"description": "Expected height of a single interior page in inches (trim height)."
+		},
+		"page_count": {
+			"type": "integer",
+			"description": "Total number of pages in the interior manuscript."
+		},
+		"paper_type": {
+			"type": "string",
+			"enum": ["white", "cream", "color"],
+			"description": "The type of paper used: 'white', 'cream', or 'color'."
+		},
+		"bleed_inches": {
+			"type": "number",
+			"minimum": 0,
+			"description": "Optional bleed offset. Defaults to 0.125 inches."
+		},
+		"expected_isbn": {
+			"type": "string",
+			"description": "Optional expected ISBN barcode digits to verify."
+		}
+	},
+	"required": ["pdf_path", "expected_width_inches", "expected_height_inches", "page_count", "paper_type"]
+}`
+
 func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) {
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "pw-mcp-pdfcheck",
@@ -119,6 +157,14 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 		InputSchema: json.RawMessage(validatePDFSchema),
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return handleValidatePDF(ctx, req, workspaceRoot)
+	})
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "validate_cover_pdf",
+		Description: "Performs validation checks on a compiled cover PDF to ensure KDP paperback geometry compliance and barcode readability.",
+		InputSchema: json.RawMessage(validateCoverPDFSchema),
+	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return handleValidateCoverPDF(ctx, req, workspaceRoot)
 	})
 
 	return srv, nil
@@ -167,6 +213,70 @@ func handleValidatePDF(ctx context.Context, req *mcp.CallToolRequest, workspaceR
 		return &mcp.CallToolResult{
 			IsError: true,
 			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("preflight validation failed: %v", err)}},
+		}, nil
+	}
+
+	data, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+	}, nil
+}
+
+func handleValidateCoverPDF(ctx context.Context, req *mcp.CallToolRequest, workspaceRoot string) (*mcp.CallToolResult, error) {
+	var args pdfcheck.ValidateCoverInput
+	if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+		return nil, err
+	}
+
+	if args.PDFPath == "" {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "pdf_path parameter is required"}},
+		}, nil
+	}
+
+	if !filepath.IsAbs(args.PDFPath) {
+		args.PDFPath = filepath.Join(workspaceRoot, args.PDFPath)
+	}
+
+	if args.ExpectedWidthInches <= 0 || args.ExpectedHeightInches <= 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "expected_width_inches and expected_height_inches parameters must be positive"}},
+		}, nil
+	}
+
+	if args.PageCount <= 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "page_count parameter must be positive"}},
+		}, nil
+	}
+
+	if args.BleedInches != nil && *args.BleedInches < 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "bleed_inches parameter must be non-negative"}},
+		}, nil
+	}
+
+	pt := strings.ToLower(args.PaperType)
+	if pt != "white" && pt != "cream" && pt != "color" {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "paper_type parameter must be one of 'white', 'cream', or 'color'"}},
+		}, nil
+	}
+
+	res, err := pdfcheck.ValidateCoverPDF(ctx, args)
+	if err != nil {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("cover validation failed: %v", err)}},
 		}, nil
 	}
 
