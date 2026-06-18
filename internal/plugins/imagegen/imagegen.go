@@ -120,12 +120,18 @@ type OpenAIBackend struct {
 	client *openai.Client
 }
 
-// NewOpenAIBackend creates a new OpenAI image generator wrapper.
+// NewOpenAIBackend creates a new OpenAI image generator wrapper with the default timeout of 120 seconds.
 func NewOpenAIBackend(apiKey string) *OpenAIBackend {
+	return NewOpenAIBackendWithTimeout(apiKey, 120*time.Second)
+}
+
+// NewOpenAIBackendWithTimeout creates a new OpenAI image generator wrapper with a custom timeout.
+func NewOpenAIBackendWithTimeout(apiKey string, timeout time.Duration) *OpenAIBackend {
 	cfg := openai.DefaultConfig(apiKey)
 	if baseURL := os.Getenv("OPENAI_BASE_URL"); baseURL != "" {
 		cfg.BaseURL = baseURL
 	}
+	cfg.HTTPClient = &http.Client{Timeout: timeout}
 	return &OpenAIBackend{
 		client: openai.NewClientWithConfig(cfg),
 	}
@@ -174,8 +180,13 @@ func NewGoogleBackend(apiKey, model string) *GoogleBackend {
 		apiURL: apiURL,
 		apiKey: apiKey,
 		model:  model,
-		client: &http.Client{Timeout: 30 * time.Second},
+		client: &http.Client{Timeout: 120 * time.Second},
 	}
+}
+
+// SetTimeout sets a custom HTTP client timeout.
+func (b *GoogleBackend) SetTimeout(t time.Duration) {
+	b.client.Timeout = t
 }
 
 // GenerateImage generates the image via direct predict REST call and returns decoded raw bytes and mimeType.
@@ -301,8 +312,13 @@ func NewVeoBackend(apiKey, model, intervalStr, timeoutStr string) (*VeoBackend, 
 		model:           model,
 		pollingInterval: interval,
 		pollingTimeout:  timeout,
-		client:          &http.Client{Timeout: 30 * time.Second},
+		client:          &http.Client{Timeout: 120 * time.Second},
 	}, nil
+}
+
+// SetTimeout sets a custom HTTP client timeout.
+func (b *VeoBackend) SetTimeout(t time.Duration) {
+	b.client.Timeout = t
 }
 
 func (b *VeoBackend) downloadVideo(ctx context.Context, videoURI string) ([]byte, error) {
@@ -540,8 +556,13 @@ func NewMidjourneyBackend(apiURL, apiKey, intervalStr, timeoutStr string) (*Midj
 		apiKey:          apiKey,
 		pollingInterval: interval,
 		pollingTimeout:  timeout,
-		httpClient:      &http.Client{Timeout: 30 * time.Second},
+		httpClient:      &http.Client{Timeout: 120 * time.Second},
 	}, nil
+}
+
+// SetTimeout sets a custom HTTP client timeout.
+func (b *MidjourneyBackend) SetTimeout(t time.Duration) {
+	b.httpClient.Timeout = t
 }
 
 func extractTaskID(m map[string]interface{}) string {
@@ -748,6 +769,17 @@ func NewImageGenService(workspaceRoot string, cfg *config.Config) *ImageGenServi
 	}
 }
 
+func (s *ImageGenService) getRequestTimeout() time.Duration {
+	tStr := s.cfg.Plugins.ImageGen.RequestTimeout
+	if tStr == "" {
+		return 120 * time.Second
+	}
+	if d, err := time.ParseDuration(tStr); err == nil && d > 0 {
+		return d
+	}
+	return 120 * time.Second
+}
+
 // StyleStore returns the underlying style profile registry.
 func (s *ImageGenService) StyleStore() *StyleStore {
 	return s.styleStore
@@ -780,7 +812,7 @@ func (s *ImageGenService) runOpenAI(ctx context.Context, finalPrompt, size strin
 	if apiKey == "" {
 		return "", fmt.Errorf("openai API key is not configured (set plugins.imagegen.openai_api_key or api_keys.openai)")
 	}
-	client := NewOpenAIBackend(apiKey)
+	client := NewOpenAIBackendWithTimeout(apiKey, s.getRequestTimeout())
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
@@ -814,6 +846,7 @@ func (s *ImageGenService) runMidjourney(ctx context.Context, finalPrompt, size, 
 	if newErr != nil {
 		return "", fmt.Errorf("failed to initialize Midjourney backend: %w", newErr)
 	}
+	client.SetTimeout(s.getRequestTimeout())
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
@@ -826,6 +859,7 @@ func (s *ImageGenService) runGoogle(ctx context.Context, finalPrompt, size strin
 		return nil, "", fmt.Errorf("google/gemini API key is not configured (set plugins.imagegen.google_api_key or api_keys.gemini)")
 	}
 	client := NewGoogleBackend(apiKey, s.cfg.Plugins.ImageGen.GoogleModel)
+	client.SetTimeout(s.getRequestTimeout())
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
@@ -850,6 +884,7 @@ func (s *ImageGenService) runVeo(ctx context.Context, finalPrompt, size string) 
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to initialize Veo backend: %w", err)
 	}
+	client.SetTimeout(s.getRequestTimeout())
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
@@ -898,7 +933,7 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 	if imageBytes != nil {
 		localPath, err = saveImageBytes(imageBytes, mimeType, s.workspaceRoot, prompt)
 	} else {
-		localPath, err = downloadImage(ctx, imageURL, s.workspaceRoot, prompt)
+		localPath, err = downloadImage(ctx, imageURL, s.workspaceRoot, prompt, s.getRequestTimeout())
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to save generated image: %w", err)
@@ -944,8 +979,11 @@ func saveImageBytes(data []byte, mimeType string, workspaceRoot string, prompt s
 	return filePath, nil
 }
 
-func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, prompt string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, prompt string, timeout time.Duration) (string, error) {
+	derivedCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(derivedCtx, "GET", urlStr, nil)
 	if err != nil {
 		return "", err
 	}

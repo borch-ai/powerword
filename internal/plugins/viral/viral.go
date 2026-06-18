@@ -220,6 +220,12 @@ func (s *ViralService) runVeo(ctx context.Context, prompt, size string) ([]byte,
 		return nil, fmt.Errorf("failed to initialize Veo backend: %w", err)
 	}
 
+	if s.cfg.Plugins.ImageGen.RequestTimeout != "" {
+		if d, errParse := time.ParseDuration(s.cfg.Plugins.ImageGen.RequestTimeout); errParse == nil && d > 0 {
+			backend.SetTimeout(d)
+		}
+	}
+
 	videoBytes, _, err := backend.GenerateImage(ctx, prompt, size)
 	if err != nil {
 		return nil, err
