@@ -259,6 +259,85 @@ Prompt 1
 	assertResponse(t, res, false, "page_count")
 }
 
+func TestTypst_MCP_CompileInteriorLayoutSuccess(t *testing.T) {
+	mockTypst := createMockTypstBin(t)
+	t.Setenv("POWERWORD_TYPST_BIN", mockTypst)
+
+	tempDir := t.TempDir()
+
+	manuscriptPath := filepath.Join(tempDir, "manuscript.md")
+	manuscriptContent := `
+# Page 1
+## Text
+Stanza 1
+
+## Prompt
+Prompt 1
+`
+	if err := os.WriteFile(manuscriptPath, []byte(manuscriptContent), 0600); err != nil {
+		t.Fatalf("failed to write mock manuscript: %v", err)
+	}
+
+	imagesDir := filepath.Join(tempDir, "images")
+	if err := os.Mkdir(imagesDir, 0700); err != nil {
+		t.Fatalf("failed to create images dir: %v", err)
+	}
+	realPNG := createTinyPNG(t)
+	//nolint:gosec // paths are generated safely in tempDir
+	if err := os.WriteFile(filepath.Join(imagesDir, "page_1.png"), realPNG, 0600); err != nil {
+		t.Fatalf("failed to write mock image: %v", err)
+	}
+
+	outputPath := filepath.Join(tempDir, "output.pdf")
+
+	session, ctx, cleanup := startTestServer(t, tempDir)
+	defer cleanup()
+
+	args := fmt.Sprintf(`{
+		"manuscript_path": %q,
+		"images_dir": %q,
+		"output_path": %q,
+		"page_size": "4in,4in",
+		"margin_inside": "0.5in",
+		"margin_outside": "0.5in",
+		"bleed": "0in",
+		"layout": "facing-pages"
+	}`, manuscriptPath, imagesDir, outputPath)
+
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "compile_interior",
+		Arguments: json.RawMessage(args),
+	})
+	if err != nil {
+		t.Fatalf("CallTool compile_interior layout failed: %v", err)
+	}
+
+	assertResponse(t, res, false, "output_pdf")
+}
+
+func TestTypst_MCP_CompileInteriorLayoutValidationError(t *testing.T) {
+	tempDir := t.TempDir()
+	session, ctx, cleanup := startTestServer(t, tempDir)
+	defer cleanup()
+
+	args := `{
+		"manuscript_path": "manuscript.md",
+		"images_dir": ".",
+		"output_path": "output.pdf",
+		"layout": "invalid-layout"
+	}`
+
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "compile_interior",
+		Arguments: json.RawMessage(args),
+	})
+	if err != nil {
+		t.Fatalf("CallTool compile_interior layout validation failed: %v", err)
+	}
+
+	assertResponse(t, res, true, "invalid layout")
+}
+
 func TestTypst_MCP_CompileCoverSuccess(t *testing.T) {
 	mockTypst := createMockTypstBin(t)
 	t.Setenv("POWERWORD_TYPST_BIN", mockTypst)
