@@ -1829,6 +1829,14 @@ func TestValidator_ColorspaceHelpers(t *testing.T) {
 	}
 }
 
+type mockCMYKImageWrapper struct {
+	*image.CMYK
+}
+
+func (w mockCMYKImageWrapper) At(x, y int) color.Color {
+	return w.CMYKAt(x, y)
+}
+
 //nolint:gocognit,funlen
 func TestCheckInkDensity(t *testing.T) {
 	// 1. Missing Ghostscript warning
@@ -1930,8 +1938,8 @@ func TestCheckInkDensity(t *testing.T) {
 		}
 	})
 
-	// 5. RGB Image success and error cases (Slow Path)
-	t.Run("rgb images (slow path)", func(t *testing.T) {
+	// 5. non-*image.CMYK wrapper success and error cases (Slow Path)
+	t.Run("slow path (non-*image.CMYK)", func(t *testing.T) {
 		defer MockExecLookPath(func(file string) (string, error) {
 			return "/usr/bin/gs", nil
 		})()
@@ -1956,27 +1964,26 @@ func TestCheckInkDensity(t *testing.T) {
 			return mockImg, nil
 		})()
 
-		// Case A: RGB image under 240%
-		rgbaUnder := image.NewRGBA(image.Rect(0, 0, 2, 2))
-		rgbaUnder.Set(0, 0, color.RGBA{R: 255, G: 255, B: 255, A: 255})
-		mockImg = rgbaUnder
+		// Case A: Slow path CMYK image under 240%
+		cmykUnder := image.NewCMYK(image.Rect(0, 0, 2, 2))
+		cmykUnder.SetCMYK(0, 0, color.CMYK{C: 150, M: 150, Y: 150, K: 150})
+		mockImg = mockCMYKImageWrapper{CMYK: cmykUnder}
 
 		res := &ValidatePDFResult{}
 		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
 		if len(res.Errors) != 0 {
-			t.Errorf("expected no errors for under-limit RGB, got: %v", res.Errors)
+			t.Errorf("expected no errors for under-limit slow path CMYK, got: %v", res.Errors)
 		}
 
-		// Case B: RGB image over 240%
-		// Dark blue (R=0, G=0, B=128) converts to C=255, M=255, Y=0, K=127 which sums to 637 (249.8%)
-		rgbaOver := image.NewRGBA(image.Rect(0, 0, 2, 2))
-		rgbaOver.Set(0, 0, color.RGBA{R: 0, G: 0, B: 128, A: 255})
-		mockImg = rgbaOver
+		// Case B: Slow path CMYK image over 240%
+		cmykOver := image.NewCMYK(image.Rect(0, 0, 2, 2))
+		cmykOver.SetCMYK(0, 0, color.CMYK{C: 170, M: 170, Y: 170, K: 170})
+		mockImg = mockCMYKImageWrapper{CMYK: cmykOver}
 
 		res = &ValidatePDFResult{}
 		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
-		if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "maximum ink density of 249.8% exceeds the limit of 240%") {
-			t.Errorf("expected ink density error for over-limit RGB, got: %v", res.Errors)
+		if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "maximum ink density of 266.7% exceeds the limit of 240%") {
+			t.Errorf("expected ink density error for over-limit slow path CMYK, got: %v", res.Errors)
 		}
 	})
 
