@@ -257,6 +257,10 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.21: Provider API Key Fallback Resolution**
     *   Add fallback resolution to `LoadConfig` so that canonical provider env var names (`GEMINI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SERP_API_KEY`) are recognised when the `POWERWORD_`-prefixed variant is not set. Eliminates the need to set separate keys per tool in the Borch-AI stack — one key covers the whole stack. `POWERWORD_*` vars retain highest precedence.
     *   [Implementation Plan](plans/phase_6/task_6_21_api_key_fallback_resolution.md)
+*   [ ] **Task 6.22: Google Backend Image/Video Generation Timeout Adjustment**
+    *   Increase default http.Client timeout from 30 seconds to 120 seconds in Google and Midjourney image/video generation backends to prevent context deadline exceeded timeout issues during Imagen generation.
+    *   [Implementation Plan](plans/phase_6/task_6_22_google_backend_timeout.md)
+
 
 
 
