@@ -124,6 +124,12 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.21: Typst Per-Page Layout Overrides (`pw-mcp-typst`)**
     *   Extend `pw-mcp-typst`'s `ParseManuscript` parser and template compilation to support per-page layout configuration via comments (e.g. `<!-- Layout: <type> -->`) inside the Markdown manuscript.
     *   [Implementation Plan](plans/phase_3/task_3_21_typst_per_page_layouts.md)
+*   [ ] **Task 3.22: YouTube Integration Plugin (`pw-mcp-youtube`)**
+    *   Implement a native Go MCP server exposing tools to interface with YouTube APIs (video uploads, metadata customization, and analytics fetching).
+    *   [Implementation Plan](plans/phase_3/task_3_22_youtube_mcp.md)
+*   [ ] **Task 3.23: Digital Music Distribution Helper (`pw-mcp-music`)**
+    *   Implement a native Go MCP server exposing tools to package lossless audio and artwork and submit releases to distributor webhook endpoints.
+    *   [Implementation Plan](plans/phase_3/task_3_23_music_mcp.md)
 
 ---
 
