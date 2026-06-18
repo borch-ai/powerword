@@ -241,6 +241,12 @@ func parseAndSanitizeInterior(compiler *typst.Compiler, args *interiorArgs) (*in
 		return nil, fmt.Errorf("invalid layout %q: must be 'full-bleed', 'facing-pages', or 'facing-pages-flipped'", args.Layout)
 	}
 
+	if strings.HasSuffix(strings.ToLower(absManuscript), ".typ") {
+		if args.Layout != "full-bleed" {
+			return nil, fmt.Errorf("layout option %q is not supported for pure Typst (.typ) manuscripts", args.Layout)
+		}
+	}
+
 	return &interiorConfig{
 		absManuscript: absManuscript,
 		absImages:     absImages,

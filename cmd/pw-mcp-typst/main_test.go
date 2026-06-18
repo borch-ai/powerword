@@ -338,6 +338,28 @@ func TestTypst_MCP_CompileInteriorLayoutValidationError(t *testing.T) {
 	assertResponse(t, res, true, "invalid layout")
 }
 
+func TestTypst_MCP_CompileInteriorTypstLayoutValidationError(t *testing.T) {
+	tempDir := t.TempDir()
+	session, ctx, cleanup := startTestServer(t, tempDir)
+	defer cleanup()
+
+	args := `{
+		"manuscript_path": "manuscript.typ",
+		"output_path": "output.pdf",
+		"layout": "facing-pages"
+	}`
+
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "compile_interior",
+		Arguments: json.RawMessage(args),
+	})
+	if err != nil {
+		t.Fatalf("CallTool compile_interior typst layout validation failed: %v", err)
+	}
+
+	assertResponse(t, res, true, "layout option \"facing-pages\" is not supported for pure Typst")
+}
+
 func TestTypst_MCP_CompileCoverSuccess(t *testing.T) {
 	mockTypst := createMockTypstBin(t)
 	t.Setenv("POWERWORD_TYPST_BIN", mockTypst)
