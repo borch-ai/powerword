@@ -68,6 +68,7 @@ type ImageGenConfig struct {
 	MidjourneyPollingTimeout  string `mapstructure:"midjourney_polling_timeout"`
 	GoogleAPIKey              string `mapstructure:"google_api_key"`
 	GoogleModel               string `mapstructure:"google_model"`
+	RequestTimeout            string `mapstructure:"request_timeout"`
 }
 
 // KDPMathConfig holds parameters for the KDP Math plugin.
@@ -283,6 +284,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.imagegen.midjourney_polling_interval", "5s")
 	v.SetDefault("plugins.imagegen.midjourney_polling_timeout", "5m")
 	v.SetDefault("plugins.imagegen.google_model", "imagen-3.0-generate-002")
+	v.SetDefault("plugins.imagegen.request_timeout", "120s")
 	v.SetDefault("plugins.seo.cache_ttl_hours", 4.0)
 	v.SetDefault("plugins.seo.rate_limit_ms", 500)
 	v.SetDefault("plugins.viral.tts_provider", "openai")
@@ -341,6 +343,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.imagegen.midjourney_polling_timeout", "POWERWORD_IMAGEGEN_MIDJOURNEY_POLLING_TIMEOUT")
 	bindEnv(v, "plugins.imagegen.google_api_key", "POWERWORD_IMAGEGEN_GOOGLE_API_KEY")
 	bindEnv(v, "plugins.imagegen.google_model", "POWERWORD_IMAGEGEN_GOOGLE_MODEL")
+	bindEnv(v, "plugins.imagegen.request_timeout", "POWERWORD_IMAGEGEN_REQUEST_TIMEOUT")
 	bindEnv(v, "plugins.seo.cache_ttl_hours", "POWERWORD_SEO_CACHE_TTL_HOURS")
 	bindEnv(v, "plugins.seo.rate_limit_ms", "POWERWORD_SEO_RATE_LIMIT_MS")
 	bindEnv(v, "plugins.viral.tts_provider", "POWERWORD_VIRAL_TTS_PROVIDER")

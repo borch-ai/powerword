@@ -529,7 +529,7 @@ func TestDownloadImage_ContentTypesAndErrors(t *testing.T) {
 			_, _ = w.Write([]byte("fake-bytes"))
 		}))
 
-		path, err := downloadImage(context.Background(), server.URL, tmpDir, fmt.Sprintf("prompt-%d", i))
+		path, err := downloadImage(context.Background(), server.URL, tmpDir, fmt.Sprintf("prompt-%d", i), 120*time.Second)
 		server.Close()
 
 		if err != nil {
@@ -546,13 +546,13 @@ func TestDownloadImage_ContentTypesAndErrors(t *testing.T) {
 	}))
 	defer server404.Close()
 
-	_, err := downloadImage(context.Background(), server404.URL, tmpDir, "prompt")
+	_, err := downloadImage(context.Background(), server404.URL, tmpDir, "prompt", 120*time.Second)
 	if err == nil {
 		t.Error("expected error downloading with 404 status, got nil")
 	}
 
 	// 3. Invalid URL error
-	_, err = downloadImage(context.Background(), "http:// [invalid-url]", tmpDir, "prompt")
+	_, err = downloadImage(context.Background(), "http:// [invalid-url]", tmpDir, "prompt", 120*time.Second)
 	if err == nil {
 		t.Error("expected error with invalid URL, got nil")
 	}
@@ -576,7 +576,7 @@ func TestDownloadImage_MkdirAllError(t *testing.T) {
 		t.Fatalf("failed to write blocker file: %v", err)
 	}
 
-	_, err = downloadImage(context.Background(), "http://example.com", tmpDir, "prompt")
+	_, err = downloadImage(context.Background(), "http://example.com", tmpDir, "prompt", 120*time.Second)
 	if err == nil {
 		t.Error("expected error when generated_images is a file blocking directory creation, got nil")
 	}
@@ -679,7 +679,7 @@ func TestDownloadImage_OpenFileError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := downloadImage(context.Background(), server.URL, tmpDir, "prompt")
+	_, err := downloadImage(context.Background(), server.URL, tmpDir, "prompt", 120*time.Second)
 	if err == nil {
 		t.Error("expected error when directory is read-only, got nil")
 	}
@@ -1378,5 +1378,58 @@ func TestImageGenService_MidjourneyCrefAndCw_Validation(t *testing.T) {
 	_, err = service.GenerateImage(context.Background(), "castle", "1024x1024", "", "http://example.com/cref.png", &cwHigh)
 	if err == nil || !strings.Contains(err.Error(), "invalid character_weight") {
 		t.Errorf("expected error containing 'invalid character_weight', got %v", err)
+	}
+}
+
+func TestImageGenService_GetRequestTimeout(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected time.Duration
+	}{
+		{
+			name:     "empty timeout gets default",
+			input:    "",
+			expected: 120 * time.Second,
+		},
+		{
+			name:     "valid positive timeout gets parsed",
+			input:    "45s",
+			expected: 45 * time.Second,
+		},
+		{
+			name:     "invalid format gets default",
+			input:    "invalid",
+			expected: 120 * time.Second,
+		},
+		{
+			name:     "zero duration gets default",
+			input:    "0s",
+			expected: 120 * time.Second,
+		},
+		{
+			name:     "negative duration gets default",
+			input:    "-5s",
+			expected: 120 * time.Second,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Plugins: config.PluginsConfig{
+					ImageGen: config.ImageGenConfig{
+						RequestTimeout: tc.input,
+					},
+				},
+			}
+			service := NewImageGenService(tmpDir, cfg)
+			got := service.getRequestTimeout()
+			if got != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, got)
+			}
+		})
 	}
 }

@@ -341,3 +341,82 @@ midjourney_polling_timeout = "1s"
 		t.Errorf("generated image size too small: %d bytes", info.Size())
 	}
 }
+
+func TestMCP_ImageGenPlugin_RequestTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Mock server that sleeps for 200ms before responding
+	var mockServer *httptest.Server
+	mockServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		if strings.Contains(r.URL.Path, "/v1/images/generations") {
+			w.Header().Set("Content-Type", "application/json")
+			resp := fmt.Sprintf(`{"data": [{"url": "%s/image.png"}]}`, mockServer.URL)
+			_, _ = w.Write([]byte(resp))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	// Create temp workspace directory
+	workspaceDir, err := os.MkdirTemp("", "pw-imagegen-timeout-workspace-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// Write mock powerword.toml setting the backend, key, and a very short request timeout
+	cfgTOML := `
+[api_keys]
+openai = "dummy-openai-key"
+[plugins.imagegen]
+backend = "openai"
+request_timeout = "50ms"
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "powerword.toml"), []byte(cfgTOML), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Setup server config
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env: []string{
+			"POWERWORD_WORKSPACE_ROOT=" + workspaceDir,
+			"OPENAI_BASE_URL=" + mockServer.URL + "/v1",
+		},
+	}
+
+	// Create and start ServerProcess
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-imagegen", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() {
+		_ = sp.GracefulShutdown(1 * time.Second)
+	}()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	// CallTool to generate image - should fail due to HTTP timeout (50ms limit vs 200ms sleep)
+	argsGen := map[string]interface{}{
+		"prompt": "An worried egg sitting on a shelf",
+		"size":   "1024x1024",
+	}
+	resultGen, err := client.CallTool(ctx, "imagegen_generate", argsGen)
+	if err != nil {
+		t.Fatalf("failed to call imagegen_generate tool: %v", err)
+	}
+	if !resultGen.IsError {
+		t.Fatalf("expected tool execution to fail due to request timeout, but it succeeded")
+	}
+
+	resStr, _ := mcp.FormatToolResult(resultGen)
+	if !strings.Contains(resStr, "timeout") && !strings.Contains(resStr, "deadline exceeded") && !strings.Contains(resStr, "exceeded") {
+		t.Errorf("expected timeout/deadline error in tool response, got: %q", resStr)
+	}
+}

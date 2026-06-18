@@ -257,9 +257,18 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.21: Provider API Key Fallback Resolution**
     *   Add fallback resolution to `LoadConfig` so that canonical provider env var names (`GEMINI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `SERP_API_KEY`) are recognised when the `POWERWORD_`-prefixed variant is not set. Eliminates the need to set separate keys per tool in the Borch-AI stack — one key covers the whole stack. `POWERWORD_*` vars retain highest precedence.
     *   [Implementation Plan](plans/phase_6/task_6_21_api_key_fallback_resolution.md)
-*   [ ] **Task 6.22: Google Backend Image/Video Generation Timeout Adjustment**
-    *   Increase default http.Client timeout from 30 seconds to 120 seconds in Google and Midjourney image/video generation backends to prevent context deadline exceeded timeout issues during Imagen generation.
-    *   [Implementation Plan](plans/phase_6/task_6_22_google_backend_timeout.md)
+*   [x] **Task 6.22: Configurable & Generalized Image/Video Generation Timeouts**
+    *   Add a configurable `plugins.imagegen.request_timeout` parameter (defaulting to 120s) across all backends (Google Imagen, Google Veo, Midjourney, OpenAI DALL-E) and download helpers to prevent context deadline exceeded issues under high load.
+    *   [Implementation Plan](plans/phase_6/task_6_22_configurable_imagegen_timeouts.md)
+*   [ ] **Task 6.23: Standardized Request Retry Engine with Exponential Backoff**
+    *   Implement transient error detection and auto-retries with exponential backoff and jitter for GenAI API requests and image generators.
+    *   [Implementation Plan](plans/phase_6/task_6_23_retry_backoff.md)
+*   [ ] **Task 6.24: Active Process Termination & Poll Cleanup on Context Cancellation**
+    *   Ensure all native plugins listen to context cancellation and actively kill spawned subprocesses and terminate background API polling.
+    *   [Implementation Plan](plans/phase_6/task_6_24_process_termination.md)
+*   [ ] **Task 6.25: OpenTelemetry (OTel) Tracing Instrumentation**
+    *   Add trace spans to the ReAct reasoning loop and tool calling interface to monitor execution latency and trace tool interactions.
+    *   [Implementation Plan](plans/phase_6/task_6_25_opentelemetry_tracing.md)
 
 
 
