@@ -9,7 +9,7 @@ This task implements pre-flight validation tools to verify GCP IAM credentials, 
 ## User Review Required
 
 > [!IMPORTANT]
-> Performing pre-flight checks helps identify permission gaps (such as missing `run.admin` or `secretmanager.secretAccessor` roles) and un-enabled APIs early, avoiding opaque errors during deployments.
+> Performing pre-flight checks helps identify permission gaps (such as missing `run.admin` or `secretmanager.secretAccessor` roles) and disabled APIs early, avoiding opaque errors during deployments.
 
 ---
 

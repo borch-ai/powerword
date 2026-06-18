@@ -21,7 +21,7 @@ Implement Google Artifact Registry checks using `cloud.google.com/go/artifactreg
 
 #### [NEW] [registry.go](file://../../internal/plugins/cloud/registry.go)
 - Initialize the Artifact Registry API client.
-- Implement `CheckRegistryImage(ctx context.Context, repository, image, tag, region string) (bool, error)` to verify if the specified tag is uploaded and readable.
+- Implement `CheckRegistryImage(ctx context.Context, repository, image, tag string) (bool, error)` to verify if the specified tag is uploaded and readable.
 
 #### [MODIFY] [cloud.go](file://../../internal/plugins/cloud/cloud.go)
 - Register the new MCP tool:
