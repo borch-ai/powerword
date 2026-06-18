@@ -134,6 +134,7 @@ const validateCoverPDFSchema = `{
 		},
 		"bleed_inches": {
 			"type": "number",
+			"minimum": 0,
 			"description": "Optional bleed offset. Defaults to 0.125 inches."
 		},
 		"expected_isbn": {
@@ -253,6 +254,13 @@ func handleValidateCoverPDF(ctx context.Context, req *mcp.CallToolRequest, works
 		return &mcp.CallToolResult{
 			IsError: true,
 			Content: []mcp.Content{&mcp.TextContent{Text: "page_count parameter must be positive"}},
+		}, nil
+	}
+
+	if args.BleedInches != nil && *args.BleedInches < 0 {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "bleed_inches parameter must be non-negative"}},
 		}, nil
 	}
 

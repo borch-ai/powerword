@@ -902,6 +902,15 @@ func getObjectID(page pdf.Page, name string) (int, bool) {
 	if !ptrField.IsValid() {
 		return 0, false
 	}
+	for ptrField.Kind() == reflect.Pointer || ptrField.Kind() == reflect.Interface {
+		if ptrField.IsNil() {
+			return 0, false
+		}
+		ptrField = ptrField.Elem()
+	}
+	if ptrField.Kind() != reflect.Struct {
+		return 0, false
+	}
 	idField := ptrField.FieldByName("id")
 	if !idField.IsValid() {
 		return 0, false
@@ -943,37 +952,46 @@ func findImagePlacements(p pdf.Page) []imagePlacement {
 				args[i] = stk.Pop()
 			}
 
-			switch op {
-			case "q":
-				ctmStack = append(ctmStack, currentCTM)
-			case "Q":
-				if len(ctmStack) > 0 {
-					currentCTM = ctmStack[len(ctmStack)-1]
-					ctmStack = ctmStack[:len(ctmStack)-1]
-				}
-			case "cm":
-				if len(args) == 6 {
-					m := [6]float64{
-						getFloat(args[0]),
-						getFloat(args[1]),
-						getFloat(args[2]),
-						getFloat(args[3]),
-						getFloat(args[4]),
-						getFloat(args[5]),
-					}
-					currentCTM = multiply(m, currentCTM)
-				}
-			case "Do":
-				if len(args) > 0 && args[0].Kind() == pdf.Name {
-					placements = append(placements, imagePlacement{
-						name: args[0].Name(),
-						ctm:  currentCTM,
-					})
-				}
-			}
+			placements, currentCTM, ctmStack = handlePDFOp(p, op, args, placements, currentCTM, ctmStack)
 		})
 	}
 	return placements
+}
+
+func handlePDFOp(p pdf.Page, op string, args []pdf.Value, placements []imagePlacement, currentCTM [6]float64, ctmStack [][6]float64) ([]imagePlacement, [6]float64, [][6]float64) {
+	switch op {
+	case "q":
+		ctmStack = append(ctmStack, currentCTM)
+	case "Q":
+		if len(ctmStack) > 0 {
+			currentCTM = ctmStack[len(ctmStack)-1]
+			ctmStack = ctmStack[:len(ctmStack)-1]
+		}
+	case "cm":
+		if len(args) == 6 {
+			m := [6]float64{
+				getFloat(args[0]),
+				getFloat(args[1]),
+				getFloat(args[2]),
+				getFloat(args[3]),
+				getFloat(args[4]),
+				getFloat(args[5]),
+			}
+			currentCTM = multiply(m, currentCTM)
+		}
+	case "Do":
+		if len(args) > 0 && args[0].Kind() == pdf.Name {
+			name := args[0].Name()
+			xobj := p.Resources().Key("XObject").Key(name)
+			if !xobj.IsNull() && xobj.Key("Subtype").Name() == "Image" {
+				placements = append(placements, imagePlacement{
+					name: name,
+					ctm:  currentCTM,
+				})
+			}
+		}
+	}
+	return placements, currentCTM, ctmStack
 }
 
 func getFloat(v pdf.Value) float64 {
