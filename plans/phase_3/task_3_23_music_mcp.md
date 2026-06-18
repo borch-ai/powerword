@@ -21,14 +21,16 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-music` to encapsul
 ### Sibling: Powerword (`cmd/pw-mcp-music`)
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-music/main.go)
-* Initializes the MCP server using the Go MCP SDK.
+* Initializes the MCP server using `github.com/modelcontextprotocol/go-sdk`.
+* Secret Management:
+  * Sourced via environment variables (e.g., `POWERWORD_MUSIC_DISTRIBUTOR_TOKEN`) rather than passed as tool arguments, to prevent sensitive tokens from leaking in LLM traces or agent transcripts.
 * Mounts tools:
   * `music_validate_artwork`:
     * Arguments: `image_path`.
-    * Implementation: Uses Go native `image` package to verify image resolution (must be exactly 3000x3000px) and checks that the color space is RGB (not CMYK).
+    * Implementation: Uses Go native `image` package to verify image resolution (must be exactly 3000x3000px) and rejects CMYK color space where detectable (e.g., JPEG decoding to `color.CMYK`), with documented limitations.
   * `music_submit_release`:
-    * Arguments: `audio_path` (lossless WAV), `cover_path`, `title`, `artist`, `distributor_api_url`, `distributor_token`.
-    * Implementation: Packages files as multipart form data and posts to the distributor API endpoint, handling payload serialization.
+    * Arguments: `audio_path` (lossless WAV), `cover_path`, `title`, `artist`, `distributor_api_url`.
+    * Implementation: Sourced `distributor_token` from environment variables/configuration, packages files as multipart form data, and posts to the distributor API endpoint, handling payload serialization.
 
 ---
 
