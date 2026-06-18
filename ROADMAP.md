@@ -121,6 +121,9 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)**
     *   Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to check that print-ready PDF files do not exceed maximum ink density limits (e.g. 240% for KDP paperbacks), preventing smudging and press tearing.
     *   [Implementation Plan](plans/phase_3/task_3_20_pdfcheck_ink_coverage.md)
+*   [ ] **Task 3.21: Typst Per-Page Layout Overrides (`pw-mcp-typst`)**
+    *   Extend `pw-mcp-typst`'s `ParseManuscript` parser and template compilation to support per-page layout configuration via comments (e.g. `<!-- Layout: <type> -->`) inside the Markdown manuscript.
+    *   [Implementation Plan](plans/phase_3/task_3_21_typst_per_page_layouts.md)
 
 ---
 
@@ -149,6 +152,18 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.7: MCP ImageGen Cref Extensions**
     *   Extend the `pw-mcp-imagegen` server to accept `cref_url` and `character_weight` inputs. Automatically upload local character assets before generation.
     *   [Implementation Plan](plans/phase_4/task_4_7_imagegen_cref_extensions.md)
+*   [ ] **Task 4.8: Google Cloud Run Orchestration Tools (`pw-mcp-cloud`)**
+    *   Extend `pw-mcp-cloud` to support serverless container deployments. Expose tools like `cloud_deploy_run_service`, `cloud_get_run_service`, and `cloud_list_run_services` to control Google Cloud Run services.
+    *   [Implementation Plan](plans/phase_4/task_4_8_cloud_run_orchestration.md)
+*   [ ] **Task 4.9: Artifact Registry & Container Delivery Verification (`pw-mcp-cloud`)**
+    *   Implement tools to inspect Google Artifact Registry, checking for container image tags and delivery status via `cloud_check_registry_image` before deploying to Cloud Run.
+    *   [Implementation Plan](plans/phase_4/task_4_9_artifact_registry.md)
+*   [ ] **Task 4.10: GCP Secret Manager Integration (`pw-mcp-cloud`)**
+    *   Expose tools to manage and retrieve runtime secrets securely from GCP Secret Manager (such as database credentials and API keys) to avoid exposing credentials.
+    *   [Implementation Plan](plans/phase_4/task_4_10_secret_manager.md)
+*   [ ] **Task 4.11: IAM Policies & Pre-flight API Verification (`pw-mcp-cloud`)**
+    *   Add validation tools `cloud_verify_iam_roles` and `cloud_check_enabled_apis` to verify service accounts have permissions and that target GCP APIs are enabled.
+    *   [Implementation Plan](plans/phase_4/task_4_11_iam_api_verification.md)
 
 ---
 
