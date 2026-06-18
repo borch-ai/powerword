@@ -1739,6 +1739,7 @@ func TestValidateCoverPDF_BarcodeOnlyOnFrontWithBackImage(t *testing.T) {
 func TestValidator_Cover_AdditionalCoverage(t *testing.T) {
 	tempDir := t.TempDir()
 	// Test matching img-%d.* (e.g. img-0.png)
+	//nolint:gosec // testing path constructed safely in tempDir
 	f0, err := os.Create(filepath.Join(tempDir, "img-0.png"))
 	if err == nil {
 		_ = f0.Close()
