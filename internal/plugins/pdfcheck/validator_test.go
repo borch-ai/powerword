@@ -1829,6 +1829,7 @@ func TestValidator_ColorspaceHelpers(t *testing.T) {
 	}
 }
 
+//nolint:gocognit,funlen
 func TestCheckInkDensity(t *testing.T) {
 	// 1. Missing Ghostscript warning
 	t.Run("missing gs warning", func(t *testing.T) {

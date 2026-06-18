@@ -1045,6 +1045,8 @@ func MockJpegDecode(fn func(r io.Reader) (image.Image, error)) func() {
 }
 
 // checkInkDensity renders the pages to CMYK JPEGs using Ghostscript and parses them to check for ink coverage.
+//
+//nolint:gocognit
 func checkInkDensity(ctx context.Context, pdfPath string, limit int, res *ValidatePDFResult) {
 	_, lookGsErr := execLookPath("gs")
 	if lookGsErr != nil {
@@ -1081,6 +1083,7 @@ func checkInkDensity(ctx context.Context, pdfPath string, limit int, res *Valida
 			pageNum = 0
 		}
 
+		//nolint:gosec // match is constructed safely from the generated local temporary directory
 		imgFile, err := os.Open(match)
 		if err != nil {
 			res.Errors = append(res.Errors, fmt.Sprintf("Page %d: failed to open rendered image: %v", pageNum, err))

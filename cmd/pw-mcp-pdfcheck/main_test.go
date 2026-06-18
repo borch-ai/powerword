@@ -91,6 +91,7 @@ func startTestServer(t *testing.T, workspaceRoot string) (*mcp.ClientSession, co
 	return session, ctx, cleanup
 }
 
+//nolint:funlen
 func TestPdfcheck_MCP_ValidatePDF(t *testing.T) {
 	tempDir := t.TempDir()
 
