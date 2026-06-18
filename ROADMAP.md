@@ -118,7 +118,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.19: Spine Cover Wrap & Barcode Layout Checker (`pw-mcp-pdfcheck`)**
     *   Implement cover wrap geometry checking and back cover barcode detection in `pw-mcp-pdfcheck` to verify that compiled book covers have the exact KDP-compliant dimensions and contain a readable barcode.
     *   [Implementation Plan](plans/phase_3/task_3_19_pdfcheck_cover_barcode.md)
-*   [ ] **Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)**
+*   [x] **Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)**
     *   Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to check that print-ready PDF files do not exceed maximum ink density limits (e.g. 240% for KDP paperbacks), preventing smudging and press tearing.
     *   [Implementation Plan](plans/phase_3/task_3_20_pdfcheck_ink_coverage.md)
 *   [ ] **Task 3.21: Typst Per-Page Layout Overrides (`pw-mcp-typst`)**

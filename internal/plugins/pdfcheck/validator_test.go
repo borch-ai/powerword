@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
+	"image/color"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1824,4 +1827,187 @@ func TestValidator_ColorspaceHelpers(t *testing.T) {
 	if !isNonGrayColorspaceValue(valArraySeparation, p) {
 		t.Error("expected separation cmyk array to be non-gray")
 	}
+}
+
+func TestCheckInkDensity(t *testing.T) {
+	// 1. Missing Ghostscript warning
+	t.Run("missing gs warning", func(t *testing.T) {
+		defer MockExecLookPath(func(file string) (string, error) {
+			return "", fmt.Errorf("gs not found")
+		})()
+
+		res := &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+
+		if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "Ghostscript (gs) utility not found") {
+			t.Errorf("expected missing gs warning, got: %v", res.Warnings)
+		}
+	})
+
+	// 2. Ghostscript execution error
+	t.Run("gs execution error", func(t *testing.T) {
+		defer MockExecLookPath(func(file string) (string, error) {
+			return "/usr/bin/gs", nil
+		})()
+		defer MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "false")
+		})()
+
+		res := &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+
+		if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "Failed to run Ghostscript") {
+			t.Errorf("expected gs execution error, got: %v", res.Errors)
+		}
+	})
+
+	// 3. Glob listing failure (or no output files)
+	t.Run("gs success but no output files", func(t *testing.T) {
+		defer MockExecLookPath(func(file string) (string, error) {
+			return "/usr/bin/gs", nil
+		})()
+		defer MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "true")
+		})()
+
+		res := &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+
+		if len(res.Errors) != 0 {
+			t.Errorf("expected no errors for empty matching output files, got: %v", res.Errors)
+		}
+	})
+
+	// 4. CMYK Image success and error cases
+	t.Run("cmyk images", func(t *testing.T) {
+		defer MockExecLookPath(func(file string) (string, error) {
+			return "/usr/bin/gs", nil
+		})()
+
+		defer MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			var outputPattern string
+			for _, arg := range args {
+				if strings.HasPrefix(arg, "-sOutputFile=") {
+					outputPattern = strings.TrimPrefix(arg, "-sOutputFile=")
+					break
+				}
+			}
+			if outputPattern != "" {
+				targetPath := strings.Replace(outputPattern, "%d", "1", 1)
+				_ = os.WriteFile(targetPath, []byte("dummy"), 0600)
+			}
+			return exec.CommandContext(ctx, "true")
+		})()
+
+		// Case A: CMYK image under 240%
+		var mockImg image.Image
+		defer MockJpegDecode(func(r io.Reader) (image.Image, error) {
+			return mockImg, nil
+		})()
+
+		// 150/255 * 4 = 235.3%
+		cmykUnder := image.NewCMYK(image.Rect(0, 0, 2, 2))
+		cmykUnder.SetCMYK(0, 0, color.CMYK{C: 150, M: 150, Y: 150, K: 150})
+		mockImg = cmykUnder
+
+		res := &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+		if len(res.Errors) != 0 {
+			t.Errorf("expected no errors for under-limit CMYK, got: %v", res.Errors)
+		}
+
+		// Case B: CMYK image over 240%
+		// 170/255 * 4 = 266.7%
+		cmykOver := image.NewCMYK(image.Rect(0, 0, 2, 2))
+		cmykOver.SetCMYK(0, 0, color.CMYK{C: 170, M: 170, Y: 170, K: 170})
+		mockImg = cmykOver
+
+		res = &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+		if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "maximum ink density of 266.7% exceeds the limit of 240%") {
+			t.Errorf("expected ink density error for over-limit CMYK, got: %v", res.Errors)
+		}
+	})
+
+	// 5. RGB Image success and error cases (Slow Path)
+	t.Run("rgb images (slow path)", func(t *testing.T) {
+		defer MockExecLookPath(func(file string) (string, error) {
+			return "/usr/bin/gs", nil
+		})()
+
+		defer MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			var outputPattern string
+			for _, arg := range args {
+				if strings.HasPrefix(arg, "-sOutputFile=") {
+					outputPattern = strings.TrimPrefix(arg, "-sOutputFile=")
+					break
+				}
+			}
+			if outputPattern != "" {
+				targetPath := strings.Replace(outputPattern, "%d", "1", 1)
+				_ = os.WriteFile(targetPath, []byte("dummy"), 0600)
+			}
+			return exec.CommandContext(ctx, "true")
+		})()
+
+		var mockImg image.Image
+		defer MockJpegDecode(func(r io.Reader) (image.Image, error) {
+			return mockImg, nil
+		})()
+
+		// Case A: RGB image under 240%
+		rgbaUnder := image.NewRGBA(image.Rect(0, 0, 2, 2))
+		rgbaUnder.Set(0, 0, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+		mockImg = rgbaUnder
+
+		res := &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+		if len(res.Errors) != 0 {
+			t.Errorf("expected no errors for under-limit RGB, got: %v", res.Errors)
+		}
+
+		// Case B: RGB image over 240%
+		// Dark blue (R=0, G=0, B=128) converts to C=255, M=255, Y=0, K=127 which sums to 637 (249.8%)
+		rgbaOver := image.NewRGBA(image.Rect(0, 0, 2, 2))
+		rgbaOver.Set(0, 0, color.RGBA{R: 0, G: 0, B: 128, A: 255})
+		mockImg = rgbaOver
+
+		res = &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+		if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "maximum ink density of 249.8% exceeds the limit of 240%") {
+			t.Errorf("expected ink density error for over-limit RGB, got: %v", res.Errors)
+		}
+	})
+
+	// 6. Decode error
+	t.Run("corrupted image file", func(t *testing.T) {
+		defer MockExecLookPath(func(file string) (string, error) {
+			return "/usr/bin/gs", nil
+		})()
+		defer MockExecCommand(func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			var outputPattern string
+			for _, arg := range args {
+				if strings.HasPrefix(arg, "-sOutputFile=") {
+					outputPattern = strings.TrimPrefix(arg, "-sOutputFile=")
+					break
+				}
+			}
+			if outputPattern != "" {
+				targetPath := strings.Replace(outputPattern, "%d", "1", 1)
+				_ = os.WriteFile(targetPath, []byte("corrupted content"), 0600)
+			}
+			return exec.CommandContext(ctx, "true")
+		})()
+
+		defer MockJpegDecode(func(r io.Reader) (image.Image, error) {
+			return nil, fmt.Errorf("decode error")
+		})()
+
+		res := &ValidatePDFResult{}
+		checkInkDensity(context.Background(), "dummy.pdf", 240, res)
+
+		if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "failed to decode rendered image") {
+			t.Errorf("expected decode error, got: %v", res.Errors)
+		}
+	})
 }

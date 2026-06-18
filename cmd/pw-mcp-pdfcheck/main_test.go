@@ -179,6 +179,38 @@ func TestPdfcheck_MCP_ValidatePDF(t *testing.T) {
 		t.Fatalf("CallTool failed: %v", err)
 	}
 	assertResponse(t, res, true, "preflight validation failed")
+
+	// 6. MaxInkCoverage Valid Call
+	validInkJSON := fmt.Sprintf(`{
+		"pdf_path": %q,
+		"expected_width_inches": 6.0,
+		"expected_height_inches": 9.0,
+		"max_ink_coverage": 240
+	}`, pdfPath)
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "validate_pdf",
+		Arguments: json.RawMessage(validInkJSON),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, res, false, `"valid": true`)
+
+	// 7. MaxInkCoverage Invalid Call (out of bounds)
+	invalidInkJSON := fmt.Sprintf(`{
+		"pdf_path": %q,
+		"expected_width_inches": 6.0,
+		"expected_height_inches": 9.0,
+		"max_ink_coverage": 500
+	}`, pdfPath)
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "validate_pdf",
+		Arguments: json.RawMessage(invalidInkJSON),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, res, true, "max_ink_coverage parameter must be between 0 and 400")
 }
 
 func TestPdfcheck_MCP_InvalidJSON(t *testing.T) {

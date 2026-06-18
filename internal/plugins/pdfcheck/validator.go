@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"io"
 	"math"
 	"os"
@@ -28,6 +31,7 @@ type ValidatePDFInput struct {
 	EnforceGrayscale     *bool    `json:"enforce_grayscale,omitempty"`      // default: false
 	MinGutterInches      *float64 `json:"min_gutter_inches,omitempty"`
 	MinMarginInches      *float64 `json:"min_margin_inches,omitempty"`
+	MaxInkCoverage       *int     `json:"max_ink_coverage,omitempty"`
 }
 
 // ValidatePDFResult represents the JSON response output for the validate_pdf tool.
@@ -42,6 +46,7 @@ type ValidatePDFResult struct {
 // Package-level function variable to allow unit-test mocking of external subprocess runs.
 var execCommand = exec.CommandContext
 var execLookPath = exec.LookPath
+var jpegDecode = jpeg.Decode
 
 // findInherited walks the Page dictionary tree ancestors via 'Parent' nodes to resolve inherited values.
 func findInherited(v pdf.Value, key string) pdf.Value {
@@ -241,7 +246,7 @@ func checkImages(ctx context.Context, pdfPath string, minDPI int, enforceCMYK bo
 }
 
 // parseInputDefaults resolves and sets default values for input validation arguments.
-func parseInputDefaults(input ValidatePDFInput) (float64, int, bool, bool, bool) {
+func parseInputDefaults(input ValidatePDFInput) (float64, int, bool, bool, bool, int) {
 	bleed := 0.125
 	if input.BleedInches != nil {
 		bleed = *input.BleedInches
@@ -262,12 +267,16 @@ func parseInputDefaults(input ValidatePDFInput) (float64, int, bool, bool, bool)
 	if input.EnforceGrayscale != nil {
 		enforceGrayscale = *input.EnforceGrayscale
 	}
-	return bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale
+	maxInkCoverage := 240
+	if input.MaxInkCoverage != nil {
+		maxInkCoverage = *input.MaxInkCoverage
+	}
+	return bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale, maxInkCoverage
 }
 
 // ValidatePDFPreflight performs the validation of PDF geometry, fonts, images, and colors.
 func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*ValidatePDFResult, error) {
-	bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale := parseInputDefaults(input)
+	bleed, minDPI, enforceFonts, enforceCMYK, enforceGrayscale, maxInkCoverage := parseInputDefaults(input)
 
 	if input.MinGutterInches != nil && *input.MinGutterInches < 0 {
 		return nil, fmt.Errorf("min_gutter_inches must be non-negative")
@@ -315,6 +324,9 @@ func ValidatePDFPreflight(ctx context.Context, input ValidatePDFInput) (*Validat
 
 	// Image resolution and color space analysis
 	checkImages(ctx, input.PDFPath, minDPI, enforceCMYK, enforceGrayscale, res)
+
+	// Ink density analysis
+	checkInkDensity(ctx, input.PDFPath, maxInkCoverage, res)
 
 	// Content stream vector/text operator analysis
 	if enforceGrayscale {
@@ -1023,4 +1035,95 @@ func MockExecLookPath(fn func(file string) (string, error)) func() {
 	old := execLookPath
 	execLookPath = fn
 	return func() { execLookPath = old }
+}
+
+// MockJpegDecode overrides the package-level jpegDecode and returns a cleanup function.
+func MockJpegDecode(fn func(r io.Reader) (image.Image, error)) func() {
+	old := jpegDecode
+	jpegDecode = fn
+	return func() { jpegDecode = old }
+}
+
+// checkInkDensity renders the pages to CMYK JPEGs using Ghostscript and parses them to check for ink coverage.
+func checkInkDensity(ctx context.Context, pdfPath string, limit int, res *ValidatePDFResult) {
+	_, lookGsErr := execLookPath("gs")
+	if lookGsErr != nil {
+		res.Warnings = append(res.Warnings, "Ghostscript (gs) utility not found on host. Skipping ink density checks.")
+		return
+	}
+
+	tempDir, err := os.MkdirTemp("", "pdf-inkcov-*")
+	if err != nil {
+		res.Errors = append(res.Errors, fmt.Sprintf("Failed to create temporary directory for ink density check: %v", err))
+		return
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	outputPath := filepath.Join(tempDir, "page-%d.jpg")
+	cmd := execCommand(ctx, "gs", "-dSAFER", "-dNOPAUSE", "-dBATCH", "-sDEVICE=jpegcmyk", "-r150", "-sOutputFile="+outputPath, pdfPath)
+	outputBytes, cmdErr := cmd.CombinedOutput()
+	if cmdErr != nil {
+		res.Errors = append(res.Errors, fmt.Sprintf("Failed to run Ghostscript for ink density check: %v (output: %s)", cmdErr, string(outputBytes)))
+		return
+	}
+
+	matches, err := filepath.Glob(filepath.Join(tempDir, "page-*.jpg"))
+	if err != nil {
+		res.Errors = append(res.Errors, fmt.Sprintf("Failed to list generated page images: %v", err))
+		return
+	}
+
+	for _, match := range matches {
+		base := filepath.Base(match)
+		var pageNum int
+		_, sscanfErr := fmt.Sscanf(base, "page-%d.jpg", &pageNum)
+		if sscanfErr != nil {
+			pageNum = 0
+		}
+
+		imgFile, err := os.Open(match)
+		if err != nil {
+			res.Errors = append(res.Errors, fmt.Sprintf("Page %d: failed to open rendered image: %v", pageNum, err))
+			continue
+		}
+
+		img, err := jpegDecode(imgFile)
+		_ = imgFile.Close()
+		if err != nil {
+			res.Errors = append(res.Errors, fmt.Sprintf("Page %d: failed to decode rendered image: %v", pageNum, err))
+			continue
+		}
+
+		maxDensity := 0
+		cmykImg, ok := img.(*image.CMYK)
+		if ok {
+			bounds := cmykImg.Bounds()
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := cmykImg.CMYKAt(x, y)
+					density := int(c.C) + int(c.M) + int(c.Y) + int(c.K)
+					if density > maxDensity {
+						maxDensity = density
+					}
+				}
+			}
+		} else {
+			bounds := img.Bounds()
+			for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+				for x := bounds.Min.X; x < bounds.Max.X; x++ {
+					c := img.At(x, y)
+					cmykColor := color.CMYKModel.Convert(c).(color.CMYK)
+					density := int(cmykColor.C) + int(cmykColor.M) + int(cmykColor.Y) + int(cmykColor.K)
+					if density > maxDensity {
+						maxDensity = density
+					}
+				}
+			}
+		}
+
+		maxPercent := float64(maxDensity) * 100.0 / 255.0
+		if maxPercent > float64(limit) {
+			res.Errors = append(res.Errors, fmt.Sprintf("Page %d: maximum ink density of %.1f%% exceeds the limit of %d%%", pageNum, maxPercent, limit))
+		}
+	}
 }
