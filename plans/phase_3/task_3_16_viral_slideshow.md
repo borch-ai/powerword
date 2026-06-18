@@ -1,9 +1,9 @@
 # plan: Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Complete
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-18
+**Unit Test Coverage:** 91.1%
 
 Extend the `pw-mcp-viral` toolset with a slideshow generator tool that compiles sequences of paired images and audio narration segments into a single unified MP4 video trailer using ffmpeg.
 

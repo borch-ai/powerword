@@ -113,6 +113,40 @@ const (
 		},
 		"required": ["video_path", "audio_path"]
 	}`
+
+	stitchSlideshowSchema = `{
+		"type": "object",
+		"properties": {
+			"slides": {
+				"type": "array",
+				"minItems": 1,
+				"items": {
+					"type": "object",
+					"properties": {
+						"image_path": {
+							"type": "string",
+							"description": "Absolute path to the slide illustration."
+						},
+						"audio_path": {
+							"type": "string",
+							"description": "Absolute path to the voiceover narration for that slide."
+						}
+					},
+					"required": ["image_path", "audio_path"]
+				},
+				"description": "List of slides to stitch together."
+			},
+			"background_audio_path": {
+				"type": "string",
+				"description": "Optional absolute path to background music track."
+			},
+			"output_name": {
+				"type": "string",
+				"description": "Optional custom name for the output MP4 file."
+			}
+		},
+		"required": ["slides"]
+	}`
 )
 
 func setupServer(workspaceRoot string, cfg *config.Config, svc *viral.ViralService) (*mcp.Server, error) {
@@ -143,6 +177,12 @@ func setupServer(workspaceRoot string, cfg *config.Config, svc *viral.ViralServi
 		Description: "Stitches background video, main voiceover audio, and optional background music into an MP4 file using a local ffmpeg installation.",
 		InputSchema: json.RawMessage(stitchTrailerSchema),
 	}, handleStitchTrailer(viralService))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "viral_stitch_slideshow",
+		Description: "Stitches sequences of paired images and audio narration segments into a single unified MP4 video trailer using a local ffmpeg installation.",
+		InputSchema: json.RawMessage(stitchSlideshowSchema),
+	}, handleStitchSlideshow(viralService))
 
 	return srv, nil
 }
@@ -239,6 +279,38 @@ func handleStitchTrailer(svc *viral.ViralService) func(context.Context, *mcp.Cal
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Successfully stitched trailer and saved to: %s", filePath)}},
+		}, nil
+	}
+}
+
+func handleStitchSlideshow(svc *viral.ViralService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Slides              []viral.Slide `json:"slides"`
+			BackgroundAudioPath string        `json:"background_audio_path"`
+			OutputName          string        `json:"output_name"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+
+		if len(args.Slides) == 0 {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "slides parameter is required and cannot be empty"}},
+			}, nil
+		}
+
+		filePath, err := svc.StitchSlideshow(ctx, args.Slides, args.BackgroundAudioPath, args.OutputName)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to stitch slideshow: %v", err)}},
+			}, nil
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Successfully stitched slideshow and saved to: %s", filePath)}},
 		}, nil
 	}
 }

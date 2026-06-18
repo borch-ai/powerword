@@ -419,3 +419,214 @@ func (s *ViralService) StitchTrailer(ctx context.Context, videoPath, audioPath, 
 
 	return outputPath, nil
 }
+
+// Slide represents a single slide in the slideshow.
+type Slide struct {
+	ImagePath string `json:"image_path"`
+	AudioPath string `json:"audio_path"`
+}
+
+// renderSlide renders a single slide to a temporary MP4 segment.
+func renderSlide(ctx context.Context, ffmpegCmd string, i int, slide Slide, dir string) (string, error) {
+	tempSegmentPath := filepath.Join(dir, fmt.Sprintf("temp_slide_%d_%d.mp4", i, time.Now().UnixNano()))
+
+	args := []string{
+		"-y",
+		"-loop", "1",
+		"-i", slide.ImagePath,
+		"-i", slide.AudioPath,
+		"-vf", "scale=1024:1024:force_original_aspect_ratio=decrease,pad=1024:1024:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
+		"-c:v", "libx264",
+		"-tune", "stillimage",
+		"-c:a", "aac",
+		"-ar", "44100",
+		"-ac", "2",
+		"-pix_fmt", "yuv420p",
+		"-shortest",
+		tempSegmentPath,
+	}
+
+	//nolint:gosec
+	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to render slide video segment %d: %w, stderr: %s", i, err, stderr.String())
+	}
+
+	return tempSegmentPath, nil
+}
+
+// copyFile copies a file from src to dst.
+func copyFile(src, dst string) error {
+	//nolint:gosec
+	input, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = input.Close() }()
+
+	//nolint:gosec
+	output, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = output.Close() }()
+
+	_, err = io.Copy(output, input)
+	return err
+}
+
+// validateStitchInputs validates the presence and status of inputs for slideshow stitching.
+func validateStitchInputs(slides []Slide, backgroundAudioPath string) error {
+	if len(slides) == 0 {
+		return fmt.Errorf("slides list cannot be empty")
+	}
+
+	for i, slide := range slides {
+		if _, err := os.Stat(slide.ImagePath); err != nil {
+			return fmt.Errorf("image file for slide %d error: %w", i, err)
+		}
+		if _, err := os.Stat(slide.AudioPath); err != nil {
+			return fmt.Errorf("audio file for slide %d error: %w", i, err)
+		}
+	}
+
+	if backgroundAudioPath != "" {
+		if _, err := os.Stat(backgroundAudioPath); err != nil {
+			return fmt.Errorf("background audio file error: %w", err)
+		}
+	}
+	return nil
+}
+
+// writeConcatList writes the concat list text file for ffmpeg.
+func writeConcatList(path string, segmentPaths []string) error {
+	var lines []string
+	for _, p := range segmentPaths {
+		escaped := strings.ReplaceAll(p, "'", "'\\''")
+		lines = append(lines, fmt.Sprintf("file '%s'", escaped))
+	}
+	return os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0600)
+}
+
+// concatSegments concatenates multiple video segments using ffmpeg concat demuxer.
+func concatSegments(ctx context.Context, ffmpegCmd, concatListPath, mergedVideoPath string) error {
+	args := []string{
+		"-y",
+		"-f", "concat",
+		"-safe", "0",
+		"-i", concatListPath,
+		"-c", "copy",
+		mergedVideoPath,
+	}
+
+	//nolint:gosec
+	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to concatenate slide segments: %w, stderr: %s", err, stderr.String())
+	}
+	return nil
+}
+
+// finalizeOutput mixes optional background audio or copies the merged video to output.
+func finalizeOutput(ctx context.Context, ffmpegCmd, mergedVideoPath, backgroundAudioPath, outputPath string) error {
+	if backgroundAudioPath == "" {
+		return copyFile(mergedVideoPath, outputPath)
+	}
+
+	args := []string{
+		"-y",
+		"-i", mergedVideoPath,
+		"-i", backgroundAudioPath,
+		"-filter_complex", "[1:a]volume=0.15[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[a]",
+		"-map", "0:v",
+		"-map", "[a]",
+		"-c:v", "copy",
+		"-c:a", "aac",
+		"-shortest",
+		outputPath,
+	}
+
+	//nolint:gosec
+	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to mix background music: %w, stderr: %s", err, stderr.String())
+	}
+	return nil
+}
+
+// StitchSlideshow renders temporary video segments for each slide, concatenates them, and mixes background audio.
+func (s *ViralService) StitchSlideshow(ctx context.Context, slides []Slide, backgroundAudioPath, outputName string) (string, error) {
+	if err := checkFFmpeg(s.cfg.Plugins.Viral.FFmpegPath); err != nil {
+		return "", err
+	}
+
+	if err := validateStitchInputs(slides, backgroundAudioPath); err != nil {
+		return "", err
+	}
+
+	dir := filepath.Join(s.workspaceRoot, "generated_media")
+	if mkdirErr := os.MkdirAll(dir, 0750); mkdirErr != nil {
+		return "", fmt.Errorf("failed to create generated_media directory: %w", mkdirErr)
+	}
+
+	ffmpegCmd := s.cfg.Plugins.Viral.FFmpegPath
+	if ffmpegCmd == "" {
+		ffmpegCmd = "ffmpeg"
+	}
+
+	var tempFiles []string
+	defer func() {
+		for _, f := range tempFiles {
+			_ = os.Remove(f)
+		}
+	}()
+
+	// 1. Render temporary video segment for each slide
+	var segmentPaths []string
+	for i, slide := range slides {
+		tempSegmentPath, err := renderSlide(ctx, ffmpegCmd, i, slide, dir)
+		if err != nil {
+			return "", err
+		}
+		tempFiles = append(tempFiles, tempSegmentPath)
+		segmentPaths = append(segmentPaths, tempSegmentPath)
+	}
+
+	// 2. Write concat list text file
+	concatListPath := filepath.Join(dir, fmt.Sprintf("concat_%d.txt", time.Now().UnixNano()))
+	tempFiles = append(tempFiles, concatListPath)
+	if err := writeConcatList(concatListPath, segmentPaths); err != nil {
+		return "", fmt.Errorf("failed to write concat list: %w", err)
+	}
+
+	// 3. Concatenate video segments
+	mergedVideoPath := filepath.Join(dir, fmt.Sprintf("merged_%d.mp4", time.Now().UnixNano()))
+	tempFiles = append(tempFiles, mergedVideoPath)
+	if err := concatSegments(ctx, ffmpegCmd, concatListPath, mergedVideoPath); err != nil {
+		return "", err
+	}
+
+	// 4. Mix background audio if provided, or copy/rename
+	outName := outputName
+	if outName == "" {
+		outName = fmt.Sprintf("slideshow_%d.mp4", time.Now().UnixNano())
+	} else {
+		outName = filepath.Base(outName)
+	}
+	if !strings.HasSuffix(outName, ".mp4") {
+		outName += ".mp4"
+	}
+	outputPath := filepath.Join(dir, outName)
+
+	if err := finalizeOutput(ctx, ffmpegCmd, mergedVideoPath, backgroundAudioPath, outputPath); err != nil {
+		return "", err
+	}
+
+	return outputPath, nil
+}

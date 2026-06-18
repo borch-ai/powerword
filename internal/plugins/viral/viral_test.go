@@ -543,6 +543,143 @@ exit 1
 	}
 }
 
+func TestStitchSlideshow_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockFFmpegPath := createMockFFmpeg(t)
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				FFmpegPath: mockFFmpegPath,
+			},
+		},
+	}
+	svc := NewViralService(tmpDir, cfg)
+
+	img1 := filepath.Join(tmpDir, "img1.png")
+	audio1 := filepath.Join(tmpDir, "audio1.mp3")
+	img2 := filepath.Join(tmpDir, "img2.png")
+	audio2 := filepath.Join(tmpDir, "audio2.mp3")
+	bgAudio := filepath.Join(tmpDir, "bg.mp3")
+
+	_ = os.WriteFile(img1, []byte("fake-img-1"), 0600)
+	_ = os.WriteFile(audio1, []byte("fake-audio-1"), 0600)
+	_ = os.WriteFile(img2, []byte("fake-img-2"), 0600)
+	_ = os.WriteFile(audio2, []byte("fake-audio-2"), 0600)
+	_ = os.WriteFile(bgAudio, []byte("fake-bg"), 0600)
+
+	slides := []Slide{
+		{ImagePath: img1, AudioPath: audio1},
+		{ImagePath: img2, AudioPath: audio2},
+	}
+
+	// 1. Success without background music
+	outputPath, err := svc.StitchSlideshow(context.Background(), slides, "", "out_slideshow.mp4")
+	if err != nil {
+		t.Fatalf("StitchSlideshow failed: %v", err)
+	}
+	if !strings.HasSuffix(outputPath, "out_slideshow.mp4") {
+		t.Errorf("unexpected output path suffix: %s", outputPath)
+	}
+	if _, statErr := os.Stat(outputPath); os.IsNotExist(statErr) {
+		t.Error("expected output file to exist")
+	}
+
+	// 2. Success with background music
+	outputPathBg, err := svc.StitchSlideshow(context.Background(), slides, bgAudio, "")
+	if err != nil {
+		t.Fatalf("StitchSlideshow with bg failed: %v", err)
+	}
+	if !strings.HasSuffix(outputPathBg, ".mp4") {
+		t.Errorf("unexpected output path format: %s", outputPathBg)
+	}
+	if _, statErr := os.Stat(outputPathBg); os.IsNotExist(statErr) {
+		t.Error("expected output file with bg to exist")
+	}
+}
+
+func TestStitchSlideshow_Errors(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockFFmpegPath := createMockFFmpeg(t)
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				FFmpegPath: mockFFmpegPath,
+			},
+		},
+	}
+	svc := NewViralService(tmpDir, cfg)
+
+	img1 := filepath.Join(tmpDir, "img1.png")
+	audio1 := filepath.Join(tmpDir, "audio1.mp3")
+
+	_ = os.WriteFile(img1, []byte("fake-img-1"), 0600)
+	_ = os.WriteFile(audio1, []byte("fake-audio-1"), 0600)
+
+	// 1. Empty slides
+	_, err := svc.StitchSlideshow(context.Background(), []Slide{}, "", "")
+	if err == nil {
+		t.Error("expected error for empty slides, got nil")
+	}
+
+	// 2. Missing image
+	_, err = svc.StitchSlideshow(context.Background(), []Slide{{ImagePath: "missing.png", AudioPath: audio1}}, "", "")
+	if err == nil {
+		t.Error("expected error for missing image, got nil")
+	}
+
+	// 3. Missing audio
+	_, err = svc.StitchSlideshow(context.Background(), []Slide{{ImagePath: img1, AudioPath: "missing.mp3"}}, "", "")
+	if err == nil {
+		t.Error("expected error for missing audio, got nil")
+	}
+
+	// 4. Missing background music
+	_, err = svc.StitchSlideshow(context.Background(), []Slide{{ImagePath: img1, AudioPath: audio1}}, "missing_bg.mp3", "")
+	if err == nil {
+		t.Error("expected error for missing background audio, got nil")
+	}
+
+	// 5. checkFFmpeg fails
+	cfgBadFFmpeg := &config.Config{
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				FFmpegPath: "non-existent-ffmpeg-path-999",
+			},
+		},
+	}
+	svcBadFFmpeg := NewViralService(tmpDir, cfgBadFFmpeg)
+	_, err = svcBadFFmpeg.StitchSlideshow(context.Background(), []Slide{{ImagePath: img1, AudioPath: audio1}}, "", "")
+	if err == nil {
+		t.Error("expected error when ffmpeg path is invalid, got nil")
+	}
+
+	// 6. ffmpeg command failure
+	failedFFmpeg := filepath.Join(tmpDir, "failed_ffmpeg")
+	scriptContent := `#!/bin/sh
+echo "mock-failed-stderr" >&2
+exit 1
+`
+	//nolint:gosec
+	_ = os.WriteFile(failedFFmpeg, []byte(scriptContent), 0755)
+
+	cfgFailed := &config.Config{
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				FFmpegPath: failedFFmpeg,
+			},
+		},
+	}
+	svcFailed := NewViralService(tmpDir, cfgFailed)
+	_, err = svcFailed.StitchSlideshow(context.Background(), []Slide{{ImagePath: img1, AudioPath: audio1}}, "", "")
+	if err == nil {
+		t.Error("expected error for failed ffmpeg, got nil")
+	} else if !strings.Contains(err.Error(), "mock-failed-stderr") {
+		t.Errorf("expected error message to contain stderr, got: %v", err)
+	}
+}
+
 func TestCheckFFmpeg_Empty(t *testing.T) {
 	_ = checkFFmpeg("")
 }
@@ -693,9 +830,19 @@ func TestUncoveredBranches(t *testing.T) {
 		t.Error("expected mkdir error in GenerateVideo, got nil")
 	}
 
-	_, err = svcBlocked.StitchTrailer(context.Background(), filepath.Join(tmpDir, "v.mp4"), filepath.Join(tmpDir, "a.mp3"), "", "")
+	vPath := filepath.Join(tmpDir, "v.mp4")
+	aPath := filepath.Join(tmpDir, "a.mp3")
+	_ = os.WriteFile(vPath, []byte("fake"), 0600)
+	_ = os.WriteFile(aPath, []byte("fake"), 0600)
+
+	_, err = svcBlocked.StitchTrailer(context.Background(), vPath, aPath, "", "")
 	if err == nil {
 		t.Error("expected mkdir error in StitchTrailer, got nil")
+	}
+
+	_, err = svcBlocked.StitchSlideshow(context.Background(), []Slide{{ImagePath: vPath, AudioPath: aPath}}, "", "")
+	if err == nil {
+		t.Error("expected mkdir error in StitchSlideshow, got nil")
 	}
 
 	// 6. generateTTSMock command run failure (failed command script)

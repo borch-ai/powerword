@@ -276,6 +276,84 @@ func TestViral_MCP_StitchTrailer(t *testing.T) {
 	assertResponse(t, resErr, true, "failed to stitch trailer")
 }
 
+func TestViral_MCP_StitchSlideshow(t *testing.T) {
+	tempDir := t.TempDir()
+	mockFFmpegPath := createMockFFmpegScript(t)
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				FFmpegPath: mockFFmpegPath,
+			},
+		},
+	}
+	svc := viral.NewViralService(tempDir, cfg)
+	session, ctx, cleanup := startTestServer(t, tempDir, svc)
+	defer cleanup()
+
+	imagePath := filepath.Join(tempDir, "image.png")
+	audioPath := filepath.Join(tempDir, "audio.mp3")
+	_ = os.WriteFile(imagePath, []byte("image"), 0600)
+	_ = os.WriteFile(audioPath, []byte("audio"), 0600)
+
+	// 1. Success stitch slideshow
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "viral_stitch_slideshow",
+		Arguments: json.RawMessage(fmt.Sprintf(`{
+			"slides": [
+				{
+					"image_path": %q,
+					"audio_path": %q
+				}
+			]
+		}`, imagePath, audioPath)),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, res, false, "Successfully stitched slideshow")
+
+	// 2. Missing parameters error (empty/missing slides)
+	errRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "viral_stitch_slideshow",
+		Arguments: json.RawMessage(`{
+			"slides": []
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, errRes, true, "slides parameter is required and cannot be empty")
+
+	// 3. Service call fails (e.g. non-existent ffmpeg)
+	cfgErr := &config.Config{
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				FFmpegPath: "non-existent-ffmpeg",
+			},
+		},
+	}
+	svcErr := viral.NewViralService(tempDir, cfgErr)
+	sessionErr, ctxErr, cleanupErr := startTestServer(t, tempDir, svcErr)
+	defer cleanupErr()
+
+	resErr, err := sessionErr.CallTool(ctxErr, &mcp.CallToolParams{
+		Name: "viral_stitch_slideshow",
+		Arguments: json.RawMessage(fmt.Sprintf(`{
+			"slides": [
+				{
+					"image_path": %q,
+					"audio_path": %q
+				}
+			]
+		}`, imagePath, audioPath)),
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
+	}
+	assertResponse(t, resErr, true, "failed to stitch slideshow")
+}
+
 func TestViral_MCP_UnmarshalErrors(t *testing.T) {
 	tempDir := t.TempDir()
 	session, ctx, cleanup := startTestServer(t, tempDir, nil)
@@ -299,6 +377,14 @@ func TestViral_MCP_UnmarshalErrors(t *testing.T) {
 
 	_, err = session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      "viral_stitch_trailer",
+		Arguments: json.RawMessage(`{invalid_json}`),
+	})
+	if err == nil {
+		t.Error("expected JSON unmarshal error")
+	}
+
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "viral_stitch_slideshow",
 		Arguments: json.RawMessage(`{invalid_json}`),
 	})
 	if err == nil {
