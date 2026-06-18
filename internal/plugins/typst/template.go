@@ -21,6 +21,7 @@ type InteriorParams struct {
 	MarginOutside  float64
 	FontFamily     string
 	Pages          []InteriorPage
+	Layout         string
 }
 
 // CoverParams holds the parameters for the cover layout template.
@@ -51,31 +52,76 @@ const interiorTemplateSrc = `#set page(
 )
 #set text(font: "{{.FontFamily}}", size: 18pt, fill: white)
 
+{{$layout := .Layout}}
 {{range $page := .Pages}}
-{{if $page.ImagePath}}
-#page(background: image("{{$page.ImagePath}}", width: 100%, height: 100%, fit: "cover"))[
-  #align(bottom + center)[
-    #block(
-      fill: rgb(0, 0, 0, 180),
-      inset: 15pt,
-      radius: 8pt,
-      width: 90%,
-    )[
-      #align(center)[
+{{if eq $layout "facing-pages"}}
+  {{if $page.ImagePath}}
+  #page(background: none)[
+    #set text(fill: black)
+    #align(center + horizon)[
+      #text(size: 22pt, weight: "medium")[
         {{$page.Text}}
       ]
     ]
   ]
-]
-{{else}}
-#page(background: none)[
-  #set text(fill: black)
-  #align(center + horizon)[
-    #text(size: 24pt, weight: "bold")[
-      {{$page.Text}}
+  #page(background: image("{{$page.ImagePath}}", width: 100%, height: 100%, fit: "cover"))[]
+  {{else}}
+  #page(background: none)[
+    #set text(fill: black)
+    #align(center + horizon)[
+      #text(size: 24pt, weight: "bold")[
+        {{$page.Text}}
+      ]
     ]
   ]
-]
+  {{end}}
+{{else if eq $layout "facing-pages-flipped"}}
+  {{if $page.ImagePath}}
+  #page(background: image("{{$page.ImagePath}}", width: 100%, height: 100%, fit: "cover"))[]
+  #page(background: none)[
+    #set text(fill: black)
+    #align(center + horizon)[
+      #text(size: 22pt, weight: "medium")[
+        {{$page.Text}}
+      ]
+    ]
+  ]
+  {{else}}
+  #page(background: none)[
+    #set text(fill: black)
+    #align(center + horizon)[
+      #text(size: 24pt, weight: "bold")[
+        {{$page.Text}}
+      ]
+    ]
+  ]
+  {{end}}
+{{else}}
+  {{if $page.ImagePath}}
+  #page(background: image("{{$page.ImagePath}}", width: 100%, height: 100%, fit: "cover"))[
+    #align(bottom + center)[
+      #block(
+        fill: rgb(0, 0, 0, 180),
+        inset: 15pt,
+        radius: 8pt,
+        width: 90%,
+      )[
+        #align(center)[
+          {{$page.Text}}
+        ]
+      ]
+    ]
+  ]
+  {{else}}
+  #page(background: none)[
+    #set text(fill: black)
+    #align(center + horizon)[
+      #text(size: 24pt, weight: "bold")[
+        {{$page.Text}}
+      ]
+    ]
+  ]
+  {{end}}
 {{end}}
 {{end}}
 `

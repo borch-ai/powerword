@@ -94,6 +94,10 @@ const (
 			"font_family": {
 				"type": "string",
 				"description": "Font family name, default: 'Georgia'"
+			},
+			"layout": {
+				"type": "string",
+				"description": "Book page layout mode: 'full-bleed', 'facing-pages', or 'facing-pages-flipped', default: 'full-bleed'"
 			}
 		},
 		"required": ["manuscript_path", "output_path"]
@@ -182,6 +186,7 @@ type interiorArgs struct {
 	MarginOutside  string `json:"margin_outside"`
 	Bleed          string `json:"bleed"`
 	FontFamily     string `json:"font_family"`
+	Layout         string `json:"layout"`
 }
 
 type interiorConfig struct {
@@ -232,6 +237,16 @@ func parseAndSanitizeInterior(compiler *typst.Compiler, args *interiorArgs) (*in
 		return nil, fmt.Errorf("failed to parse bleed: %w", err)
 	}
 
+	if args.Layout != "full-bleed" && args.Layout != "facing-pages" && args.Layout != "facing-pages-flipped" {
+		return nil, fmt.Errorf("invalid layout %q: must be 'full-bleed', 'facing-pages', or 'facing-pages-flipped'", args.Layout)
+	}
+
+	if strings.HasSuffix(strings.ToLower(absManuscript), ".typ") {
+		if args.Layout != "full-bleed" {
+			return nil, fmt.Errorf("layout option %q is not supported for pure Typst (.typ) manuscripts", args.Layout)
+		}
+	}
+
 	return &interiorConfig{
 		absManuscript: absManuscript,
 		absImages:     absImages,
@@ -262,7 +277,7 @@ func handleCompileInterior(compiler *typst.Compiler) func(context.Context, *mcp.
 		if strings.HasSuffix(strings.ToLower(ic.absManuscript), ".typ") {
 			compErr = compileFromTypstFile(ctx, compiler, ic.absManuscript, ic.trimW, ic.trimH, ic.inside, ic.outside, ic.bleed, args.FontFamily, ic.absOutput)
 		} else {
-			compErr = compileFromMarkdownFile(ctx, compiler, ic.absManuscript, ic.absImages, ic.trimW, ic.trimH, ic.inside, ic.outside, ic.bleed, args.FontFamily, ic.absOutput)
+			compErr = compileFromMarkdownFile(ctx, compiler, ic.absManuscript, ic.absImages, ic.trimW, ic.trimH, ic.inside, ic.outside, ic.bleed, args.FontFamily, args.Layout, ic.absOutput)
 		}
 
 		if compErr != nil {
@@ -302,6 +317,9 @@ func applyInteriorDefaults(args *interiorArgs) {
 	if args.FontFamily == "" {
 		args.FontFamily = "Georgia"
 	}
+	if args.Layout == "" {
+		args.Layout = "full-bleed"
+	}
 }
 
 func compileFromTypstFile(ctx context.Context, compiler *typst.Compiler, absManuscript string, trimW, trimH, inside, outside, b float64, fontFamily, absOutput string) error {
@@ -324,7 +342,7 @@ func compileFromTypstFile(ctx context.Context, compiler *typst.Compiler, absManu
 	return compiler.Compile(ctx, pageSetBlock+"\n"+string(contentBytes), absOutput)
 }
 
-func compileFromMarkdownFile(ctx context.Context, compiler *typst.Compiler, absManuscript, absImages string, trimW, trimH, inside, outside, b float64, fontFamily, absOutput string) error {
+func compileFromMarkdownFile(ctx context.Context, compiler *typst.Compiler, absManuscript, absImages string, trimW, trimH, inside, outside, b float64, fontFamily, layout, absOutput string) error {
 	pages, err := typst.ParseManuscript(absManuscript)
 	if err != nil {
 		return err
@@ -353,6 +371,7 @@ func compileFromMarkdownFile(ctx context.Context, compiler *typst.Compiler, absM
 		MarginOutside:  outside + b,
 		FontFamily:     fontFamily,
 		Pages:          interiorPages,
+		Layout:         layout,
 	})
 	if err != nil {
 		return err

@@ -103,7 +103,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.14: Typst Verse Line Break Formatting (`pw-mcp-typst`)**
     *   Preserve line breaks inside parsed Markdown stanzas and replace them with Typst-compliant break markers (` \\\n `) before compiling the PDF.
     *   [Implementation Plan](plans/phase_3/task_3_14_typst_line_breaks.md)
-*   [ ] **Task 3.15: Typst Mixed Layout Templates (`pw-mcp-typst`)**
+*   [x] **Task 3.15: Typst Mixed Layout Templates (`pw-mcp-typst`)**
     *   Extend `pw-mcp-typst` compile tools to support left-hand text, right-hand image, and other layout styles instead of only full-bleed backgrounds.
     *   [Implementation Plan](plans/phase_3/task_3_15_typst_mixed_layouts.md)
 *   [ ] **Task 3.16: Slideshow Video Trailer Stitching (`pw-mcp-viral`)**
@@ -146,7 +146,7 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.6: Cloud Storage Subsystem**
     *   Implement a cloud storage uploader engine within `pw-mcp-cloud` and expose it as a `cloud_upload_file` MCP tool supporting Firebase/GCS and S3 uploads.
     *   [Implementation Plan](plans/phase_4/task_4_6_cloud_storage.md)
-*   [ ] **Task 4.7: MCP ImageGen Cref Extensions**
+*   [x] **Task 4.7: MCP ImageGen Cref Extensions**
     *   Extend the `pw-mcp-imagegen` server to accept `cref_url` and `character_weight` inputs. Automatically upload local character assets before generation.
     *   [Implementation Plan](plans/phase_4/task_4_7_imagegen_cref_extensions.md)
 

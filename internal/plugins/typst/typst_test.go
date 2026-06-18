@@ -122,7 +122,7 @@ And thought about himself.`
 }
 
 func TestRenderTemplates(t *testing.T) {
-	// 1. Test Interior Template
+	// 1. Test Interior Template with full-bleed
 	params := InteriorParams{
 		PhysicalWidth:  8.75,
 		PhysicalHeight: 8.75,
@@ -135,6 +135,7 @@ func TestRenderTemplates(t *testing.T) {
 			{Text: "Hello Page 1", ImagePath: "page_1.png"},
 			{Text: "Hello Page 2", ImagePath: ""},
 		},
+		Layout: "full-bleed",
 	}
 
 	interiorCode, err := RenderInterior(params)
@@ -147,6 +148,30 @@ func TestRenderTemplates(t *testing.T) {
 		!strings.Contains(interiorCode, `image("page_1.png"`) ||
 		!strings.Contains(interiorCode, `Hello Page 2`) {
 		t.Errorf("Rendered interior lacks expected elements:\n%s", interiorCode)
+	}
+
+	// Test facing-pages layout
+	params.Layout = "facing-pages"
+	facingCode, err := RenderInterior(params)
+	if err != nil {
+		t.Fatalf("RenderInterior facing-pages failed: %v", err)
+	}
+	// Verify it contains text-only block (with background: none) and then image block
+	if !strings.Contains(facingCode, `#page(background: none)`) ||
+		!strings.Contains(facingCode, `image("page_1.png"`) ||
+		!strings.Contains(facingCode, `Hello Page 1`) {
+		t.Errorf("Rendered facing interior lacks expected elements:\n%s", facingCode)
+	}
+
+	// Test facing-pages-flipped layout
+	params.Layout = "facing-pages-flipped"
+	flippedCode, err := RenderInterior(params)
+	if err != nil {
+		t.Fatalf("RenderInterior facing-pages-flipped failed: %v", err)
+	}
+	if !strings.Contains(flippedCode, `#page(background: image("page_1.png"`) ||
+		!strings.Contains(flippedCode, `Hello Page 1`) {
+		t.Errorf("Rendered flipped interior lacks expected elements:\n%s", flippedCode)
 	}
 
 	// 2. Test Cover Template
