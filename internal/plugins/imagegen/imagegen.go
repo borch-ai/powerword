@@ -190,13 +190,18 @@ func (b *GoogleBackend) SetTimeout(t time.Duration) {
 }
 
 // GenerateImage generates the image via direct predict REST call and returns decoded raw bytes and mimeType.
-func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size string) ([]byte, string, error) {
+func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size string, crefURL string, characterWeight *int) ([]byte, string, error) {
 	aspectRatio := "1:1"
 	switch size {
 	case "1024x1792":
 		aspectRatio = "9:16"
 	case "1792x1024":
 		aspectRatio = "16:9"
+	}
+
+	if crefURL != "" {
+		fmt.Fprintln(os.Stderr, "Warning: Google Imagen backend does not natively support image-based character references; falling back to prepended character description.")
+		prompt = fmt.Sprintf("[Character Reference: %s] %s", crefURL, prompt)
 	}
 
 	payload := map[string]interface{}{
@@ -357,8 +362,8 @@ func (b *VeoBackend) downloadVideo(ctx context.Context, videoURI string) ([]byte
 
 // GenerateImage generates the video via predictLongRunning API and polls until complete.
 // It returns the video bytes and "video/mp4" mimeType.
-func (b *VeoBackend) GenerateImage(ctx context.Context, prompt string, size string) ([]byte, string, error) {
-	opName, err := b.initiateVeo(ctx, prompt, size)
+func (b *VeoBackend) GenerateImage(ctx context.Context, prompt string, size string, crefURL string, characterWeight *int) ([]byte, string, error) {
+	opName, err := b.initiateVeo(ctx, prompt, size, crefURL, characterWeight)
 	if err != nil {
 		return nil, "", err
 	}
@@ -369,7 +374,50 @@ func (b *VeoBackend) GenerateImage(ctx context.Context, prompt string, size stri
 	return videoBytes, "video/mp4", nil
 }
 
-func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string) (string, error) {
+func (b *VeoBackend) downloadImageBytes(ctx context.Context, urlStr string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("failed to download image, status %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "image/png"
+	}
+	return data, contentType, nil
+}
+
+func (b *VeoBackend) resolveReferenceImage(ctx context.Context, crefURL string) (map[string]interface{}, error) {
+	if strings.HasPrefix(crefURL, "gs://") {
+		return map[string]interface{}{
+			"gcsUri": crefURL,
+		}, nil
+	}
+	imageBytes, contentType, err := b.downloadImageBytes(ctx, crefURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download character reference image: %w", err)
+	}
+	return map[string]interface{}{
+		"imageBytes": base64.StdEncoding.EncodeToString(imageBytes),
+		"mimeType":   contentType,
+	}, nil
+}
+
+func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string, crefURL string, characterWeight *int) (string, error) {
 	aspectRatio := "1:1"
 	switch size {
 	case "1024x1792":
@@ -378,11 +426,21 @@ func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string) (stri
 		aspectRatio = "16:9"
 	}
 
+	instance := map[string]interface{}{
+		"prompt": prompt,
+	}
+
+	if crefURL != "" {
+		refImg, err := b.resolveReferenceImage(ctx, crefURL)
+		if err != nil {
+			return "", err
+		}
+		instance["image"] = refImg
+	}
+
 	payload := map[string]interface{}{
-		"instances": []map[string]string{
-			{
-				"prompt": prompt,
-			},
+		"instances": []interface{}{
+			instance,
 		},
 		"parameters": map[string]interface{}{
 			"sampleCount": 1,
@@ -850,7 +908,7 @@ func (s *ImageGenService) runMidjourney(ctx context.Context, finalPrompt, size, 
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
-func (s *ImageGenService) runGoogle(ctx context.Context, finalPrompt, size string) ([]byte, string, error) {
+func (s *ImageGenService) runGoogle(ctx context.Context, finalPrompt, size string, crefURL string, characterWeight *int) ([]byte, string, error) {
 	apiKey := s.cfg.Plugins.ImageGen.GoogleAPIKey
 	if apiKey == "" {
 		apiKey = s.cfg.APIKeys.Gemini
@@ -860,10 +918,10 @@ func (s *ImageGenService) runGoogle(ctx context.Context, finalPrompt, size strin
 	}
 	client := NewGoogleBackend(apiKey, s.cfg.Plugins.ImageGen.GoogleModel)
 	client.SetTimeout(s.getRequestTimeout())
-	return client.GenerateImage(ctx, finalPrompt, size)
+	return client.GenerateImage(ctx, finalPrompt, size, crefURL, characterWeight)
 }
 
-func (s *ImageGenService) runVeo(ctx context.Context, finalPrompt, size string) ([]byte, string, error) {
+func (s *ImageGenService) runVeo(ctx context.Context, finalPrompt, size string, crefURL string, characterWeight *int) ([]byte, string, error) {
 	apiKey := s.cfg.Plugins.ImageGen.GoogleAPIKey
 	if apiKey == "" {
 		apiKey = s.cfg.APIKeys.Gemini
@@ -885,7 +943,7 @@ func (s *ImageGenService) runVeo(ctx context.Context, finalPrompt, size string) 
 		return nil, "", fmt.Errorf("failed to initialize Veo backend: %w", err)
 	}
 	client.SetTimeout(s.getRequestTimeout())
-	return client.GenerateImage(ctx, finalPrompt, size)
+	return client.GenerateImage(ctx, finalPrompt, size, crefURL, characterWeight)
 }
 
 // GenerateImage generates and downloads the image to workspaceRoot/generated_images/
@@ -916,12 +974,12 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 			return "", err
 		}
 	case "google", "imagen":
-		imageBytes, mimeType, err = s.runGoogle(ctx, finalPrompt, size)
+		imageBytes, mimeType, err = s.runGoogle(ctx, finalPrompt, size, crefURL, characterWeight)
 		if err != nil {
 			return "", err
 		}
 	case "veo", "google-veo":
-		imageBytes, mimeType, err = s.runVeo(ctx, finalPrompt, size)
+		imageBytes, mimeType, err = s.runVeo(ctx, finalPrompt, size, crefURL, characterWeight)
 		if err != nil {
 			return "", err
 		}

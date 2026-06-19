@@ -1,8 +1,9 @@
 # plan: Task 4.12: Google Veo & Imagen Character Seeding Support
 
-**Status:** Pending
+**Status:** Completed
 **Go Version:** 1.26.4
-**Unit Test Coverage:** 91.0% (Target)
+**Date Completed:** 2026-06-18
+**Unit Test Coverage:** 91.1%
 
 This task implements character visual consistency for the Google Veo (video generation) and Google Imagen (image generation) backends in the `pw-mcp-imagegen` server. Currently, when `cref_url` and `character_weight` are passed to `imagegen_generate`, they are silently ignored if the backend is configured to `"google"` (Imagen) or `"veo"` (Google Veo).
 
