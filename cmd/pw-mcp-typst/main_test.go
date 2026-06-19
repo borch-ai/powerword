@@ -212,6 +212,7 @@ func TestTypst_MCP_CompileInteriorSuccess(t *testing.T) {
 	manuscriptPath := filepath.Join(tempDir, "manuscript.md")
 	manuscriptContent := `
 # Page 1
+<!-- Layout: facing-pages -->
 ## Text
 Stanza 1
 

@@ -72,6 +72,7 @@ func TestParseManuscript(t *testing.T) {
 comment
 -->
 # Page 1
+<!-- Layout: facing-pages -->
 ## Text
 Mr. Eggerton, with worried gaze,
 Sat high upon the shelf.
@@ -84,6 +85,7 @@ The scene is a grand, ornate office.
 
 <!-- Another comment -->
 # Page 2
+<!-- Layout: facing-pages-flipped -->
 ## Text
 He fretted over market shares.
 `
@@ -112,11 +114,11 @@ Sat high upon the shelf.
 
 He fretted over market shares, \
 And thought about himself.`
-	if pages[0].Number != 1 || pages[0].Text != expectedPage1Text || pages[0].Prompt != "The scene is a grand, ornate office." {
+	if pages[0].Number != 1 || pages[0].Text != expectedPage1Text || pages[0].Prompt != "The scene is a grand, ornate office." || pages[0].Layout != "facing-pages" {
 		t.Errorf("page 1 mismatch: %+v", pages[0])
 	}
 
-	if pages[1].Number != 2 || pages[1].Text != "He fretted over market shares." || pages[1].Prompt != "" {
+	if pages[1].Number != 2 || pages[1].Text != "He fretted over market shares." || pages[1].Prompt != "" || pages[1].Layout != "facing-pages-flipped" {
 		t.Errorf("page 2 mismatch: %+v", pages[1])
 	}
 }
@@ -172,6 +174,20 @@ func TestRenderTemplates(t *testing.T) {
 	if !strings.Contains(flippedCode, `#page(background: image("page_1.png"`) ||
 		!strings.Contains(flippedCode, `Hello Page 1`) {
 		t.Errorf("Rendered flipped interior lacks expected elements:\n%s", flippedCode)
+	}
+
+	// Test per-page layout overrides
+	params.Layout = "full-bleed"
+	params.Pages[0].Layout = "facing-pages"
+	params.Pages[1].Layout = "facing-pages-flipped"
+	overrideCode, err := RenderInterior(params)
+	if err != nil {
+		t.Fatalf("RenderInterior overrides failed: %v", err)
+	}
+	if !strings.Contains(overrideCode, `#page(background: none)`) ||
+		!strings.Contains(overrideCode, `image("page_1.png"`) ||
+		!strings.Contains(overrideCode, `Hello Page 2`) {
+		t.Errorf("Rendered overrides interior lacks expected elements:\n%s", overrideCode)
 	}
 
 	// 2. Test Cover Template

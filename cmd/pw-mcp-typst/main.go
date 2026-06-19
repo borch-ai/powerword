@@ -351,7 +351,8 @@ func compileFromMarkdownFile(ctx context.Context, compiler *typst.Compiler, absM
 	var interiorPages []typst.InteriorPage
 	for _, p := range pages {
 		ip := typst.InteriorPage{
-			Text: p.Text,
+			Text:   p.Text,
+			Layout: p.Layout,
 		}
 
 		imgFile, imgErr := typst.FindImageForPage(absImages, p.Number)

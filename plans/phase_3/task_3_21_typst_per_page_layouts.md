@@ -1,9 +1,9 @@
 # plan: Task 3.21: Typst Per-Page Layout Overrides
 
-**Status:** Open
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage Target:** ≥91.0%
+**Date Completed:** June 19, 2026
+**Unit Test Coverage:** 91.2% (codebase-wide statement coverage)
 
 Extend the `pw-mcp-typst` compiler to support per-page layout styles (e.g. `facing-pages`, `facing-pages-flipped`, `full-bleed`) inside compiled book interior PDFs, configured via comments inside the Markdown manuscript (e.g., `<!-- Layout: facing-pages -->`).
 
