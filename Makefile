@@ -28,6 +28,7 @@ TYPST_PLUGIN=pw-mcp-typst
 LINTER_PLUGIN=pw-mcp-linter
 CLOUD_PLUGIN=pw-mcp-cloud
 COVERAGE_PLUGIN=pw-mcp-coverage
+YOUTUBE_PLUGIN=pw-mcp-youtube
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -54,6 +55,7 @@ build:
 	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOBUILD) -o bin/$(LINTER_PLUGIN) ./cmd/$(LINTER_PLUGIN); fi
 	@if [ -d cmd/$(CLOUD_PLUGIN) ]; then $(GOBUILD) -o bin/$(CLOUD_PLUGIN) ./cmd/$(CLOUD_PLUGIN); fi
 	@if [ -d cmd/$(COVERAGE_PLUGIN) ]; then $(GOBUILD) -o bin/$(COVERAGE_PLUGIN) ./cmd/$(COVERAGE_PLUGIN); fi
+	@if [ -d cmd/$(YOUTUBE_PLUGIN) ]; then $(GOBUILD) -o bin/$(YOUTUBE_PLUGIN) ./cmd/$(YOUTUBE_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -73,6 +75,7 @@ install:
 	@if [ -d cmd/$(LINTER_PLUGIN) ]; then $(GOCMD) install ./cmd/$(LINTER_PLUGIN); fi
 	@if [ -d cmd/$(CLOUD_PLUGIN) ]; then $(GOCMD) install ./cmd/$(CLOUD_PLUGIN); fi
 	@if [ -d cmd/$(COVERAGE_PLUGIN) ]; then $(GOCMD) install ./cmd/$(COVERAGE_PLUGIN); fi
+	@if [ -d cmd/$(YOUTUBE_PLUGIN) ]; then $(GOCMD) install ./cmd/$(YOUTUBE_PLUGIN); fi
 
 
 install-hooks:

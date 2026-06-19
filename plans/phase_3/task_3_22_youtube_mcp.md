@@ -1,9 +1,9 @@
 # plan: Task 3.22: YouTube Integration Plugin (`pw-mcp-youtube`)
 
-**Status:** Open
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** June 19, 2026
+**Unit Test Coverage:** 91.2% (codebase-wide statement coverage)
 
 ## Goal Description
 

@@ -104,6 +104,13 @@ type CloudConfig struct {
 	Region          string `mapstructure:"region"`           // AWS Region (e.g. us-east-1)
 }
 
+// YouTubeConfig holds parameters for the YouTube plugin.
+type YouTubeConfig struct {
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
+	RefreshToken string `mapstructure:"refresh_token"`
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
@@ -112,6 +119,7 @@ type PluginsConfig struct {
 	Viral    ViralConfig    `mapstructure:"viral"`
 	Trends   TrendsConfig   `mapstructure:"trends"`
 	Cloud    CloudConfig    `mapstructure:"cloud"`
+	YouTube  YouTubeConfig  `mapstructure:"youtube"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -293,6 +301,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.viral.ffmpeg_path", "ffmpeg")
 	v.SetDefault("plugins.trends.serp_api_key", "")
 	v.SetDefault("plugins.cloud.provider", "noop")
+	v.SetDefault("plugins.youtube.client_id", "")
+	v.SetDefault("plugins.youtube.client_secret", "")
+	v.SetDefault("plugins.youtube.refresh_token", "")
 
 	// Read config files in order
 	readErr := readConfigFile(v, configFilesToTry, cfgFile)
@@ -357,6 +368,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.cloud.bucket", "POWERWORD_CLOUD_BUCKET")
 	bindEnv(v, "plugins.cloud.credentials_path", "POWERWORD_CLOUD_CREDENTIALS_PATH")
 	bindEnv(v, "plugins.cloud.region", "POWERWORD_CLOUD_REGION")
+	bindEnv(v, "plugins.youtube.client_id", "POWERWORD_YOUTUBE_CLIENT_ID")
+	bindEnv(v, "plugins.youtube.client_secret", "POWERWORD_YOUTUBE_CLIENT_SECRET")
+	bindEnv(v, "plugins.youtube.refresh_token", "POWERWORD_YOUTUBE_REFRESH_TOKEN")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
