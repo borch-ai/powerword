@@ -134,6 +134,18 @@ func TestImageGen_MCP(t *testing.T) {
 	}
 	assertResponse(t, genRes, false, "Successfully generated image and saved to")
 
+	// Test 4: Get Capabilities
+	capRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "imagegen_get_capabilities",
+		Arguments: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("CallTool get capabilities failed: %v", err)
+	}
+	assertResponse(t, capRes, false, `"backend": "openai"`)
+	assertResponse(t, capRes, false, `"supports_cref": false`)
+	assertResponse(t, capRes, false, `"supports_sref": false`)
+
 	// Check if file is saved correctly in generated_images
 	generatedDir := filepath.Join(tempDir, "generated_images")
 	entries, err := os.ReadDir(generatedDir)

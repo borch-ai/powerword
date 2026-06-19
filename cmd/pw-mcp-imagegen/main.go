@@ -129,6 +129,15 @@ func setupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 		}`),
 	}, handleListStyles(service))
 
+	srv.AddTool(&mcp.Tool{
+		Name:        "imagegen_get_capabilities",
+		Description: "Returns the active backend capabilities, indicating support for character references (cref) or style references (sref).",
+		InputSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {}
+		}`),
+	}, handleGetCapabilities(service))
+
 	return srv, nil
 }
 
@@ -210,6 +219,19 @@ func handleListStyles(service *imagegen.ImageGenService) func(context.Context, *
 			return nil, err
 		}
 
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		}, nil
+	}
+}
+
+func handleGetCapabilities(service *imagegen.ImageGenService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		caps := service.GetCapabilities()
+		data, err := json.MarshalIndent(caps, "", "  ")
+		if err != nil {
+			return nil, err
+		}
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
 		}, nil

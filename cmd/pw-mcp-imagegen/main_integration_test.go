@@ -134,6 +134,7 @@ backend = "openai"
 	foundGenerate := false
 	foundRegisterStyle := false
 	foundListStyles := false
+	foundGetCapabilities := false
 	for _, tool := range tools {
 		if tool.Name == "imagegen_generate" {
 			foundGenerate = true
@@ -144,6 +145,9 @@ backend = "openai"
 		if tool.Name == "imagegen_list_styles" {
 			foundListStyles = true
 		}
+		if tool.Name == "imagegen_get_capabilities" {
+			foundGetCapabilities = true
+		}
 	}
 	if !foundGenerate {
 		t.Errorf("expected to find 'imagegen_generate' tool, got tools: %+v", tools)
@@ -153,6 +157,49 @@ backend = "openai"
 	}
 	if !foundListStyles {
 		t.Errorf("expected to find 'imagegen_list_styles' tool, got tools: %+v", tools)
+	}
+	if !foundGetCapabilities {
+		t.Errorf("expected to find 'imagegen_get_capabilities' tool, got tools: %+v", tools)
+	}
+
+	// 1.5 CallTool to get capabilities
+	resultCaps, err := client.CallTool(ctx, "imagegen_get_capabilities", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("failed to call imagegen_get_capabilities tool: %v", err)
+	}
+	if resultCaps.IsError {
+		t.Fatalf("tool execution imagegen_get_capabilities returned error: %v", resultCaps)
+	}
+	capsStr, err := mcp.FormatToolResult(resultCaps)
+	if err != nil {
+		t.Fatalf("failed to format capabilities result: %v", err)
+	}
+	if !strings.Contains(capsStr, `"backend": "openai"`) {
+		t.Errorf("expected capabilities to contain backend 'openai', got: %q", capsStr)
+	}
+	if !strings.Contains(capsStr, `"supports_cref": false`) {
+		t.Errorf("expected capabilities to contain supports_cref false, got: %q", capsStr)
+	}
+
+	// 1.6 CallTool to generate with unsupported cref_url on openai backend
+	argsGenBad := map[string]interface{}{
+		"prompt":   "An worried egg sitting on a shelf",
+		"size":     "1024x1024",
+		"cref_url": "http://example.com/cref.png",
+	}
+	resultGenBad, err := client.CallTool(ctx, "imagegen_generate", argsGenBad)
+	if err != nil {
+		t.Fatalf("failed to call imagegen_generate tool: %v", err)
+	}
+	if !resultGenBad.IsError {
+		t.Fatalf("expected generation to fail with unsupported cref_url, but it succeeded")
+	}
+	genBadStr, err := mcp.FormatToolResult(resultGenBad)
+	if err != nil {
+		t.Fatalf("failed to format generate result: %v", err)
+	}
+	if !strings.Contains(genBadStr, "character reference (cref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected validation error in output, got: %q", genBadStr)
 	}
 
 	// 2. CallTool to register style profile

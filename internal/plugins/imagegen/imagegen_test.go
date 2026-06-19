@@ -1762,3 +1762,83 @@ func TestVeoBackend_CharacterWeightWarning(t *testing.T) {
 		t.Errorf("expected stderr warning %q, got %q", expectedWarning, output)
 	}
 }
+
+func TestGetCapabilities(t *testing.T) {
+	tests := []struct {
+		name         string
+		backend      string
+		wantCref     bool
+		wantSref     bool
+		expectedName string
+	}{
+		{"default_empty", "", false, false, "openai"},
+		{"openai", "openai", false, false, "openai"},
+		{"midjourney", "midjourney", true, true, "midjourney"},
+		{"google", "google", true, false, "google"},
+		{"imagen", "imagen", true, false, "imagen"},
+		{"veo", "veo", true, false, "veo"},
+		{"google-veo", "google-veo", true, false, "google-veo"},
+		{"unsupported", "unsupported", false, false, "unsupported"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Plugins: config.PluginsConfig{
+					ImageGen: config.ImageGenConfig{
+						Backend: tt.backend,
+					},
+				},
+			}
+			service := NewImageGenService(t.TempDir(), cfg)
+			caps := service.GetCapabilities()
+
+			if caps.Backend != tt.expectedName {
+				t.Errorf("expected backend %q, got %q", tt.expectedName, caps.Backend)
+			}
+			if caps.SupportsCref != tt.wantCref {
+				t.Errorf("expected supports_cref %v, got %v", tt.wantCref, caps.SupportsCref)
+			}
+			if caps.SupportsSref != tt.wantSref {
+				t.Errorf("expected supports_sref %v, got %v", tt.wantSref, caps.SupportsSref)
+			}
+		})
+	}
+}
+
+func TestGenerateImage_CapabilitiesValidation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test 1: OpenAI backend does not support cref_url
+	cfgOpenAI := &config.Config{
+		APIKeys: config.APIKeys{
+			OpenAI: "mock-key",
+		},
+		Plugins: config.PluginsConfig{
+			ImageGen: config.ImageGenConfig{
+				Backend: "openai",
+			},
+		},
+	}
+	serviceOpenAI := NewImageGenService(tmpDir, cfgOpenAI)
+	_, err := serviceOpenAI.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "character reference (cref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected error containing 'character reference (cref_url) is not supported by the active imagegen backend', got: %v", err)
+	}
+
+	// Test 2: Style requiring sref_url applied to OpenAI backend (which does not support style reference)
+	styleStore := serviceOpenAI.StyleStore()
+	err = styleStore.Register(StyleProfile{
+		StyleID:    "sref-style",
+		PromptSeed: "prompt seed",
+		SrefURL:    "http://example.com/sref.png",
+	})
+	if err != nil {
+		t.Fatalf("failed to register style: %v", err)
+	}
+
+	_, err = serviceOpenAI.GenerateImage(context.Background(), "prompt", "1024x1024", "sref-style", "", nil)
+	if err == nil || !strings.Contains(err.Error(), "style reference (sref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected error containing 'style reference (sref_url) is not supported by the active imagegen backend', got: %v", err)
+	}
+}
