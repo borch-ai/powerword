@@ -9,6 +9,7 @@ import (
 type InteriorPage struct {
 	Text      string
 	ImagePath string
+	Layout    string
 }
 
 // InteriorParams holds the parameters for the interior layout template.
@@ -52,8 +53,8 @@ const interiorTemplateSrc = `#set page(
 )
 #set text(font: "{{.FontFamily}}", size: 18pt, fill: white)
 
-{{$layout := .Layout}}
 {{range $page := .Pages}}
+{{$layout := $page.Layout}}{{if eq $layout ""}}{{$layout = $.Layout}}{{end}}
 {{if eq $layout "facing-pages"}}
   {{if $page.ImagePath}}
   #page(background: none)[

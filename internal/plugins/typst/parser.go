@@ -14,9 +14,13 @@ type Page struct {
 	Number int
 	Text   string
 	Prompt string
+	Layout string
 }
 
-var pageHeaderRegex = regexp.MustCompile(`^(?i)#\s*Page\s*(\d+)`)
+var (
+	pageHeaderRegex    = regexp.MustCompile(`^(?i)#\s*Page\s*(\d+)`)
+	layoutCommentRegex = regexp.MustCompile(`^(?i)<!--\s*Layout:\s*([a-zA-Z0-9_-]+)\s*-->`)
+)
 
 // ParseManuscript parses a Markdown manuscript containing # Page N, ## Text, and ## Prompt sections.
 func ParseManuscript(filePath string) ([]Page, error) {
@@ -34,19 +38,18 @@ func ParseManuscript(filePath string) ([]Page, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		if handleLayoutComment(line, currentPage) {
+			continue
+		}
 		if shouldSkip(line) {
 			continue
 		}
 
-		if matches := pageHeaderRegex.FindStringSubmatch(line); len(matches) > 0 {
-			pageNum, err := strconv.Atoi(matches[1])
+		if newPage, ok, err := handlePageHeader(line, currentPage, &pages); ok {
 			if err != nil {
-				return nil, fmt.Errorf("invalid page number: %w", err)
+				return nil, err
 			}
-			if currentPage != nil {
-				pages = append(pages, *currentPage)
-			}
-			currentPage = &Page{Number: pageNum}
+			currentPage = newPage
 			state = 0
 			continue
 		}
@@ -118,4 +121,30 @@ func cleanPages(pages []Page) {
 		pages[i].Text = strings.Join(paragraphs, "\n\n")
 		pages[i].Prompt = strings.TrimSpace(pages[i].Prompt)
 	}
+}
+
+func handleLayoutComment(line string, currentPage *Page) bool {
+	matches := layoutCommentRegex.FindStringSubmatch(line)
+	if len(matches) > 0 {
+		if currentPage != nil {
+			currentPage.Layout = strings.ToLower(strings.TrimSpace(matches[1]))
+		}
+		return true
+	}
+	return false
+}
+
+func handlePageHeader(line string, currentPage *Page, pages *[]Page) (*Page, bool, error) {
+	matches := pageHeaderRegex.FindStringSubmatch(line)
+	if len(matches) == 0 {
+		return nil, false, nil
+	}
+	pageNum, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid page number: %w", err)
+	}
+	if currentPage != nil {
+		*pages = append(*pages, *currentPage)
+	}
+	return &Page{Number: pageNum}, true, nil
 }

@@ -350,8 +350,12 @@ func compileFromMarkdownFile(ctx context.Context, compiler *typst.Compiler, absM
 
 	var interiorPages []typst.InteriorPage
 	for _, p := range pages {
+		if p.Layout != "" && p.Layout != "full-bleed" && p.Layout != "facing-pages" && p.Layout != "facing-pages-flipped" {
+			return fmt.Errorf("invalid per-page layout %q on page %d: must be 'full-bleed', 'facing-pages', or 'facing-pages-flipped'", p.Layout, p.Number)
+		}
 		ip := typst.InteriorPage{
-			Text: p.Text,
+			Text:   p.Text,
+			Layout: p.Layout,
 		}
 
 		imgFile, imgErr := typst.FindImageForPage(absImages, p.Number)
