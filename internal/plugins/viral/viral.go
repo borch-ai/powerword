@@ -226,7 +226,7 @@ func (s *ViralService) runVeo(ctx context.Context, prompt, size string) ([]byte,
 		}
 	}
 
-	videoBytes, _, err := backend.GenerateImage(ctx, prompt, size)
+	videoBytes, _, err := backend.GenerateImage(ctx, prompt, size, "", nil)
 	if err != nil {
 		return nil, err
 	}

@@ -1,10 +1,12 @@
 package imagegen
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -775,7 +777,7 @@ func TestGoogleBackend_Success(t *testing.T) {
 	t.Setenv("GOOGLE_BASE_URL", server.URL)
 	backend := NewGoogleBackend("mock-key", "imagen-3.0-generate-002")
 
-	imgBytes, mimeType, err := backend.GenerateImage(context.Background(), "a beautiful painting", "1024x1792")
+	imgBytes, mimeType, err := backend.GenerateImage(context.Background(), "a beautiful painting", "1024x1792", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage failed: %v", err)
 	}
@@ -791,7 +793,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	// 1. Invalid URL / POST fails
 	backendBad := NewGoogleBackend("mock-key", "model")
 	backendBad.apiURL = "http:// [invalid-url]"
-	_, _, err := backendBad.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err := backendBad.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with invalid URL, got nil")
 	}
@@ -804,7 +806,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	defer errServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", errServer.URL)
 	backendErr := NewGoogleBackend("mock-key", "model")
-	_, _, err = backendErr.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendErr.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with 500 status, got nil")
 	}
@@ -816,7 +818,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	defer badJsonServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", badJsonServer.URL)
 	backendBadJson := NewGoogleBackend("mock-key", "model")
-	_, _, err = backendBadJson.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendBadJson.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with bad json response, got nil")
 	}
@@ -828,7 +830,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	defer missingPredServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", missingPredServer.URL)
 	backendMissingPred := NewGoogleBackend("mock-key", "model")
-	_, _, err = backendMissingPred.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendMissingPred.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with empty predictions, got nil")
 	}
@@ -840,7 +842,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	defer badFormatServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", badFormatServer.URL)
 	backendBadFormat := NewGoogleBackend("mock-key", "model")
-	_, _, err = backendBadFormat.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendBadFormat.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with invalid prediction format, got nil")
 	}
@@ -852,7 +854,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	defer missingBytesServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", missingBytesServer.URL)
 	backendMissingBytes := NewGoogleBackend("mock-key", "model")
-	_, _, err = backendMissingBytes.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendMissingBytes.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with missing base64 bytes, got nil")
 	}
@@ -864,7 +866,7 @@ func TestGoogleBackend_Errors(t *testing.T) {
 	defer badBase64Server.Close()
 	t.Setenv("GOOGLE_BASE_URL", badBase64Server.URL)
 	backendBadBase64 := NewGoogleBackend("mock-key", "model")
-	_, _, err = backendBadBase64.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendBadBase64.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with invalid base64 encoding, got nil")
 	}
@@ -996,7 +998,7 @@ func TestVeoBackend_Success(t *testing.T) {
 		t.Fatalf("failed to create VeoBackend: %v", err)
 	}
 
-	videoBytes, mimeType, err := backend.GenerateImage(context.Background(), "a flying bird", "1792x1024")
+	videoBytes, mimeType, err := backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", "", nil)
 	if err != nil {
 		t.Fatalf("GenerateImage failed: %v", err)
 	}
@@ -1015,7 +1017,7 @@ func TestVeoBackend_Errors(t *testing.T) {
 		t.Fatalf("failed to initialize: %v", err)
 	}
 	backendBad.apiURL = "http:// [invalid-url]"
-	_, _, err = backendBad.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendBad.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with invalid URL, got nil")
 	}
@@ -1028,7 +1030,7 @@ func TestVeoBackend_Errors(t *testing.T) {
 	defer errServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", errServer.URL)
 	backendErr, _ := NewVeoBackend("mock-key", "model", "1ms", "10ms")
-	_, _, err = backendErr.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendErr.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with 500 status on initiate, got nil")
 	}
@@ -1040,7 +1042,7 @@ func TestVeoBackend_Errors(t *testing.T) {
 	defer missingNameServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", missingNameServer.URL)
 	backendMissingName, _ := NewVeoBackend("mock-key", "model", "1ms", "10ms")
-	_, _, err = backendMissingName.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendMissingName.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error with missing name, got nil")
 	}
@@ -1057,7 +1059,7 @@ func TestVeoBackend_Errors(t *testing.T) {
 	defer opErrServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", opErrServer.URL)
 	backendOpErr, _ := NewVeoBackend("mock-key", "model", "1ms", "100ms")
-	_, _, err = backendOpErr.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendOpErr.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected error when operation fails, got nil")
 	}
@@ -1073,7 +1075,7 @@ func TestVeoBackend_Errors(t *testing.T) {
 	defer pollingTimeoutServer.Close()
 	t.Setenv("GOOGLE_BASE_URL", pollingTimeoutServer.URL)
 	backendTimeout, _ := NewVeoBackend("mock-key", "model", "1ms", "5ms")
-	_, _, err = backendTimeout.GenerateImage(context.Background(), "prompt", "1024x1024")
+	_, _, err = backendTimeout.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
 	if err == nil {
 		t.Error("expected polling timeout error, got nil")
 	}
@@ -1149,13 +1151,13 @@ func TestVeoBackend_DetailedErrors(t *testing.T) {
 	defer s1.Close()
 	t.Setenv("GOOGLE_BASE_URL", s1.URL)
 	b1, _ := NewVeoBackend("key", "model", "1ms", "100ms")
-	_, _ = b1.initiateVeo(context.Background(), "prompt", "1024x1792")
-	_, _ = b1.initiateVeo(context.Background(), "prompt", "1024x1024")
+	_, _ = b1.initiateVeo(context.Background(), "prompt", "1024x1792", "", nil)
+	_, _ = b1.initiateVeo(context.Background(), "prompt", "1024x1024", "", nil)
 
 	// 2. NewRequestWithContext invalid URL (for initiate)
 	b2, _ := NewVeoBackend("key", "model", "1ms", "100ms")
 	b2.apiURL = "http:// [invalid-url]"
-	_, _ = b2.initiateVeo(context.Background(), "prompt", "")
+	_, _ = b2.initiateVeo(context.Background(), "prompt", "", "", nil)
 
 	// 3. Initiate JSON unmarshal error
 	s3 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1164,7 +1166,7 @@ func TestVeoBackend_DetailedErrors(t *testing.T) {
 	defer s3.Close()
 	t.Setenv("GOOGLE_BASE_URL", s3.URL)
 	b3, _ := NewVeoBackend("key", "model", "1ms", "100ms")
-	_, _ = b3.initiateVeo(context.Background(), "prompt", "")
+	_, _ = b3.initiateVeo(context.Background(), "prompt", "", "", nil)
 
 	// 4. pollOnceVeo - HTTP request creation error
 	b4, _ := NewVeoBackend("key", "model", "1ms", "100ms")
@@ -1431,5 +1433,332 @@ func TestImageGenService_GetRequestTimeout(t *testing.T) {
 				t.Errorf("expected %v, got %v", tc.expected, got)
 			}
 		})
+	}
+}
+
+func TestGoogleBackend_CharacterReference(t *testing.T) {
+	expectedBytes := []byte("google-image-bytes-cref")
+	b64Data := base64.StdEncoding.EncodeToString(expectedBytes)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Instances []struct {
+				Prompt string `json:"prompt"`
+			} `json:"instances"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+		}
+
+		expectedPrompt := "[Character Reference: http://example.com/cref.png] a beautiful painting"
+		if len(req.Instances) == 0 || req.Instances[0].Prompt != expectedPrompt {
+			t.Errorf("expected prompt %q, got %q", expectedPrompt, req.Instances[0].Prompt)
+		}
+
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{
+					"bytesBase64Encoded": b64Data,
+					"mimeType":           "image/jpeg",
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend := NewGoogleBackend("mock-key", "imagen-3.0-generate-002")
+
+	imgBytes, _, err := backend.GenerateImage(context.Background(), "a beautiful painting", "1024x1792", "http://example.com/cref.png", nil)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+	if string(imgBytes) != string(expectedBytes) {
+		t.Errorf("expected bytes %q, got %q", string(expectedBytes), string(imgBytes))
+	}
+}
+
+func TestVeoBackend_CharacterReference_GCS(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			var req struct {
+				Instances []struct {
+					Prompt string `json:"prompt"`
+					Image  struct {
+						GCSURI string `json:"gcsUri"`
+					} `json:"image"`
+				} `json:"instances"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Errorf("failed to decode request body: %v", err)
+			}
+
+			if req.Instances[0].Image.GCSURI != "gs://my-bucket/char.png" {
+				t.Errorf("expected GCS URI gs://my-bucket/char.png, got %s", req.Instances[0].Image.GCSURI)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"operations/veo-op-cref-gcs"}`))
+			return
+		}
+		if r.Method == "GET" {
+			respJSON := `{"name": "operations/veo-op-cref-gcs", "done": true, "response": {"generatedVideos": [{"video": {"uri": "http://example.com/file.mp4"}}]}}`
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(respJSON))
+			return
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	// Mock downloadVideo method to return mock bytes, while routing other calls to standard transport
+	backend.client = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "files") || strings.Contains(req.URL.Query().Get("alt"), "media") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("mock-video-bytes"))),
+					Header:     make(http.Header),
+				}, nil
+			}
+			return http.DefaultTransport.RoundTrip(req)
+		}),
+	}
+
+	videoBytes, _, err := backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", "gs://my-bucket/char.png", nil)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+	if string(videoBytes) != "mock-video-bytes" {
+		t.Errorf("expected video bytes 'mock-video-bytes', got %s", string(videoBytes))
+	}
+}
+
+type roundTripFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+//nolint:gocognit // test structure adds complexity
+func TestVeoBackend_CharacterReference_HTTP(t *testing.T) {
+	imageServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("mock-image-data"))
+	}))
+	defer imageServer.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			var req struct {
+				Instances []struct {
+					Prompt string `json:"prompt"`
+					Image  struct {
+						ImageBytes string `json:"imageBytes"`
+						MIMEType   string `json:"mimeType"`
+					} `json:"image"`
+				} `json:"instances"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Errorf("failed to decode request body: %v", err)
+			}
+
+			expectedB64 := base64.StdEncoding.EncodeToString([]byte("mock-image-data"))
+			if req.Instances[0].Image.ImageBytes != expectedB64 {
+				t.Errorf("expected base64 image bytes, got %s", req.Instances[0].Image.ImageBytes)
+			}
+			if req.Instances[0].Image.MIMEType != "image/png" {
+				t.Errorf("expected mimeType image/png, got %s", req.Instances[0].Image.MIMEType)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"operations/veo-op-cref-http"}`))
+			return
+		}
+		if r.Method == "GET" {
+			respJSON := `{"name": "operations/veo-op-cref-http", "done": true, "response": {"generatedVideos": [{"video": {"uri": "http://example.com/file.mp4"}}]}}`
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(respJSON))
+			return
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	backend.client = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "/operations") || strings.Contains(req.URL.Path, "predictLongRunning") {
+				return http.DefaultTransport.RoundTrip(req)
+			}
+			if strings.Contains(req.URL.String(), "file.mp4") {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader([]byte("mock-video-bytes"))),
+					Header:     make(http.Header),
+				}, nil
+			}
+			// Otherwise request image
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader([]byte("mock-image-data"))),
+				Header: http.Header{
+					"Content-Type": []string{"image/png"},
+				},
+			}, nil
+		}),
+	}
+
+	videoBytes, _, err := backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", imageServer.URL+"/char.png", nil)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+	if string(videoBytes) != "mock-video-bytes" {
+		t.Errorf("expected video bytes 'mock-video-bytes', got %s", string(videoBytes))
+	}
+}
+
+func TestVeoBackend_CharacterReference_InvalidScheme(t *testing.T) {
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	_, _, err = backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", "ftp://example.com/char.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid cref_url") {
+		t.Errorf("expected error with invalid URL scheme, got %v", err)
+	}
+}
+
+func TestVeoBackend_CharacterReference_TooLarge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		zeros := make([]byte, 1024*1024)
+		for i := 0; i < 10; i++ {
+			_, _ = w.Write(zeros)
+		}
+		_, _ = w.Write([]byte("extra-bytes"))
+	}))
+	defer server.Close()
+
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	_, _, err = backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", server.URL+"/large.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "image exceeds maximum allowed size") {
+		t.Errorf("expected error about maximum allowed size, got %v", err)
+	}
+}
+
+func TestGoogleBackend_CharacterWeightWarning(t *testing.T) {
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	expectedBytes := []byte("google-image-bytes-cref")
+	b64Data := base64.StdEncoding.EncodeToString(expectedBytes)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{
+					"bytesBase64Encoded": b64Data,
+					"mimeType":           "image/jpeg",
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend := NewGoogleBackend("mock-key", "imagen-3.0-generate-002")
+
+	cw := 50
+	_, _, err := backend.GenerateImage(context.Background(), "a beautiful painting", "1024x1792", "", &cw)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	expectedWarning := "Warning: Google Imagen backend does not support character weight adjustment; parameter will be ignored."
+	if !strings.Contains(output, expectedWarning) {
+		t.Errorf("expected stderr warning %q, got %q", expectedWarning, output)
+	}
+}
+
+func TestVeoBackend_CharacterWeightWarning(t *testing.T) {
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"operations/veo-op-cw-test"}`))
+			return
+		}
+		if r.Method == "GET" {
+			respJSON := `{"name": "operations/veo-op-cw-test", "done": true, "response": {"generatedVideos": [{"video": {"uri": "http://example.com/file.mp4"}}]}}`
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(respJSON))
+			return
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	backend.client = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "/operations") || strings.Contains(req.URL.Path, "predictLongRunning") {
+				return http.DefaultTransport.RoundTrip(req)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader([]byte("mock-video-bytes"))),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	cw := 50
+	_, _, err = backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", "", &cw)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	expectedWarning := "Warning: Google Veo backend does not support character weight adjustment; parameter will be ignored."
+	if !strings.Contains(output, expectedWarning) {
+		t.Errorf("expected stderr warning %q, got %q", expectedWarning, output)
 	}
 }
