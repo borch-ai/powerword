@@ -1005,10 +1005,10 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 
 	caps := s.GetCapabilities()
 	if crefURL != "" && !caps.SupportsCref {
-		return "", fmt.Errorf("character reference (cref_url) is not supported by the active imagegen backend")
+		return "", fmt.Errorf("character reference (cref_url) is not supported by the active imagegen backend %q", caps.Backend)
 	}
 	if srefURL != "" && !caps.SupportsSref {
-		return "", fmt.Errorf("style reference (sref_url) is not supported by the active imagegen backend")
+		return "", fmt.Errorf("style reference (sref_url) is not supported by the active imagegen backend %q", caps.Backend)
 	}
 
 	backend := strings.ToLower(s.cfg.Plugins.ImageGen.Backend)

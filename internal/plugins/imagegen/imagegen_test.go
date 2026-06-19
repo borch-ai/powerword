@@ -1765,23 +1765,24 @@ func TestVeoBackend_CharacterWeightWarning(t *testing.T) {
 
 func TestGetCapabilities(t *testing.T) {
 	tests := []struct {
+		name         string
 		backend      string
 		wantCref     bool
 		wantSref     bool
 		expectedName string
 	}{
-		{"", false, false, "openai"},
-		{"openai", false, false, "openai"},
-		{"midjourney", true, true, "midjourney"},
-		{"google", true, false, "google"},
-		{"imagen", true, false, "imagen"},
-		{"veo", true, false, "veo"},
-		{"google-veo", true, false, "google-veo"},
-		{"unsupported", false, false, "unsupported"},
+		{"default_empty", "", false, false, "openai"},
+		{"openai", "openai", false, false, "openai"},
+		{"midjourney", "midjourney", true, true, "midjourney"},
+		{"google", "google", true, false, "google"},
+		{"imagen", "imagen", true, false, "imagen"},
+		{"veo", "veo", true, false, "veo"},
+		{"google-veo", "google-veo", true, false, "google-veo"},
+		{"unsupported", "unsupported", false, false, "unsupported"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.backend, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			cfg := &config.Config{
 				Plugins: config.PluginsConfig{
 					ImageGen: config.ImageGenConfig{

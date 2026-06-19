@@ -163,7 +163,7 @@ backend = "openai"
 	}
 
 	// 1.5 CallTool to get capabilities
-	resultCaps, err := client.CallTool(ctx, "imagegen_get_capabilities", nil)
+	resultCaps, err := client.CallTool(ctx, "imagegen_get_capabilities", map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("failed to call imagegen_get_capabilities tool: %v", err)
 	}
