@@ -121,10 +121,10 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)**
     *   Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to check that print-ready PDF files do not exceed maximum ink density limits (e.g. 240% for KDP paperbacks), preventing smudging and press tearing.
     *   [Implementation Plan](plans/phase_3/task_3_20_pdfcheck_ink_coverage.md)
-*   [ ] **Task 3.21: Typst Per-Page Layout Overrides (`pw-mcp-typst`)**
+*   [x] **Task 3.21: Typst Per-Page Layout Overrides (`pw-mcp-typst`)**
     *   Extend `pw-mcp-typst`'s `ParseManuscript` parser and template compilation to support per-page layout configuration via comments (e.g. `<!-- Layout: <type> -->`) inside the Markdown manuscript.
     *   [Implementation Plan](plans/phase_3/task_3_21_typst_per_page_layouts.md)
-*   [ ] **Task 3.22: YouTube Integration Plugin (`pw-mcp-youtube`)**
+*   [x] **Task 3.22: YouTube Integration Plugin (`pw-mcp-youtube`)**
     *   Implement a native Go MCP server exposing tools to interface with YouTube APIs (video uploads, metadata customization, and analytics fetching).
     *   [Implementation Plan](plans/phase_3/task_3_22_youtube_mcp.md)
 *   [ ] **Task 3.23: Digital Music Distribution Helper (`pw-mcp-music`)**
