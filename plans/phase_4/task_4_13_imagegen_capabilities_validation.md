@@ -9,7 +9,7 @@ This task introduces capability queries and input validation checks to the `pw-m
 ## User Review Required
 
 > [!IMPORTANT]
-> **Validation Policy:** Calling `imagegen_generate` with unsupported arguments (e.g. providing `cref_url` when the active backend is `google` or `openai`) will return an explicit tool execution error rather than silently ignoring the input parameters.
+> **Validation Policy:** Calling `imagegen_generate` with unsupported arguments (e.g. providing `cref_url` when the active backend is `openai` or style reference/sref when the active backend is `google`) will return an explicit tool execution error rather than silently ignoring the input parameters.
 
 ---
 
@@ -27,8 +27,7 @@ This task introduces capability queries and input validation checks to the `pw-m
   }
   ```
 - Implement `GetCapabilities() Capabilities` on the `ImageGenService` struct:
-  * Read the active backend from config.
-  * Map capabilities (e.g. `supports_cref` and `supports_sref` are `true` for `midjourney`, and `false` for others until native support is implemented).
+  * Map capabilities: `supports_cref` is `true` for `midjourney`, `google`/`imagen`, and `veo` backends; `supports_sref` is `true` for `midjourney` (and `false` for others).
 - Modify the `GenerateImage` method to perform a pre-flight validation check:
   * If the caller provides `crefURL` but `GetCapabilities().SupportsCref` is false, return an error: `"character reference (cref_url) is not supported by the active imagegen backend"`
   * If the caller provides a style ID that registers style references (`sref`) but `GetCapabilities().SupportsSref` is false, return an error.

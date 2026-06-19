@@ -1628,3 +1628,137 @@ func TestVeoBackend_CharacterReference_HTTP(t *testing.T) {
 		t.Errorf("expected video bytes 'mock-video-bytes', got %s", string(videoBytes))
 	}
 }
+
+func TestVeoBackend_CharacterReference_InvalidScheme(t *testing.T) {
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	_, _, err = backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", "ftp://example.com/char.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "invalid cref_url") {
+		t.Errorf("expected error with invalid URL scheme, got %v", err)
+	}
+}
+
+func TestVeoBackend_CharacterReference_TooLarge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		zeros := make([]byte, 1024*1024)
+		for i := 0; i < 10; i++ {
+			_, _ = w.Write(zeros)
+		}
+		_, _ = w.Write([]byte("extra-bytes"))
+	}))
+	defer server.Close()
+
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	_, _, err = backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", server.URL+"/large.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "image exceeds maximum allowed size") {
+		t.Errorf("expected error about maximum allowed size, got %v", err)
+	}
+}
+
+func TestGoogleBackend_CharacterWeightWarning(t *testing.T) {
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	expectedBytes := []byte("google-image-bytes-cref")
+	b64Data := base64.StdEncoding.EncodeToString(expectedBytes)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{
+					"bytesBase64Encoded": b64Data,
+					"mimeType":           "image/jpeg",
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend := NewGoogleBackend("mock-key", "imagen-3.0-generate-002")
+
+	cw := 50
+	_, _, err := backend.GenerateImage(context.Background(), "a beautiful painting", "1024x1792", "", &cw)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	expectedWarning := "Warning: Google Imagen backend does not support character weight adjustment; parameter will be ignored."
+	if !strings.Contains(output, expectedWarning) {
+		t.Errorf("expected stderr warning %q, got %q", expectedWarning, output)
+	}
+}
+
+func TestVeoBackend_CharacterWeightWarning(t *testing.T) {
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"name":"operations/veo-op-cw-test"}`))
+			return
+		}
+		if r.Method == "GET" {
+			respJSON := `{"name": "operations/veo-op-cw-test", "done": true, "response": {"generatedVideos": [{"video": {"uri": "http://example.com/file.mp4"}}]}}`
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(respJSON))
+			return
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend, err := NewVeoBackend("mock-key", "veo-2.0-generate-001", "1ms", "1s")
+	if err != nil {
+		t.Fatalf("failed to create VeoBackend: %v", err)
+	}
+
+	backend.client = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "/operations") || strings.Contains(req.URL.Path, "predictLongRunning") {
+				return http.DefaultTransport.RoundTrip(req)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader([]byte("mock-video-bytes"))),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	cw := 50
+	_, _, err = backend.GenerateImage(context.Background(), "a flying bird", "1792x1024", "", &cw)
+	if err != nil {
+		t.Fatalf("GenerateImage failed: %v", err)
+	}
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	expectedWarning := "Warning: Google Veo backend does not support character weight adjustment; parameter will be ignored."
+	if !strings.Contains(output, expectedWarning) {
+		t.Errorf("expected stderr warning %q, got %q", expectedWarning, output)
+	}
+}

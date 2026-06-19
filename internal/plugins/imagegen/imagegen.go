@@ -204,6 +204,10 @@ func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size s
 		prompt = fmt.Sprintf("[Character Reference: %s] %s", crefURL, prompt)
 	}
 
+	if characterWeight != nil {
+		fmt.Fprintln(os.Stderr, "Warning: Google Imagen backend does not support character weight adjustment; parameter will be ignored.")
+	}
+
 	payload := map[string]interface{}{
 		"instances": []map[string]string{
 			{
@@ -244,8 +248,12 @@ func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size s
 		return nil, "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	return parseGooglePrediction(bodyBytes)
+}
+
+func parseGooglePrediction(bodyBytes []byte) ([]byte, string, error) {
 	var responseMap map[string]interface{}
-	err = json.Unmarshal(bodyBytes, &responseMap)
+	err := json.Unmarshal(bodyBytes, &responseMap)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to decode Google response: %w", err)
 	}
@@ -389,9 +397,15 @@ func (b *VeoBackend) downloadImageBytes(ctx context.Context, urlStr string) ([]b
 		return nil, "", fmt.Errorf("failed to download image, status %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	// Limit image download size to 10MB to prevent DoS
+	const maxDownloadSize = 10 * 1024 * 1024
+	limitReader := io.LimitReader(resp.Body, maxDownloadSize+1)
+	data, err := io.ReadAll(limitReader)
 	if err != nil {
 		return nil, "", err
+	}
+	if len(data) > maxDownloadSize {
+		return nil, "", fmt.Errorf("image exceeds maximum allowed size of %d bytes", maxDownloadSize)
 	}
 
 	contentType := resp.Header.Get("Content-Type")
@@ -406,6 +420,10 @@ func (b *VeoBackend) resolveReferenceImage(ctx context.Context, crefURL string) 
 		return map[string]interface{}{
 			"gcsUri": crefURL,
 		}, nil
+	}
+	u, err := url.Parse(crefURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, fmt.Errorf("invalid cref_url: must be a valid HTTP or HTTPS URL or a gs:// URI")
 	}
 	imageBytes, contentType, err := b.downloadImageBytes(ctx, crefURL)
 	if err != nil {
@@ -428,6 +446,10 @@ func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string, crefU
 
 	instance := map[string]interface{}{
 		"prompt": prompt,
+	}
+
+	if characterWeight != nil {
+		fmt.Fprintln(os.Stderr, "Warning: Google Veo backend does not support character weight adjustment; parameter will be ignored.")
 	}
 
 	if crefURL != "" {
