@@ -376,3 +376,103 @@ func TestMCP_PdfcheckPlugin_Margins(t *testing.T) {
 		t.Errorf("expected bottom margin violation error, got errors: %v", resp.Errors)
 	}
 }
+
+func TestMCP_PdfcheckPlugin_InkCoverage(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	workspaceDir, err := os.MkdirTemp("", "pw-pdfcheck-workspace-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	pdfBytes := createMinimalPDFBytesHelper()
+	pdfPath := filepath.Join(workspaceDir, "test.pdf")
+	if err := os.WriteFile(pdfPath, pdfBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir, "PATH=" + os.Getenv("PATH")},
+	}
+
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-pdfcheck", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() {
+		_ = sp.GracefulShutdown(1 * time.Second)
+	}()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	// Case A: Valid MaxInkCoverage on a white/blank PDF
+	args := map[string]interface{}{
+		"pdf_path":               pdfPath,
+		"expected_width_inches":  6.0,
+		"expected_height_inches": 9.0,
+		"max_ink_coverage":       240,
+	}
+	result, err := client.CallTool(ctx, "validate_pdf", args)
+	if err != nil {
+		t.Fatalf("failed to call validate_pdf tool: %v", err)
+	}
+
+	if result.IsError {
+		t.Fatalf("tool execution returned error: %v", result)
+	}
+
+	var contentStr string
+	if txt, ok := result.Content[0].(*sdkMcp.TextContent); ok {
+		contentStr = txt.Text
+	} else {
+		contentStr = fmt.Sprint(result.Content[0])
+	}
+
+	type validationResponse struct {
+		Valid    bool     `json:"valid"`
+		Errors   []string `json:"errors"`
+		Warnings []string `json:"warnings"`
+	}
+
+	var resp validationResponse
+	if err := json.Unmarshal([]byte(contentStr), &resp); err != nil {
+		t.Fatalf("failed to unmarshal validation verdict: %v", err)
+	}
+
+	if !resp.Valid {
+		t.Errorf("expected blank PDF to be valid for ink density check, got errors: %v", resp.Errors)
+	}
+
+	// Case B: Invalid MaxInkCoverage parameter (out of bounds)
+	badArgs := map[string]interface{}{
+		"pdf_path":               pdfPath,
+		"expected_width_inches":  6.0,
+		"expected_height_inches": 9.0,
+		"max_ink_coverage":       -5,
+	}
+	badResult, err := client.CallTool(ctx, "validate_pdf", badArgs)
+	if err != nil {
+		t.Fatalf("failed to call validate_pdf tool with bad args: %v", err)
+	}
+
+	if !badResult.IsError {
+		t.Error("expected error response for invalid max_ink_coverage, got none")
+	}
+
+	var badContentStr string
+	if txt, ok := badResult.Content[0].(*sdkMcp.TextContent); ok {
+		badContentStr = txt.Text
+	} else {
+		badContentStr = fmt.Sprint(badResult.Content[0])
+	}
+
+	if !strings.Contains(badContentStr, "max_ink_coverage parameter must be between 0 and 400") {
+		t.Errorf("expected error message to contain 'between 0 and 400', got: %s", badContentStr)
+	}
+}

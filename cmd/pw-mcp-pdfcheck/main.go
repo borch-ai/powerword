@@ -103,6 +103,12 @@ const validatePDFSchema = `{
 			"type": "number",
 			"minimum": 0,
 			"description": "Optional minimum top, bottom, and outer margin in inches."
+		},
+		"max_ink_coverage": {
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 400,
+			"description": "Optional maximum ink coverage percentage limit. Defaults to 240."
 		}
 	},
 	"required": ["pdf_path", "expected_width_inches", "expected_height_inches"]
@@ -205,6 +211,13 @@ func handleValidatePDF(ctx context.Context, req *mcp.CallToolRequest, workspaceR
 		return &mcp.CallToolResult{
 			IsError: true,
 			Content: []mcp.Content{&mcp.TextContent{Text: "min_margin_inches parameter must be non-negative"}},
+		}, nil
+	}
+
+	if args.MaxInkCoverage != nil && (*args.MaxInkCoverage < 0 || *args.MaxInkCoverage > 400) {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: "max_ink_coverage parameter must be between 0 and 400"}},
 		}, nil
 	}
 

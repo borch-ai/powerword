@@ -1,9 +1,9 @@
 # plan: Task 3.20: Total Area Coverage Ink Density Analyzer (`pw-mcp-pdfcheck`)
 
-**Status:** Open (Issue #TBD)
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-18
+**Unit Test Coverage:** 91.10% (statements)
 
 Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to check that print-ready PDF files do not exceed maximum ink density limits (e.g. 240% for KDP paperbacks), preventing smudging and press tearing.
 
