@@ -27,6 +27,13 @@ type StyleProfile struct {
 	SrefURL    string `json:"sref_url,omitempty"`
 }
 
+// Capabilities defines the features supported by the active imagegen backend.
+type Capabilities struct {
+	Backend      string `json:"backend"`
+	SupportsCref bool   `json:"supports_cref"`
+	SupportsSref bool   `json:"supports_sref"`
+}
+
 // StyleStore manages registered styles saved in the workspace.
 type StyleStore struct {
 	mu       sync.RWMutex
@@ -849,6 +856,27 @@ func NewImageGenService(workspaceRoot string, cfg *config.Config) *ImageGenServi
 	}
 }
 
+// GetCapabilities returns the features supported by the active imagegen backend.
+func (s *ImageGenService) GetCapabilities() Capabilities {
+	backend := strings.ToLower(s.cfg.Plugins.ImageGen.Backend)
+	if backend == "" {
+		backend = "openai"
+	}
+	var supportsCref, supportsSref bool
+	switch backend {
+	case "midjourney":
+		supportsCref = true
+		supportsSref = true
+	case "google", "imagen", "veo", "google-veo":
+		supportsCref = true
+	}
+	return Capabilities{
+		Backend:      backend,
+		SupportsCref: supportsCref,
+		SupportsSref: supportsSref,
+	}
+}
+
 func (s *ImageGenService) getRequestTimeout() time.Duration {
 	tStr := s.cfg.Plugins.ImageGen.RequestTimeout
 	if tStr == "" {
@@ -973,6 +1001,14 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 	finalPrompt, srefURL, err := s.resolvePrompt(prompt, styleID)
 	if err != nil {
 		return "", err
+	}
+
+	caps := s.GetCapabilities()
+	if crefURL != "" && !caps.SupportsCref {
+		return "", fmt.Errorf("character reference (cref_url) is not supported by the active imagegen backend")
+	}
+	if srefURL != "" && !caps.SupportsSref {
+		return "", fmt.Errorf("style reference (sref_url) is not supported by the active imagegen backend")
 	}
 
 	backend := strings.ToLower(s.cfg.Plugins.ImageGen.Backend)

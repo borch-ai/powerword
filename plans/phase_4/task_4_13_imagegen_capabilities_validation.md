@@ -1,8 +1,8 @@
 # plan: Task 4.13: ImageGen Capabilities Handshake and Validation
 
-**Status:** Pending
+**Status:** Completed
 **Go Version:** 1.26.4
-**Unit Test Coverage:** 91.0% (Target)
+**Unit Test Coverage:** 91.1% (Actual)
 
 This task introduces capability queries and input validation checks to the `pw-mcp-imagegen` server. When sibling projects query the generator, they should be able to determine feature compatibility (such as character or style reference support) dynamically and prevent failures during active production runs.
 
