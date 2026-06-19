@@ -173,7 +173,7 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.12: Google Veo & Imagen Character Seeding Support**
     *   Extend the `pw-mcp-imagegen` server's Google Veo and Imagen backends to support image-based references and character consistency. Route `crefURL` and `characterWeight` to the Google GenAI API where applicable (e.g. as a starting image frame for Veo or style reference/image-to-image input), or handle fallback consistency adjustments.
     *   [Implementation Plan](plans/phase_4/task_4_12_veo_character_reference_support.md)
-*   [ ] **Task 4.13: ImageGen Capabilities Handshake and Validation**
+*   [x] **Task 4.13: ImageGen Capabilities Handshake and Validation**
     *   Implement an `imagegen_get_capabilities` tool in the `pw-mcp-imagegen` server to expose active backend parameters (e.g. supports_cref). Validate generation arguments and return tool errors when unsupported options are passed.
     *   [Implementation Plan](plans/phase_4/task_4_13_imagegen_capabilities_validation.md)
 
