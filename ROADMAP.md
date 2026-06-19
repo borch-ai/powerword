@@ -176,6 +176,10 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.13: ImageGen Capabilities Handshake and Validation**
     *   Implement an `imagegen_get_capabilities` tool in the `pw-mcp-imagegen` server to expose active backend parameters (e.g. supports_cref). Validate generation arguments and return tool errors when unsupported options are passed.
     *   [Implementation Plan](plans/phase_4/task_4_13_imagegen_capabilities_validation.md)
+*   [ ] **Task 4.14: Model-Level Imagegen Capabilities Mapping & Overrides**
+    *   Refactor `ImageGenService.GetCapabilities()` to delegate capability mapping directly to the active backend instance. Update the Google backend capabilities logic to inspect the configured model (returning supports_cref = true for Veo and false for Imagen). Allow explicit overrides (force_cref/force_sref) in `ImageGenConfig` to bypass checks.
+    *   [Implementation Plan](plans/phase_4/task_4_14_imagegen_model_capabilities.md)
+
 
 ---
 
