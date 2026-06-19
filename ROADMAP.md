@@ -170,6 +170,12 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [ ] **Task 4.11: IAM Policies & Pre-flight API Verification (`pw-mcp-cloud`)**
     *   Add validation tools `cloud_verify_iam_roles` and `cloud_check_enabled_apis` to verify service accounts have permissions and that target GCP APIs are enabled.
     *   [Implementation Plan](plans/phase_4/task_4_11_iam_api_verification.md)
+*   [ ] **Task 4.12: Google Veo & Imagen Character Seeding Support**
+    *   Extend the `pw-mcp-imagegen` server's Google Veo and Imagen backends to support image-based references and character consistency. Route `crefURL` and `characterWeight` to the Google GenAI API where applicable (e.g. as a starting image frame for Veo or style reference/image-to-image input), or handle fallback consistency adjustments.
+    *   [Implementation Plan](plans/phase_4/task_4_12_veo_character_reference_support.md)
+*   [ ] **Task 4.13: ImageGen Capabilities Handshake and Validation**
+    *   Implement an `imagegen_get_capabilities` tool in the `pw-mcp-imagegen` server to expose active backend parameters (e.g. supports_cref). Validate generation arguments and return tool errors when unsupported options are passed.
+    *   [Implementation Plan](plans/phase_4/task_4_13_imagegen_capabilities_validation.md)
 
 ---
 
