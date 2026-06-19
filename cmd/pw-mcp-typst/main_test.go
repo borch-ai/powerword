@@ -339,6 +339,54 @@ func TestTypst_MCP_CompileInteriorLayoutValidationError(t *testing.T) {
 	assertResponse(t, res, true, "invalid layout")
 }
 
+func TestTypst_MCP_CompileInteriorPerPageLayoutValidationError(t *testing.T) {
+	tempDir := t.TempDir()
+
+	manuscriptPath := filepath.Join(tempDir, "manuscript.md")
+	manuscriptContent := `
+# Page 1
+<!-- Layout: invalid-layout-type -->
+## Text
+Stanza 1
+
+## Prompt
+Prompt 1
+`
+	if err := os.WriteFile(manuscriptPath, []byte(manuscriptContent), 0600); err != nil {
+		t.Fatalf("failed to write mock manuscript: %v", err)
+	}
+
+	imagesDir := filepath.Join(tempDir, "images")
+	if err := os.Mkdir(imagesDir, 0700); err != nil {
+		t.Fatalf("failed to create images dir: %v", err)
+	}
+
+	outputPath := filepath.Join(tempDir, "output.pdf")
+
+	session, ctx, cleanup := startTestServer(t, tempDir)
+	defer cleanup()
+
+	args := fmt.Sprintf(`{
+		"manuscript_path": %q,
+		"images_dir": %q,
+		"output_path": %q,
+		"page_size": "4in,4in",
+		"margin_inside": "0.5in",
+		"margin_outside": "0.5in",
+		"bleed": "0in"
+	}`, manuscriptPath, imagesDir, outputPath)
+
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "compile_interior",
+		Arguments: json.RawMessage(args),
+	})
+	if err != nil {
+		t.Fatalf("CallTool compile_interior per-page validation failed: %v", err)
+	}
+
+	assertResponse(t, res, true, "invalid per-page layout")
+}
+
 func TestTypst_MCP_CompileInteriorTypstLayoutValidationError(t *testing.T) {
 	tempDir := t.TempDir()
 	session, ctx, cleanup := startTestServer(t, tempDir)

@@ -179,15 +179,26 @@ func TestRenderTemplates(t *testing.T) {
 	// Test per-page layout overrides
 	params.Layout = "full-bleed"
 	params.Pages[0].Layout = "facing-pages"
+	params.Pages[0].ImagePath = "page_1.png"
 	params.Pages[1].Layout = "facing-pages-flipped"
+	params.Pages[1].ImagePath = "page_2.png"
 	overrideCode, err := RenderInterior(params)
 	if err != nil {
 		t.Fatalf("RenderInterior overrides failed: %v", err)
 	}
-	if !strings.Contains(overrideCode, `#page(background: none)`) ||
-		!strings.Contains(overrideCode, `image("page_1.png"`) ||
-		!strings.Contains(overrideCode, `Hello Page 2`) {
-		t.Errorf("Rendered overrides interior lacks expected elements:\n%s", overrideCode)
+
+	// For facing-pages (page 1), text (background: none) comes before image (page_1.png)
+	idxText1 := strings.Index(overrideCode, `#page(background: none)[`)
+	idxImage1 := strings.Index(overrideCode, `image("page_1.png"`)
+	if idxText1 == -1 || idxImage1 == -1 || idxText1 > idxImage1 {
+		t.Errorf("facing-pages layout override ordering or content mismatch: text index %d, image index %d", idxText1, idxImage1)
+	}
+
+	// For facing-pages-flipped (page 2), image (page_2.png) comes before text (background: none)
+	idxImage2 := strings.Index(overrideCode, `image("page_2.png"`)
+	idxText2 := strings.LastIndex(overrideCode, `#page(background: none)[`)
+	if idxText2 == -1 || idxImage2 == -1 || idxImage2 > idxText2 {
+		t.Errorf("facing-pages-flipped layout override ordering or content mismatch: image index %d, text index %d", idxImage2, idxText2)
 	}
 
 	// 2. Test Cover Template
