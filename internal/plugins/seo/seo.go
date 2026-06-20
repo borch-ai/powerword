@@ -79,7 +79,7 @@ type SEOService struct {
 	llmClient llm.LLMClient
 }
 
-// NewSEOService creates an instance of SEOService.
+// NewSEOService creates a new instance of SEOService to handle KDP SEO scraping, caching, and listing generation.
 func NewSEOService(cfg *config.Config) *SEOService {
 	if cfg == nil {
 		cfg = &config.Config{}
