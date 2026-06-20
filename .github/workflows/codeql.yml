@@ -12,7 +12,6 @@ on:
       - 'go.sum'
       - '.github/workflows/codeql.yml'
   schedule:
-    # Run once a week to catch any newly discovered vulnerabilities
     - cron: '0 0 * * 1'
 
 permissions:
@@ -21,40 +20,6 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze Code
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'go' ]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      # Set up Go with automatic dependency caching
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-          cache: true
-
-      # Initialize CodeQL tools
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          # Standard query suite (fastest and most reliable for PRs)
-          queries: security-auditing
-
-      # Compile the Go binaries automatically for analysis
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      # Perform the scanning analysis
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+    uses: borch-ai/.github/.github/workflows/codeql.yml@feature/add-codeql-workflow
+    with:
+      language: "go"
