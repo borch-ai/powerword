@@ -3,7 +3,7 @@
 **Status:** Completed
 **Go Version:** 1.26.4
 **Date Completed:** 2026-06-20
-**Unit Test Coverage:** 91.0%
+**Unit Test Coverage:** 91.1%
 
 Expand the integration test suite to include subprocess stdio tests for the remaining MCP servers (`pw-mcp-critic`, `pw-mcp-linter`, `pw-mcp-kdp-math`, `pw-mcp-seo`) and compiled CLI integration tests for `powerword review` and `powerword link-issue` subcommands using mock stub dependencies.
 
