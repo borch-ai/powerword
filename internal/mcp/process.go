@@ -29,9 +29,11 @@ func NewServerProcess(ctx context.Context, name string, cfg config.ServerConfig)
 		return nil, fmt.Errorf("server command cannot be empty")
 	}
 
-	// We don't use CommandContext here because we manage the termination manually
-	// to allow for a graceful shutdown, instead of aggressive killing on context cancellation.
-	//nolint:gosec,noctx // Command execution is intentional and from config, noctx is intentional
+	// exec.Command is used instead of exec.CommandContext intentionally: we manage process
+	// termination manually via GracefulShutdown/ForceKill rather than relying on context
+	// cancellation to kill the subprocess abruptly, which would prevent a clean MCP session close.
+	// G204: cfg.Command is loaded from the user's own powerword config file.
+	//nolint:gosec,noctx // G204: command from user config; noctx: manual lifecycle management via GracefulShutdown
 	cmd := exec.Command(cfg.Command, cfg.Args...)
 
 	if len(cfg.Env) > 0 {

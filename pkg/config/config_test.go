@@ -624,3 +624,66 @@ SERP_API_KEY=dotenv-serp-key
 		t.Errorf("expected OS environment variable to override .env, got '%s'", cfg.APIKeys.Gemini)
 	}
 }
+
+func TestLoadFromWorkspace_WithToml(t *testing.T) {
+	defer clearEnv()()
+	tmpDir := t.TempDir()
+
+	tomlContent := `
+[api_keys]
+gemini = "workspace-gemini-key"
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "powerword.toml"), []byte(tomlContent), 0600); err != nil {
+		t.Fatalf("failed to write powerword.toml: %v", err)
+	}
+
+	cfg, err := LoadFromWorkspace(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadFromWorkspace returned unexpected error: %v", err)
+	}
+	if cfg.APIKeys.Gemini != "workspace-gemini-key" {
+		t.Errorf("expected Gemini key 'workspace-gemini-key', got '%s'", cfg.APIKeys.Gemini)
+	}
+}
+
+func TestLoadFromWorkspace_NoToml_FallsBackToGlobal(t *testing.T) {
+	defer clearEnv()()
+	origPath := DefaultConfigPath
+	defer func() { DefaultConfigPath = origPath }()
+
+	// Point global config at a valid file
+	globalTmpDir := t.TempDir()
+	globalToml := filepath.Join(globalTmpDir, "global.toml")
+	if err := os.WriteFile(globalToml, []byte("[api_keys]\ngemini = \"global-key\"\n"), 0600); err != nil {
+		t.Fatalf("failed to write global toml: %v", err)
+	}
+	DefaultConfigPath = globalToml
+
+	workspaceTmpDir := t.TempDir() // no powerword.toml here
+
+	cfg, err := LoadFromWorkspace(workspaceTmpDir)
+	if err != nil {
+		t.Fatalf("LoadFromWorkspace returned unexpected error: %v", err)
+	}
+	if cfg.APIKeys.Gemini != "global-key" {
+		t.Errorf("expected fallback Gemini key 'global-key', got '%s'", cfg.APIKeys.Gemini)
+	}
+}
+
+func TestLoadFromWorkspace_NoToml_NoGlobal_ReturnsEmpty(t *testing.T) {
+	defer clearEnv()()
+	origPath := DefaultConfigPath
+	defer func() { DefaultConfigPath = origPath }()
+	DefaultConfigPath = filepath.Join(t.TempDir(), "nonexistent.toml")
+
+	workspaceTmpDir := t.TempDir() // no powerword.toml
+
+	cfg, err := LoadFromWorkspace(workspaceTmpDir)
+	if err != nil {
+		t.Fatalf("LoadFromWorkspace returned unexpected error: %v", err)
+	}
+	// Should return an empty config (not nil)
+	if cfg == nil {
+		t.Fatal("expected non-nil config, got nil")
+	}
+}

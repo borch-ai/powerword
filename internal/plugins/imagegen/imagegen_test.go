@@ -1562,8 +1562,8 @@ func TestVeoBackend_CharacterReference_HTTP(t *testing.T) {
 				Instances []struct {
 					Prompt string `json:"prompt"`
 					Image  struct {
-						ImageBytes string `json:"imageBytes"`
-						MIMEType   string `json:"mimeType"`
+						BytesBase64Encoded string `json:"bytesBase64Encoded"`
+						MIMEType           string `json:"mimeType"`
 					} `json:"image"`
 				} `json:"instances"`
 			}
@@ -1572,8 +1572,8 @@ func TestVeoBackend_CharacterReference_HTTP(t *testing.T) {
 			}
 
 			expectedB64 := base64.StdEncoding.EncodeToString([]byte("mock-image-data"))
-			if req.Instances[0].Image.ImageBytes != expectedB64 {
-				t.Errorf("expected base64 image bytes, got %s", req.Instances[0].Image.ImageBytes)
+			if req.Instances[0].Image.BytesBase64Encoded != expectedB64 {
+				t.Errorf("expected base64 image bytes, got %s", req.Instances[0].Image.BytesBase64Encoded)
 			}
 			if req.Instances[0].Image.MIMEType != "image/png" {
 				t.Errorf("expected mimeType image/png, got %s", req.Instances[0].Image.MIMEType)

@@ -92,7 +92,6 @@ func parseIssueBody(body string) (*Plan, error) {
 	return plan, nil
 }
 
-//nolint:gocognit,funlen,nestif
 func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error {
 	if plan == nil || cfg == nil {
 		return errors.New("VerifyWorkspace requires non-nil plan and cfg")
@@ -102,50 +101,16 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 		return err
 	}
 
-	validationCmd := ""
-	if checkMakefileExists() {
-		validationCmd = "make all"
-		if !cfg.EnableCritic {
-			fmt.Println("Running local validation (make all) directly...")
-		} else {
-			fmt.Println("Running local validation (make all) via MCP pw-mcp-critic...")
-		}
-	} else {
-		fmt.Println("No Makefile found, skipping local validation")
-	}
+	validationCmd := resolveValidationCmd(cfg)
 
 	if !cfg.EnableCritic {
 		fmt.Println("Critic LLM review is disabled in config. Skipping LLM review.")
-		if validationCmd != "" {
-			fields := strings.Fields(validationCmd)
-			if len(fields) > 0 {
-				valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
-				defer valCancel()
-				//nolint:gosec // execution is explicitly requested by the CLI configuration
-				cmd := execCommand(valCtx, fields[0], fields[1:]...)
-				cmd.Dir = "."
-				out, err := cmd.CombinedOutput()
-				if err != nil {
-					return fmt.Errorf("local validation command failed: %w\nOutput:\n%s", err, string(out))
-				}
-				fmt.Println(string(out))
-			}
-		}
-		return nil
+		return runLocalValidation(ctx, validationCmd)
 	}
 
-	srvCfg, ok := cfg.Servers["critic"]
-	if !ok {
-		cmd := "pw-mcp-critic"
-		if _, err := os.Stat("bin/pw-mcp-critic"); err == nil {
-			cmd = "./bin/pw-mcp-critic"
-		} else if _, err := exec.LookPath("pw-mcp-critic"); err != nil {
-			return fmt.Errorf("pw-mcp-critic not found in bin/ or PATH, run 'make all' first")
-		}
-		srvCfg = config.ServerConfig{
-			Command: cmd,
-			Args:    []string{},
-		}
+	srvCfg, err := resolveCriticServerConfig(cfg)
+	if err != nil {
+		return err
 	}
 
 	srv, err := internalmcp.NewServerProcess(ctx, "critic", srvCfg)
@@ -156,6 +121,66 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 		_ = srv.GracefulShutdown(time.Second * 5)
 	}()
 
+	output, err := invokeCriticTool(ctx, srv, plan, validationCmd)
+	if err != nil {
+		return err
+	}
+
+	return parseCriticVerdict(output)
+}
+
+// resolveValidationCmd returns the validation command string to run, based on whether a Makefile exists.
+func resolveValidationCmd(cfg *config.Config) string {
+	if !checkMakefileExists() {
+		fmt.Println("No Makefile found, skipping local validation")
+		return ""
+	}
+	if !cfg.EnableCritic {
+		fmt.Println("Running local validation (make all) directly...")
+	} else {
+		fmt.Println("Running local validation (make all) via MCP pw-mcp-critic...")
+	}
+	return "make all"
+}
+
+// runLocalValidation executes the validation command directly (without the MCP critic).
+func runLocalValidation(ctx context.Context, validationCmd string) error {
+	if validationCmd == "" {
+		return nil
+	}
+	fields := strings.Fields(validationCmd)
+	if len(fields) == 0 {
+		return nil
+	}
+	valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer valCancel()
+	//nolint:gosec // G204: execution is explicitly requested by the CLI configuration; command is statically "make all"
+	cmd := execCommand(valCtx, fields[0], fields[1:]...)
+	cmd.Dir = "."
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("local validation command failed: %w\nOutput:\n%s", err, string(out))
+	}
+	fmt.Println(string(out))
+	return nil
+}
+
+// resolveCriticServerConfig returns the server config for the critic MCP process.
+func resolveCriticServerConfig(cfg *config.Config) (config.ServerConfig, error) {
+	if srvCfg, ok := cfg.Servers["critic"]; ok {
+		return srvCfg, nil
+	}
+	cmd := "pw-mcp-critic"
+	if _, err := os.Stat("bin/pw-mcp-critic"); err == nil {
+		cmd = "./bin/pw-mcp-critic"
+	} else if _, err := exec.LookPath("pw-mcp-critic"); err != nil {
+		return config.ServerConfig{}, fmt.Errorf("pw-mcp-critic not found in bin/ or PATH, run 'make all' first")
+	}
+	return config.ServerConfig{Command: cmd, Args: []string{}}, nil
+}
+
+// invokeCriticTool calls the review_workspace MCP tool and returns the critic output text.
+func invokeCriticTool(ctx context.Context, srv *internalmcp.ServerProcess, plan *Plan, validationCmd string) (string, error) {
 	planContent := fmt.Sprintf("## Goal\n%s\n\n## Proposed Changes\n%s\n\n## Verification Plan\n%s\n",
 		plan.Goal, plan.Changes, plan.Verification)
 
@@ -165,41 +190,41 @@ func VerifyWorkspace(ctx context.Context, plan *Plan, cfg *config.Config) error 
 		"validation_command": validationCmd,
 	})
 	if err != nil {
-		return fmt.Errorf("critic analysis tool call failed: %w", err)
+		return "", fmt.Errorf("critic analysis tool call failed: %w", err)
 	}
 	if res.IsError {
-		var errMsg string
-		if len(res.Content) > 0 {
-			if tc, ok := res.Content[0].(*mcpsdk.TextContent); ok {
-				errMsg = tc.Text
-			}
-		}
+		errMsg := extractTextContent(res.Content)
 		if errMsg == "" {
 			errMsg = "critic server returned error"
 		}
 		_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Error\n\n%s\n", errMsg)), 0600)
-		return fmt.Errorf("critic analysis failed: %s", errMsg)
+		return "", fmt.Errorf("critic analysis failed: %s", errMsg)
 	}
 
-	var criticOutput string
-	if len(res.Content) > 0 {
-		if tc, ok := res.Content[0].(*mcpsdk.TextContent); ok {
-			criticOutput = tc.Text
+	output := extractTextContent(res.Content)
+	fmt.Println("\nCritic Feedback:")
+	fmt.Println(output)
+	_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Feedback\n\n%s\n", output)), 0600)
+	return output, nil
+}
+
+// extractTextContent extracts the text from the first TextContent in a slice of MCP content items.
+func extractTextContent(content []mcpsdk.Content) string {
+	if len(content) > 0 {
+		if tc, ok := content[0].(*mcpsdk.TextContent); ok {
+			return tc.Text
 		}
 	}
+	return ""
+}
 
-	fmt.Println("\nCritic Feedback:")
-	fmt.Println(criticOutput)
-
-	_ = os.WriteFile(".powerword-critic.md", []byte(fmt.Sprintf("# Critic Feedback\n\n%s\n", criticOutput)), 0600)
-
-	trimmedOutput := strings.TrimSpace(criticOutput)
-	trimmedOutput = strings.Trim(trimmedOutput, "*_`\"'\n\r\t")
-
-	if !strings.HasSuffix(trimmedOutput, "VERDICT: ACCEPT") {
+// parseCriticVerdict checks the critic output for a VERDICT: ACCEPT suffix.
+func parseCriticVerdict(output string) error {
+	trimmed := strings.TrimSpace(output)
+	trimmed = strings.Trim(trimmed, "*_`\"'\n\r\t")
+	if !strings.HasSuffix(trimmed, "VERDICT: ACCEPT") {
 		return fmt.Errorf("critic rejected the workspace changes")
 	}
-
 	_ = os.Remove(".powerword-critic.md")
 	return nil
 }

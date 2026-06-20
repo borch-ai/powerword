@@ -72,7 +72,7 @@ func (s *ViralService) generateTTSOpenAI(ctx context.Context, apiKey, model, voi
 		apiURL = baseURL + "/audio/speech"
 	}
 
-	//nolint:gosec // apiURL is validated or retrieved from trusted config/environment
+	//nolint:gosec // G107: apiURL is the OpenAI API endpoint, overridable via OPENAI_BASE_URL for testing
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OpenAI TTS request: %w", err)
@@ -81,8 +81,7 @@ func (s *ViralService) generateTTSOpenAI(ctx context.Context, apiKey, model, voi
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	//nolint:gosec // request is sent to verified OpenAI API resource
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req)
 	if err != nil {
 		return nil, fmt.Errorf("OpenAI TTS request failed: %w", err)
 	}
@@ -125,7 +124,7 @@ func (s *ViralService) generateTTSElevenLabs(ctx context.Context, apiKey, voiceI
 		apiURL = fmt.Sprintf("%s/v1/text-to-speech/%s", baseURL, voiceID)
 	}
 
-	//nolint:gosec // apiURL is validated or retrieved from trusted config/environment
+	//nolint:gosec // G107: apiURL is the ElevenLabs API endpoint, overridable via ELEVENLABS_BASE_URL for testing
 	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ElevenLabs TTS request: %w", err)
@@ -134,8 +133,7 @@ func (s *ViralService) generateTTSElevenLabs(ctx context.Context, apiKey, voiceI
 	req.Header.Set("xi-api-key", apiKey)
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	//nolint:gosec // request is sent to verified ElevenLabs API resource
-	resp, err := client.Do(req)
+	resp, err := doRequest(client, req)
 	if err != nil {
 		return nil, fmt.Errorf("ElevenLabs TTS request failed: %w", err)
 	}
@@ -154,6 +152,20 @@ func (s *ViralService) generateTTSElevenLabs(ctx context.Context, apiKey, voiceI
 	return audioBytes, nil
 }
 
+// runFFmpeg executes the ffmpeg binary with the given arguments, returning stderr on failure.
+// G204: ffmpegCmd is either "ffmpeg" (the system default) or a path from the user's own config.
+//
+//nolint:gosec // G204: ffmpegCmd is the system ffmpeg binary or a user-configured path
+func runFFmpeg(ctx context.Context, ffmpegCmd string, args []string) error {
+	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ffmpeg failed: %w, stderr: %s", err, stderr.String())
+	}
+	return nil
+}
+
 // runMockVideo generates a dummy video using ffmpeg or placeholder content.
 func (s *ViralService) runMockVideo(ctx context.Context, prompt, size string, outPath string) error {
 	ffmpegErr := checkFFmpeg(s.cfg.Plugins.Viral.FFmpegPath)
@@ -162,14 +174,14 @@ func (s *ViralService) runMockVideo(ctx context.Context, prompt, size string, ou
 		if ffmpegCmd == "" {
 			ffmpegCmd = "ffmpeg"
 		}
-		//nolint:gosec
-		cmd := exec.CommandContext(ctx, ffmpegCmd, "-y", "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=5", "-c:v", "libx264", "-pix_fmt", "yuv420p", outPath)
-		if runErr := cmd.Run(); runErr != nil {
+		args := []string{"-y", "-f", "lavfi", "-i", "color=c=blue:s=320x240:d=5", "-c:v", "libx264", "-pix_fmt", "yuv420p", outPath}
+		if runErr := runFFmpeg(ctx, ffmpegCmd, args); runErr != nil {
 			return fmt.Errorf("failed to run mock video generator command: %w", runErr)
 		}
 		return nil
 	}
 
+	_, _ = prompt, size // suppress unused parameter warnings
 	dummyData := []byte("mock-mp4-video-bytes-ffmpeg-not-installed")
 	if writeErr := os.WriteFile(outPath, dummyData, 0600); writeErr != nil {
 		return fmt.Errorf("failed to write dummy mock video file: %w", writeErr)
@@ -185,9 +197,8 @@ func (s *ViralService) generateTTSMock(ctx context.Context, filePath string) err
 		if ffmpegCmd == "" {
 			ffmpegCmd = "ffmpeg"
 		}
-		//nolint:gosec
-		cmd := exec.CommandContext(ctx, ffmpegCmd, "-y", "-f", "lavfi", "-i", "sine=frequency=1000:duration=5", "-c:a", "aac", filePath)
-		if runErr := cmd.Run(); runErr != nil {
+		args := []string{"-y", "-f", "lavfi", "-i", "sine=frequency=1000:duration=5", "-c:a", "aac", filePath}
+		if runErr := runFFmpeg(ctx, ffmpegCmd, args); runErr != nil {
 			return fmt.Errorf("failed to generate mock audio via ffmpeg: %w", runErr)
 		}
 		return nil
@@ -409,12 +420,8 @@ func (s *ViralService) StitchTrailer(ctx context.Context, videoPath, audioPath, 
 		}
 	}
 
-	//nolint:gosec
-	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("ffmpeg stitching failed: %w, stderr: %s", err, stderr.String())
+	if err := runFFmpeg(ctx, ffmpegCmd, args); err != nil {
+		return "", fmt.Errorf("ffmpeg stitching failed: %w", err)
 	}
 
 	return outputPath, nil
@@ -446,12 +453,8 @@ func renderSlide(ctx context.Context, ffmpegCmd string, i int, slide Slide, dir 
 		tempSegmentPath,
 	}
 
-	//nolint:gosec
-	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to render slide video segment %d: %w, stderr: %s", i, err, stderr.String())
+	if err := runFFmpeg(ctx, ffmpegCmd, args); err != nil {
+		return "", fmt.Errorf("failed to render slide video segment %d: %w", i, err)
 	}
 
 	return tempSegmentPath, nil
@@ -459,14 +462,14 @@ func renderSlide(ctx context.Context, ffmpegCmd string, i int, slide Slide, dir 
 
 // copyFile copies a file from src to dst.
 func copyFile(src, dst string) error {
-	//nolint:gosec
+	//nolint:gosec // G304: src/dst are internally constructed paths within the workspace
 	input, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = input.Close() }()
 
-	//nolint:gosec
+	//nolint:gosec // G304: dst is an internally constructed path within the workspace
 	output, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
@@ -520,15 +523,7 @@ func concatSegments(ctx context.Context, ffmpegCmd, concatListPath, mergedVideoP
 		"-c", "copy",
 		mergedVideoPath,
 	}
-
-	//nolint:gosec
-	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to concatenate slide segments: %w, stderr: %s", err, stderr.String())
-	}
-	return nil
+	return runFFmpeg(ctx, ffmpegCmd, args)
 }
 
 // finalizeOutput mixes optional background audio or copies the merged video to output.
@@ -550,14 +545,7 @@ func finalizeOutput(ctx context.Context, ffmpegCmd, mergedVideoPath, backgroundA
 		outputPath,
 	}
 
-	//nolint:gosec
-	cmd := exec.CommandContext(ctx, ffmpegCmd, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to mix background music: %w, stderr: %s", err, stderr.String())
-	}
-	return nil
+	return runFFmpeg(ctx, ffmpegCmd, args)
 }
 
 // StitchSlideshow renders temporary video segments for each slide, concatenates them, and mixes background audio.
@@ -629,4 +617,9 @@ func (s *ViralService) StitchSlideshow(ctx context.Context, slides []Slide, back
 	}
 
 	return outputPath, nil
+}
+
+//nolint:gosec // G704: client.Do executes request with dynamic but trusted API URL
+func doRequest(client *http.Client, req *http.Request) (*http.Response, error) {
+	return client.Do(req)
 }

@@ -61,7 +61,6 @@ func SetupServer(workspaceRoot string, cfg *config.Config) (*mcp.Server, error) 
 	return srv, nil
 }
 
-//nolint:gocognit,nestif
 func handleReviewWorkspace(workspaceRoot string, cfg *config.Config) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args struct {
@@ -80,50 +79,75 @@ func handleReviewWorkspace(workspaceRoot string, cfg *config.Config) func(contex
 		}
 
 		// 1. Run validation command if provided
-		var validationOutput string
-		if args.ValidationCommand != "" {
-			fields := strings.Fields(args.ValidationCommand)
-			if len(fields) > 0 {
-				valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
-				defer valCancel()
-
-				//nolint:gosec // execution is explicitly requested by the orchestrator/tool call
-				cmd := execCommand(valCtx, fields[0], fields[1:]...)
-				cmd.Dir = workspaceRoot
-				out, err := cmd.CombinedOutput()
-				if err != nil {
-					return &mcp.CallToolResult{
-						Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Validation command failed: %v\nOutput:\n%s\nVERDICT: REJECT", err, string(out))}},
-					}, nil
-				}
-				validationOutput = string(out)
-			}
-		}
-
-		// 2. Extract git diff using mockable ExtractGitDiff variable
-		diffStr, err := ExtractGitDiff(ctx, cfg)
-		if err != nil {
+		validationOutput, valErr := runValidationCommand(ctx, workspaceRoot, args.ValidationCommand)
+		if valErr != nil {
 			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to extract git diff: %v", err)}},
+				Content: []mcp.Content{&mcp.TextContent{Text: valErr.Error()}},
 			}, nil
 		}
 
-		diffStr = strings.TrimSpace(diffStr)
-		if len(diffStr) == 0 {
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{&mcp.TextContent{Text: "No local changes found to review.\nVERDICT: ACCEPT"}},
-			}, nil
+		// 2. Extract git diff
+		diffStr, diffResult := extractWorkspaceDiff(ctx, cfg)
+		if diffResult != nil {
+			return diffResult, nil
 		}
 
-		// Prevent 413 Payload Too Large errors by truncating extremely large diffs
-		const maxDiffLen = 100000 // roughly 25k tokens
-		if len(diffStr) > maxDiffLen {
-			diffStr = diffStr[:maxDiffLen] + "\n\n... [diff truncated due to size limits]"
-		}
+		// 3. Call LLM critic
+		return callCriticLLM(ctx, cfg, args.PlanContent, validationOutput, diffStr)
+	}
+}
 
-		// 3. Construct prompt
-		prompt := fmt.Sprintf(`You are a strict code reviewer. Review the following workspace diff against the implementation plan.
+// runValidationCommand executes the optional validation command and returns its output.
+// Returns an error result string if validation failed (not a Go error — caller returns it as a tool result).
+func runValidationCommand(ctx context.Context, workspaceRoot, validationCommand string) (string, error) {
+	if validationCommand == "" {
+		return "", nil
+	}
+	fields := strings.Fields(validationCommand)
+	if len(fields) == 0 {
+		return "", nil
+	}
+	valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer valCancel()
+	//nolint:gosec // G204: validationCommand is "make all" requested explicitly by the orchestrator/CLI configuration
+	cmd := execCommand(valCtx, fields[0], fields[1:]...)
+	cmd.Dir = workspaceRoot
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("validation command failed: %v\nOutput:\n%s\nVERDICT: REJECT", err, string(out))
+	}
+	return string(out), nil
+}
+
+// extractWorkspaceDiff extracts the current git diff and returns it.
+// If an early-exit tool result should be returned, the second return value is non-nil.
+func extractWorkspaceDiff(ctx context.Context, cfg *config.Config) (string, *mcp.CallToolResult) {
+	diffStr, err := ExtractGitDiff(ctx, cfg)
+	if err != nil {
+		return "", &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to extract git diff: %v", err)}},
+		}
+	}
+
+	diffStr = strings.TrimSpace(diffStr)
+	if len(diffStr) == 0 {
+		return "", &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: "No local changes found to review.\nVERDICT: ACCEPT"}},
+		}
+	}
+
+	// Prevent 413 Payload Too Large errors by truncating extremely large diffs
+	const maxDiffLen = 100000 // roughly 25k tokens
+	if len(diffStr) > maxDiffLen {
+		diffStr = diffStr[:maxDiffLen] + "\n\n... [diff truncated due to size limits]"
+	}
+	return diffStr, nil
+}
+
+// callCriticLLM builds the review prompt and invokes the critic LLM.
+func callCriticLLM(ctx context.Context, cfg *config.Config, planContent, validationOutput, diffStr string) (*mcp.CallToolResult, error) {
+	prompt := fmt.Sprintf(`You are a strict code reviewer. Review the following workspace diff against the implementation plan.
 
 Implementation Plan:
 %s
@@ -139,32 +163,30 @@ Important: The Git Diff may contain new or modified plan files under the "plans/
 If the Local Validation Output indicates a failure (e.g. compile or test errors), you MUST reject the changes.
 If there are any missing changes or issues, clearly list them and end your response with exactly "VERDICT: REJECT".
 If the diff fully implements the plan correctly and all validations pass, end your response with exactly "VERDICT: ACCEPT".`,
-			args.PlanContent, validationOutput, diffStr)
+		planContent, validationOutput, diffStr)
 
-		messages := []llm.Message{
-			{Role: llm.RoleSystem, Content: "You are an automated pre-push code critic."},
-			{Role: llm.RoleUser, Content: prompt},
-		}
+	messages := []llm.Message{
+		{Role: llm.RoleSystem, Content: "You are an automated pre-push code critic."},
+		{Role: llm.RoleUser, Content: prompt},
+	}
 
-		// 4. Call LLM
-		client, err := llm.NewCriticClient(cfg)
-		if err != nil {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to initialize critic LLM client: %v", err)}},
-			}, nil
-		}
-
-		resp, err := client.Generate(ctx, messages, nil)
-		if err != nil {
-			return &mcp.CallToolResult{
-				IsError: true,
-				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("critic analysis failed: %v", err)}},
-			}, nil
-		}
-
+	client, err := llm.NewCriticClient(cfg)
+	if err != nil {
 		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: resp.Content}},
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to initialize critic LLM client: %v", err)}},
 		}, nil
 	}
+
+	resp, err := client.Generate(ctx, messages, nil)
+	if err != nil {
+		return &mcp.CallToolResult{
+			IsError: true,
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("critic analysis failed: %v", err)}},
+		}, nil
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: resp.Content}},
+	}, nil
 }

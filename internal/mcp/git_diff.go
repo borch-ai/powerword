@@ -22,21 +22,10 @@ func SetExecCommand(f func(context.Context, string, ...string) *exec.Cmd) {
 }
 
 // ExtractGitDiff starts the external mcp git server and calls its tools to extract working and committed changes.
-//
-//nolint:gocognit,nestif
 func ExtractGitDiff(ctx context.Context, cfg *config.Config) (string, error) {
-	srvCfg, ok := cfg.Servers["git"]
-	if !ok {
-		cmd := "pw-mcp-git"
-		if _, err := statFile("bin/pw-mcp-git"); err == nil {
-			cmd = "./bin/pw-mcp-git"
-		} else if _, err := lookPath("pw-mcp-git"); err != nil {
-			return "", fmt.Errorf("pw-mcp-git not found in bin/ or PATH, run 'make all' first")
-		}
-		srvCfg = config.ServerConfig{
-			Command: cmd,
-			Args:    []string{},
-		}
+	srvCfg, err := resolveGitServerConfig(cfg)
+	if err != nil {
+		return "", err
 	}
 
 	srv, err := NewServerProcess(ctx, "git", srvCfg)
@@ -47,26 +36,9 @@ func ExtractGitDiff(ctx context.Context, cfg *config.Config) (string, error) {
 		_ = srv.GracefulShutdown(time.Second * 5)
 	}()
 
-	var diffBuilder strings.Builder
+	baseBranch := resolveBaseBranch(ctx)
 
-	baseBranch := "main"
-	// Check if there's an active PR and use its base
-	ghCmd := execCommand(ctx, "gh", "pr", "view", "--json", "baseRefName", "--jq", ".baseRefName")
-	out, ghErr := ghCmd.Output()
-	if ghErr == nil {
-		if b := strings.TrimSpace(string(out)); b != "" {
-			baseBranch = b
-		}
-	} else {
-		// Fallback to origin/main if main doesn't exist locally but origin/main does
-		gitCmd := execCommand(ctx, "git", "rev-parse", "--verify", "-q", "main")
-		if gitCmd.Run() != nil {
-			gitCmd2 := execCommand(ctx, "git", "rev-parse", "--verify", "-q", "origin/main")
-			if gitCmd2.Run() == nil {
-				baseBranch = "origin/main"
-			}
-		}
-	}
+	var diffBuilder strings.Builder
 
 	// 1. Get committed changes against base branch
 	resCommits, err := srv.Client().CallTool(ctx, "git_diff_commits", map[string]interface{}{"base": baseBranch, "head": "HEAD"})
@@ -99,4 +71,36 @@ func ExtractGitDiff(ctx context.Context, cfg *config.Config) (string, error) {
 	}
 
 	return strings.TrimSpace(diffBuilder.String()), nil
+}
+
+// resolveGitServerConfig returns the ServerConfig for the git MCP process.
+func resolveGitServerConfig(cfg *config.Config) (config.ServerConfig, error) {
+	if srvCfg, ok := cfg.Servers["git"]; ok {
+		return srvCfg, nil
+	}
+	cmd := "pw-mcp-git"
+	if _, err := statFile("bin/pw-mcp-git"); err == nil {
+		cmd = "./bin/pw-mcp-git"
+	} else if _, err := lookPath("pw-mcp-git"); err != nil {
+		return config.ServerConfig{}, fmt.Errorf("pw-mcp-git not found in bin/ or PATH, run 'make all' first")
+	}
+	return config.ServerConfig{Command: cmd, Args: []string{}}, nil
+}
+
+// resolveBaseBranch determines the base branch for diffing: prefers the GitHub PR base,
+// falls back to "main" or "origin/main" if no PR is active.
+func resolveBaseBranch(ctx context.Context) string {
+	ghCmd := execCommand(ctx, "gh", "pr", "view", "--json", "baseRefName", "--jq", ".baseRefName")
+	if out, err := ghCmd.Output(); err == nil {
+		if b := strings.TrimSpace(string(out)); b != "" {
+			return b
+		}
+	}
+	// Fallback: check if main exists locally, otherwise try origin/main
+	if execCommand(ctx, "git", "rev-parse", "--verify", "-q", "main").Run() != nil {
+		if execCommand(ctx, "git", "rev-parse", "--verify", "-q", "origin/main").Run() == nil {
+			return "origin/main"
+		}
+	}
+	return "main"
 }

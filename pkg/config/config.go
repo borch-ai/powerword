@@ -251,9 +251,25 @@ func bindEnv(v *viper.Viper, input ...string) {
 	}
 }
 
-// LoadConfig loads the configuration using Viper.
+// LoadFromWorkspace loads the configuration from a workspace root directory.
+// It looks for powerword.toml in the workspace root, falling back to the global
+// config and then an empty default config if neither is found.
+// G304: cfgPath is constructed from a validated workspaceRoot via filepath.Join.
 //
-//nolint:funlen // Config loading is inherently lengthy
+//nolint:gosec // G304: path is constructed from validated workspaceRoot via filepath.Join
+func LoadFromWorkspace(workspaceRoot string) (*Config, error) {
+	cfgPath := filepath.Join(workspaceRoot, "powerword.toml")
+	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
+		cfg, loadErr := LoadConfig("")
+		if loadErr != nil {
+			return &Config{}, nil
+		}
+		return cfg, nil
+	}
+	return LoadConfig(cfgPath)
+}
+
+// LoadConfig loads the configuration using Viper.
 func LoadConfig(cfgFile string) (*Config, error) {
 	if err := loadDotEnv(); err != nil {
 		return nil, err
@@ -275,7 +291,48 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 	v.SetConfigType("toml")
 
-	// Set default values
+	setDefaults(v)
+
+	// Read config files in order
+
+	readErr := readConfigFile(v, configFilesToTry, cfgFile)
+	if readErr != nil {
+		if cfgFile != "" {
+			return nil, readErr
+		}
+		if _, ok := readErr.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(readErr) {
+			return nil, readErr
+		}
+	}
+
+	bindEnvVars(v)
+
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Support legacy disable_critic key as a deprecated alias when enable_critic isn't explicitly set
+	if !v.IsSet("enable_critic") {
+		if v.IsSet("disable_critic") {
+			cfg.EnableCritic = !cfg.DisableCritic
+		}
+	}
+
+	return &cfg, nil
+}
+
+// Validate validates that the configuration is correct, specifically checking
+// if at least one API key is present.
+func (c *Config) Validate() error {
+	if c.APIKeys.Gemini == "" && c.APIKeys.OpenAI == "" && c.APIKeys.Anthropic == "" {
+		return errors.New("no API keys found; at least one of Gemini, OpenAI, or Anthropic API keys must be provided via config or environment variables")
+	}
+	return nil
+}
+
+// setDefaults registers all default configuration values on the given Viper instance.
+func setDefaults(v *viper.Viper) {
 	v.SetDefault("verbose", false)
 	v.SetDefault("model", "gemini-1.5-pro")
 	v.SetDefault("max_loop_iterations", 10)
@@ -308,20 +365,15 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	v.SetDefault("plugins.youtube.client_id", "")
 	v.SetDefault("plugins.youtube.client_secret", "")
 	v.SetDefault("plugins.youtube.refresh_token", "")
+}
 
-	// Read config files in order
-	readErr := readConfigFile(v, configFilesToTry, cfgFile)
-	if readErr != nil {
-		if cfgFile != "" {
-			return nil, readErr
-		}
-		if _, ok := readErr.(viper.ConfigFileNotFoundError); !ok && !os.IsNotExist(readErr) {
-			return nil, readErr
-		}
-	}
+// bindEnvVars binds all known environment variable overrides to their Viper config paths.
+func bindEnvVars(v *viper.Viper) {
+	bindBaseEnvVars(v)
+	bindPluginEnvVars(v)
+}
 
-	// Environment variable overrides
-	// Explicitly bind env vars to mapstructure path
+func bindBaseEnvVars(v *viper.Viper) {
 	bindEnv(v, "api_keys.gemini", "POWERWORD_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
 	bindEnv(v, "api_keys.openai", "POWERWORD_OPENAI_API_KEY", "OPENAI_API_KEY")
 	bindEnv(v, "api_keys.anthropic", "POWERWORD_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY")
@@ -350,6 +402,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "max_input_tokens", "POWERWORD_MAX_INPUT_TOKENS")
 	bindEnv(v, "max_output_tokens", "POWERWORD_MAX_OUTPUT_TOKENS")
 	bindEnv(v, "max_cached_tokens", "POWERWORD_MAX_CACHED_TOKENS")
+}
+
+func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.imagegen.backend", "POWERWORD_IMAGEGEN_BACKEND")
 	bindEnv(v, "plugins.imagegen.openai_api_key", "POWERWORD_IMAGEGEN_OPENAI_API_KEY")
 	bindEnv(v, "plugins.imagegen.midjourney_api_url", "POWERWORD_IMAGEGEN_MIDJOURNEY_API_URL")
@@ -377,29 +432,6 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	bindEnv(v, "plugins.youtube.client_id", "POWERWORD_YOUTUBE_CLIENT_ID")
 	bindEnv(v, "plugins.youtube.client_secret", "POWERWORD_YOUTUBE_CLIENT_SECRET")
 	bindEnv(v, "plugins.youtube.refresh_token", "POWERWORD_YOUTUBE_REFRESH_TOKEN")
-
-	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	// Support legacy disable_critic key as a deprecated alias when enable_critic isn't explicitly set
-	if !v.IsSet("enable_critic") {
-		if v.IsSet("disable_critic") {
-			cfg.EnableCritic = !cfg.DisableCritic
-		}
-	}
-
-	return &cfg, nil
-}
-
-// Validate validates that the configuration is correct, specifically checking
-// if at least one API key is present.
-func (c *Config) Validate() error {
-	if c.APIKeys.Gemini == "" && c.APIKeys.OpenAI == "" && c.APIKeys.Anthropic == "" {
-		return errors.New("no API keys found; at least one of Gemini, OpenAI, or Anthropic API keys must be provided via config or environment variables")
-	}
-	return nil
 }
 
 func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {

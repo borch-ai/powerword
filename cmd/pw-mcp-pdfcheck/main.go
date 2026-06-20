@@ -33,21 +33,9 @@ func run() error {
 		workspaceRoot = cwd
 	}
 
-	cfgPath := filepath.Join(workspaceRoot, "powerword.toml")
-	var cfg *config.Config
-	var err error
-
-	//nolint:gosec // cfgPath is constructed from validated workspaceRoot
-	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
-		cfg, err = config.LoadConfig("")
-		if err != nil {
-			cfg = &config.Config{}
-		}
-	} else {
-		cfg, err = config.LoadConfig(cfgPath)
-		if err != nil {
-			return fmt.Errorf("failed to load configuration from %s: %w", cfgPath, err)
-		}
+	cfg, err := config.LoadFromWorkspace(workspaceRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	srv, err := setupServer(workspaceRoot, cfg)

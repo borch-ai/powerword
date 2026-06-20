@@ -474,3 +474,109 @@ func TestVerifyWorkspace_EnableCriticFalse_ValidationFails(t *testing.T) {
 		t.Error("expected validation command failure error, got nil")
 	}
 }
+
+func TestResolveCriticServerConfig_FromServerMap(t *testing.T) {
+	cfg := &config.Config{
+		Servers: map[string]config.ServerConfig{
+			"critic": {Command: "custom-critic", Args: []string{"--verbose"}},
+		},
+	}
+	srvCfg, err := resolveCriticServerConfig(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if srvCfg.Command != "custom-critic" {
+		t.Errorf("expected command 'custom-critic', got '%s'", srvCfg.Command)
+	}
+}
+
+func TestResolveCriticServerConfig_NotInPathOrBin(t *testing.T) {
+	cfg := &config.Config{
+		Servers: map[string]config.ServerConfig{}, // no critic key
+	}
+	// pw-mcp-critic won't be in PATH in test env, and bin/ probably doesn't exist
+	_, err := resolveCriticServerConfig(cfg)
+	// Either succeeds (if bin/pw-mcp-critic happens to exist) or fails — both are valid
+	_ = err
+}
+
+func TestExtractTextContent_WithTextContent(t *testing.T) {
+	content := []mcp.Content{
+		&mcp.TextContent{Text: "hello world"},
+	}
+	got := extractTextContent(content)
+	if got != "hello world" {
+		t.Errorf("expected 'hello world', got '%s'", got)
+	}
+}
+
+func TestExtractTextContent_Empty(t *testing.T) {
+	got := extractTextContent(nil)
+	if got != "" {
+		t.Errorf("expected empty string, got '%s'", got)
+	}
+}
+
+func TestExtractTextContent_NonTextContent(t *testing.T) {
+	// Pass a non-TextContent item — should return ""
+	content := []mcp.Content{
+		&mcp.ImageContent{Data: []byte("base64data"), MIMEType: "image/png"},
+	}
+	got := extractTextContent(content)
+	if got != "" {
+		t.Errorf("expected empty string for non-text content, got '%s'", got)
+	}
+}
+
+func TestParseCriticVerdict_Accept(t *testing.T) {
+	err := parseCriticVerdict("Everything looks good. VERDICT: ACCEPT")
+	if err != nil {
+		t.Errorf("expected nil for ACCEPT verdict, got: %v", err)
+	}
+}
+
+func TestParseCriticVerdict_Reject(t *testing.T) {
+	err := parseCriticVerdict("Missing tests. VERDICT: REJECT")
+	if err == nil {
+		t.Error("expected error for REJECT verdict, got nil")
+	}
+}
+
+func TestParseCriticVerdict_WithMarkdownDecorations(t *testing.T) {
+	// Should strip surrounding markdown decorators before checking suffix
+	err := parseCriticVerdict("**VERDICT: ACCEPT**")
+	if err != nil {
+		t.Errorf("expected nil after stripping markdown, got: %v", err)
+	}
+}
+
+func TestRunLocalValidation_Empty(t *testing.T) {
+	err := runLocalValidation(context.Background(), "")
+	if err != nil {
+		t.Errorf("expected nil for empty validation command, got: %v", err)
+	}
+}
+
+func TestResolveValidationCmd_NoMakefile(t *testing.T) {
+	origCheck := checkMakefileExists
+	checkMakefileExists = func() bool { return false }
+	defer func() { checkMakefileExists = origCheck }()
+
+	cfg := &config.Config{EnableCritic: false}
+	got := resolveValidationCmd(cfg)
+	if got != "" {
+		t.Errorf("expected empty string when no Makefile, got '%s'", got)
+	}
+}
+
+func TestResolveValidationCmd_WithMakefile_CriticEnabled(t *testing.T) {
+	origCheck := checkMakefileExists
+	checkMakefileExists = func() bool { return true }
+	defer func() { checkMakefileExists = origCheck }()
+
+	cfg := &config.Config{EnableCritic: true}
+	got := resolveValidationCmd(cfg)
+	if got != "make all" {
+		t.Errorf("expected 'make all', got '%s'", got)
+	}
+}

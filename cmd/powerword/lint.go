@@ -121,7 +121,6 @@ func newLintPlansCmd() *cobra.Command {
 	return cmd
 }
 
-//nolint:nestif
 func resolveGolangciConfig(configPath string) (string, func(), error) {
 	if configPath != "" {
 		return configPath, func() {}, nil
@@ -143,11 +142,7 @@ func resolveGolangciConfig(configPath string) (string, func(), error) {
 		_ = os.Remove(tmpFile.Name())
 	}
 
-	moduleName := "github.com/borch-ai/powerword" // default fallback
-	if mod, err := getModuleName("."); err == nil {
-		moduleName = mod
-	}
-
+	moduleName := findModuleName(".")
 	configContent := strings.Replace(defaultGolangciConfig, "{{LOCAL_PREFIX}}", moduleName, 1)
 	if _, err := tmpFile.WriteString(configContent); err != nil {
 		cleanup()
@@ -155,6 +150,16 @@ func resolveGolangciConfig(configPath string) (string, func(), error) {
 	}
 	_ = tmpFile.Close()
 	return tmpFile.Name(), cleanup, nil
+}
+
+// findModuleName returns the module name from go.mod, or a fallback default.
+func findModuleName(dir string) string {
+	const defaultModule = "github.com/borch-ai/powerword"
+	mod, err := getModuleName(dir)
+	if err != nil {
+		return defaultModule
+	}
+	return mod
 }
 
 func newLintGoCmd() *cobra.Command {
