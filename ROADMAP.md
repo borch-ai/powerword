@@ -306,6 +306,10 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.27: Reduce `//nolint` Suppressions to Absolute Minimum**
     *   Systematically eliminate the 185 `//nolint` tags in the codebase through two strategies: (1) consolidating repeated, identically-justified `gosec` suppressions into single documented helper functions (`safeReadFile`, `runFFmpeg`, `newTrustedRequest`, `LoadFromWorkspace`), and (2) decomposing the large functions that carry `gocognit`, `funlen`, `nestif`, and `gocyclo` suppressions into smaller, independently unit-testable helpers. Also audits and removes stale/redundant suppressions.
     *   [Implementation Plan](plans/phase_6/task_6_27_nolint_reduction.md)
+*   [x] **Task 6.28: Advanced Integration & Subprocess Testing Suite Expansion**
+    *   Expand the integration test suite to include subprocess stdio tests for the remaining MCP servers (`pw-mcp-critic`, `pw-mcp-linter`, `pw-mcp-kdp-math`, `pw-mcp-seo`). Add compiled CLI tests for `powerword review` and `powerword link-issue` subcommands using mock stub dependencies.
+    *   [Implementation Plan](plans/phase_6/task_6_28_integration_tests_expansion.md)
+
 
 
 

@@ -158,6 +158,7 @@ func (s *SEOService) writeToCache(key string, data []byte) {
 		return
 	}
 	cacheFile := filepath.Join(s.getCacheDir(), key)
+	//nolint:gosec // G703: cacheFile is constructed via a SHA-256 hash in cacheKey, making path traversal impossible
 	_ = os.WriteFile(cacheFile, data, 0600)
 }
 
@@ -182,6 +183,7 @@ func sleepContext(ctx context.Context, duration time.Duration) error {
 
 // executeRequestAttempt performs a single HTTP request attempt for getWithRetry.
 func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, backoff time.Duration) ([]byte, bool, time.Duration, error) {
+	//nolint:gosec // G704: urlStr base is configured via a trusted environment variable
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, false, backoff, fmt.Errorf("failed to create request: %w", err)
@@ -191,6 +193,7 @@ func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, b
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 
+	//nolint:gosec // G704: client.Do executes request with URL configured via a trusted environment variable
 	resp, err := s.client.Do(req)
 	if err != nil {
 		if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
@@ -261,7 +264,11 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 // FetchSuggestions retrieves search autocomplete queries.
 func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]string, error) {
 	escapedQuery := url.QueryEscape(query)
-	u := fmt.Sprintf("https://completion.amazon.com/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", escapedQuery)
+	base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+	if base == "" {
+		base = "https://completion.amazon.com"
+	}
+	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", base, escapedQuery)
 
 	body, err := s.getWithRetry(ctx, u)
 	if err != nil {
@@ -435,7 +442,11 @@ func parseReviewsCount(htmlContent string) int {
 // searchCompetitorASINs queries Amazon search results to extract ASINs.
 func (s *SEOService) searchCompetitorASINs(ctx context.Context, query string) []string {
 	escapedQuery := url.QueryEscape(query)
-	searchURL := fmt.Sprintf("https://www.amazon.com/s?k=%s&i=stripbooks", escapedQuery)
+	base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+	if base == "" {
+		base = "https://www.amazon.com"
+	}
+	searchURL := fmt.Sprintf("%s/s?k=%s&i=stripbooks", base, escapedQuery)
 	body, err := s.getWithRetry(ctx, searchURL)
 	if err != nil {
 		return nil
@@ -467,7 +478,11 @@ func (s *SEOService) AnalyzeNiche(ctx context.Context, query string, asins []str
 
 	competitors := make([]CompetitorBook, 0)
 	for _, asin := range resolvedASINs {
-		productURL := fmt.Sprintf("https://www.amazon.com/dp/%s", asin)
+		base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+		if base == "" {
+			base = "https://www.amazon.com"
+		}
+		productURL := fmt.Sprintf("%s/dp/%s", base, asin)
 		body, err := s.getWithRetry(ctx, productURL)
 		if err != nil {
 			continue
