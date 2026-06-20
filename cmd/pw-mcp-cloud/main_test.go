@@ -60,6 +60,33 @@ func (m *mockS3Client) CheckBucket(ctx context.Context, region, bucketName strin
 	return nil, nil
 }
 
+type mockGCPRunClient struct {
+	ListServicesFunc  func(ctx context.Context, projectID, region string) ([]cloud.CloudRunService, error)
+	GetServiceFunc    func(ctx context.Context, projectID, region, serviceName string) (*cloud.CloudRunService, error)
+	DeployServiceFunc func(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*cloud.CloudRunService, error)
+}
+
+func (m *mockGCPRunClient) ListServices(ctx context.Context, projectID, region string) ([]cloud.CloudRunService, error) {
+	if m.ListServicesFunc != nil {
+		return m.ListServicesFunc(ctx, projectID, region)
+	}
+	return nil, nil
+}
+
+func (m *mockGCPRunClient) GetService(ctx context.Context, projectID, region, serviceName string) (*cloud.CloudRunService, error) {
+	if m.GetServiceFunc != nil {
+		return m.GetServiceFunc(ctx, projectID, region, serviceName)
+	}
+	return nil, nil
+}
+
+func (m *mockGCPRunClient) DeployService(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*cloud.CloudRunService, error) {
+	if m.DeployServiceFunc != nil {
+		return m.DeployServiceFunc(ctx, projectID, region, serviceName, image, envVars, concurrency, cpu, memory)
+	}
+	return nil, nil
+}
+
 func assertResponse(t *testing.T, res *mcp.CallToolResult, wantError bool, wantSubstr string) {
 	t.Helper()
 	if res.IsError != wantError {
@@ -323,6 +350,129 @@ func TestCloud_MCP_UnmarshalErrors(t *testing.T) {
 	if err == nil {
 		t.Error("expected JSON unmarshal error")
 	}
+
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "cloud_list_run_services",
+		Arguments: json.RawMessage(`{invalid_json}`),
+	})
+	if err == nil {
+		t.Error("expected JSON unmarshal error")
+	}
+
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "cloud_get_run_service",
+		Arguments: json.RawMessage(`{invalid_json}`),
+	})
+	if err == nil {
+		t.Error("expected JSON unmarshal error")
+	}
+
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "cloud_deploy_run_service",
+		Arguments: json.RawMessage(`{invalid_json}`),
+	})
+	if err == nil {
+		t.Error("expected JSON unmarshal error")
+	}
+}
+
+func TestCloud_MCP_CloudRunServices(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "test-project-123")
+
+	runMock := &mockGCPRunClient{
+		ListServicesFunc: func(ctx context.Context, projectID, region string) ([]cloud.CloudRunService, error) {
+			return []cloud.CloudRunService{{Name: "run-service", URL: "https://url"}}, nil
+		},
+		GetServiceFunc: func(ctx context.Context, projectID, region, serviceName string) (*cloud.CloudRunService, error) {
+			return &cloud.CloudRunService{Name: serviceName, URL: "https://url"}, nil
+		},
+		DeployServiceFunc: func(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*cloud.CloudRunService, error) {
+			return &cloud.CloudRunService{Name: serviceName, URL: "https://url", Image: image, Concurrency: concurrency}, nil
+		},
+	}
+
+	cfg := &config.Config{}
+	svc := cloud.NewCloudService(cfg, nil, nil, nil, nil, nil, nil)
+	svc.SetGCPRunClient(runMock)
+
+	tempDir := t.TempDir()
+	session, ctx, cleanup := startTestServer(t, tempDir, svc)
+	defer cleanup()
+
+	// 1. List
+	res, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_list_run_services",
+		Arguments: json.RawMessage(`{
+			"region": "us-central1"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("cloud_list_run_services failed: %v", err)
+	}
+	assertResponse(t, res, false, "run-service")
+
+	// Missing region
+	resErr, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "cloud_list_run_services",
+		Arguments: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("cloud_list_run_services failed: %v", err)
+	}
+	assertResponse(t, resErr, true, "region parameter is required")
+
+	// 2. Get
+	resGet, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_get_run_service",
+		Arguments: json.RawMessage(`{
+			"region": "us-central1",
+			"service_name": "my-service"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("cloud_get_run_service failed: %v", err)
+	}
+	assertResponse(t, resGet, false, "my-service")
+
+	// Missing service name
+	resGetErr, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_get_run_service",
+		Arguments: json.RawMessage(`{
+			"region": "us-central1"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("cloud_get_run_service failed: %v", err)
+	}
+	assertResponse(t, resGetErr, true, "region and service_name parameters are required")
+
+	// 3. Deploy
+	resDeploy, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_deploy_run_service",
+		Arguments: json.RawMessage(`{
+			"region": "us-central1",
+			"service_name": "my-service",
+			"image": "gcr.io/image:latest",
+			"concurrency": 80
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("cloud_deploy_run_service failed: %v", err)
+	}
+	assertResponse(t, resDeploy, false, "gcr.io/image:latest")
+
+	// Missing required image
+	resDeployErr, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cloud_deploy_run_service",
+		Arguments: json.RawMessage(`{
+			"region": "us-central1",
+			"service_name": "my-service"
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("cloud_deploy_run_service failed: %v", err)
+	}
+	assertResponse(t, resDeployErr, true, "region, service_name, and image parameters are required")
 }
 
 func TestRun_ConfigParsing(t *testing.T) {

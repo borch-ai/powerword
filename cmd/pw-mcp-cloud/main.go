@@ -138,6 +138,70 @@ const (
 		},
 		"required": ["local_path"]
 	}`
+
+	listRunServicesSchema = `{
+		"type": "object",
+		"properties": {
+			"region": {
+				"type": "string",
+				"description": "The GCP region to query (e.g. 'us-central1')."
+			}
+		},
+		"required": ["region"]
+	}`
+
+	getRunServiceSchema = `{
+		"type": "object",
+		"properties": {
+			"region": {
+				"type": "string",
+				"description": "The GCP region where the service resides (e.g. 'us-central1')."
+			},
+			"service_name": {
+				"type": "string",
+				"description": "The name of the Cloud Run service."
+			}
+		},
+		"required": ["region", "service_name"]
+	}`
+
+	deployRunServiceSchema = `{
+		"type": "object",
+		"properties": {
+			"region": {
+				"type": "string",
+				"description": "The GCP region to deploy to (e.g. 'us-central1')."
+			},
+			"service_name": {
+				"type": "string",
+				"description": "The name of the Cloud Run service to deploy."
+			},
+			"image": {
+				"type": "string",
+				"description": "The container image URL to deploy."
+			},
+			"env_vars": {
+				"type": "object",
+				"additionalProperties": {
+					"type": "string"
+				},
+				"description": "Optional environment variables map."
+			},
+			"concurrency": {
+				"type": "integer",
+				"description": "Optional container concurrency limit."
+			},
+			"cpu": {
+				"type": "string",
+				"description": "Optional CPU limit (e.g. '1', '2')."
+			},
+			"memory": {
+				"type": "string",
+				"description": "Optional memory limit (e.g. '256Mi', '512Mi', '1Gi')."
+			}
+		},
+		"required": ["region", "service_name", "image"]
+	}`
 )
 
 func setupServer(workspaceRoot string, cfg *config.Config, svc *cloud.CloudService) (*mcp.Server, error) {
@@ -174,6 +238,24 @@ func setupServer(workspaceRoot string, cfg *config.Config, svc *cloud.CloudServi
 		Description: "Uploads a local file to the configured cloud storage bucket.",
 		InputSchema: json.RawMessage(uploadFileSchema),
 	}, handleUploadFile(cloudService))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "cloud_list_run_services",
+		Description: "Retrieves the state of Cloud Run services in the target region.",
+		InputSchema: json.RawMessage(listRunServicesSchema),
+	}, handleListRunServices(cloudService))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "cloud_get_run_service",
+		Description: "Retrieves metadata for a specific Cloud Run service in the target region.",
+		InputSchema: json.RawMessage(getRunServiceSchema),
+	}, handleGetRunService(cloudService))
+
+	srv.AddTool(&mcp.Tool{
+		Name:        "cloud_deploy_run_service",
+		Description: "Deploys (creates or updates) a serverless container on GCP Cloud Run.",
+		InputSchema: json.RawMessage(deployRunServiceSchema),
+	}, handleDeployRunService(cloudService))
 
 	return srv, nil
 }
@@ -318,6 +400,118 @@ func handleUploadFile(svc *cloud.CloudService) func(context.Context, *mcp.CallTo
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: url}},
+		}, nil
+	}
+}
+
+func handleListRunServices(svc *cloud.CloudService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Region string `json:"region"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+
+		if args.Region == "" {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "region parameter is required"}},
+			}, nil
+		}
+
+		res, err := svc.ListRunServices(ctx, args.Region)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to list Cloud Run services: %v", err)}},
+			}, nil
+		}
+
+		data, err := json.MarshalIndent(res, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		}, nil
+	}
+}
+
+func handleGetRunService(svc *cloud.CloudService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Region      string `json:"region"`
+			ServiceName string `json:"service_name"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+
+		if args.Region == "" || args.ServiceName == "" {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "region and service_name parameters are required"}},
+			}, nil
+		}
+
+		res, err := svc.GetRunService(ctx, args.Region, args.ServiceName)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to get Cloud Run service: %v", err)}},
+			}, nil
+		}
+
+		data, err := json.MarshalIndent(res, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
+		}, nil
+	}
+}
+
+func handleDeployRunService(svc *cloud.CloudService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Region      string            `json:"region"`
+			ServiceName string            `json:"service_name"`
+			Image       string            `json:"image"`
+			EnvVars     map[string]string `json:"env_vars"`
+			Concurrency int64             `json:"concurrency"`
+			CPU         string            `json:"cpu"`
+			Memory      string            `json:"memory"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+
+		if args.Region == "" || args.ServiceName == "" || args.Image == "" {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "region, service_name, and image parameters are required"}},
+			}, nil
+		}
+
+		res, err := svc.DeployRunService(ctx, args.Region, args.ServiceName, args.Image, args.EnvVars, args.Concurrency, args.CPU, args.Memory)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("failed to deploy Cloud Run service: %v", err)}},
+			}, nil
+		}
+
+		data, err := json.MarshalIndent(res, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: string(data)}},
 		}, nil
 	}
 }

@@ -158,7 +158,7 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.7: MCP ImageGen Cref Extensions**
     *   Extend the `pw-mcp-imagegen` server to accept `cref_url` and `character_weight` inputs. Automatically upload local character assets before generation.
     *   [Implementation Plan](plans/phase_4/task_4_7_imagegen_cref_extensions.md)
-*   [ ] **Task 4.8: Google Cloud Run Orchestration Tools (`pw-mcp-cloud`)**
+*   [x] **Task 4.8: Google Cloud Run Orchestration Tools (`pw-mcp-cloud`)**
     *   Extend `pw-mcp-cloud` to support serverless container deployments. Expose tools like `cloud_deploy_run_service`, `cloud_get_run_service`, and `cloud_list_run_services` to control Google Cloud Run services.
     *   [Implementation Plan](plans/phase_4/task_4_8_cloud_run_orchestration.md)
 *   [ ] **Task 4.9: Artifact Registry & Container Delivery Verification (`pw-mcp-cloud`)**
