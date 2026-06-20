@@ -261,6 +261,17 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 	return nil, fmt.Errorf("max retries reached: %w", lastErr)
 }
 
+func parseBaseURL(val string, defaultVal string) string {
+	if val == "" {
+		return defaultVal
+	}
+	u, err := url.Parse(val)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return defaultVal
+	}
+	return strings.TrimSuffix(val, "/")
+}
+
 // FetchSuggestions retrieves search autocomplete queries.
 func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]string, error) {
 	escapedQuery := url.QueryEscape(query)
@@ -268,10 +279,7 @@ func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]stri
 	if base == "" {
 		base = os.Getenv("POWERWORD_SEO_API_ENDPOINT")
 	}
-	if base == "" {
-		base = "https://completion.amazon.com"
-	}
-	base = strings.TrimSuffix(base, "/")
+	base = parseBaseURL(base, "https://completion.amazon.com")
 	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", base, escapedQuery)
 
 	body, err := s.getWithRetry(ctx, u)
@@ -446,11 +454,7 @@ func parseReviewsCount(htmlContent string) int {
 // searchCompetitorASINs queries Amazon search results to extract ASINs.
 func (s *SEOService) searchCompetitorASINs(ctx context.Context, query string) []string {
 	escapedQuery := url.QueryEscape(query)
-	base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
-	if base == "" {
-		base = "https://www.amazon.com"
-	}
-	base = strings.TrimSuffix(base, "/")
+	base := parseBaseURL(os.Getenv("POWERWORD_SEO_API_ENDPOINT"), "https://www.amazon.com")
 	searchURL := fmt.Sprintf("%s/s?k=%s&i=stripbooks", base, escapedQuery)
 	body, err := s.getWithRetry(ctx, searchURL)
 	if err != nil {
@@ -481,11 +485,7 @@ func (s *SEOService) AnalyzeNiche(ctx context.Context, query string, asins []str
 		resolvedASINs = s.searchCompetitorASINs(ctx, query)
 	}
 
-	base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
-	if base == "" {
-		base = "https://www.amazon.com"
-	}
-	base = strings.TrimSuffix(base, "/")
+	base := parseBaseURL(os.Getenv("POWERWORD_SEO_API_ENDPOINT"), "https://www.amazon.com")
 
 	competitors := make([]CompetitorBook, 0)
 	for _, asin := range resolvedASINs {
