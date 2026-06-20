@@ -1,6 +1,9 @@
 # plan: Task 4.15: Imagegen Capabilities Output Type Field
 
-**Status:** Planned
+**Status:** Completed
+**Go Version:** 1.26.4
+**Date Completed:** 2026-06-20
+**Unit Test Coverage:** 91.0%
 
 This task updates the `pw-mcp-imagegen` server to include a new capability field (`output_type`) indicating whether a backend generates still images or videos. This allows client applications like Pithos to dynamically select the correct backend model depending on the media requirements of the asset (e.g. still character seeds vs video pages).
 

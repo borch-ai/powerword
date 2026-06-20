@@ -181,6 +181,9 @@ backend = "openai"
 	if !strings.Contains(capsStr, `"supports_cref": false`) {
 		t.Errorf("expected capabilities to contain supports_cref false, got: %q", capsStr)
 	}
+	if !strings.Contains(capsStr, `"output_type": "image"`) {
+		t.Errorf("expected capabilities to contain output_type 'image', got: %q", capsStr)
+	}
 
 	// 1.6 CallTool to generate with unsupported cref_url on openai backend
 	argsGenBad := map[string]interface{}{
@@ -525,6 +528,9 @@ google_model = "imagen-4.0-generate-001"
 	if !strings.Contains(capsStr, `"supports_cref": false`) {
 		t.Errorf("expected supports_cref=false for google Imagen backend, got: %q", capsStr)
 	}
+	if !strings.Contains(capsStr, `"output_type": "image"`) {
+		t.Errorf("expected capabilities to contain output_type 'image' for google backend, got: %q", capsStr)
+	}
 
 	// Verify that calling generate with cref_url returns a validation error.
 	resultGen, err := client.CallTool(ctx, "imagegen_generate", map[string]interface{}{
@@ -629,3 +635,64 @@ force_cref = true
 		t.Errorf("expected imagegen_generate to succeed with ForceCref+mock server, got error: %q", genStr)
 	}
 }
+
+func TestMCP_ImageGenPlugin_VeoBackend(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	workspaceDir, err := os.MkdirTemp("", "pw-imagegen-veo-caps-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// Configure google veo backend
+	cfgTOML := `
+[api_keys]
+gemini = "dummy-google-key"
+[plugins.imagegen]
+backend = "veo"
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "powerword.toml"), []byte(cfgTOML), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir},
+	}
+
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-imagegen", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() { _ = sp.GracefulShutdown(1 * time.Second) }()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	// Verify capabilities: veo backend owns SupportsCref=true, OutputType=video.
+	resultCaps, err := client.CallTool(ctx, "imagegen_get_capabilities", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("failed to call imagegen_get_capabilities: %v", err)
+	}
+	if resultCaps.IsError {
+		t.Fatalf("imagegen_get_capabilities returned error: %v", resultCaps)
+	}
+	capsStr, err := mcp.FormatToolResult(resultCaps)
+	if err != nil {
+		t.Fatalf("failed to format capabilities result: %v", err)
+	}
+	if !strings.Contains(capsStr, `"backend": "veo"`) {
+		t.Errorf("expected backend 'veo' in capabilities, got: %q", capsStr)
+	}
+	if !strings.Contains(capsStr, `"supports_cref": true`) {
+		t.Errorf("expected supports_cref=true for veo backend, got: %q", capsStr)
+	}
+	if !strings.Contains(capsStr, `"output_type": "video"`) {
+		t.Errorf("expected output_type='video' for veo backend, got: %q", capsStr)
+	}
+}
+

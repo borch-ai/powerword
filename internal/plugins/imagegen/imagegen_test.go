@@ -1766,25 +1766,26 @@ func TestVeoBackend_CharacterWeightWarning(t *testing.T) {
 
 func TestGetCapabilities(t *testing.T) {
 	tests := []struct {
-		name         string
-		backend      string
-		googleModel  string
-		wantCref     bool
-		wantSref     bool
-		expectedName string
+		name           string
+		backend        string
+		googleModel    string
+		wantCref       bool
+		wantSref       bool
+		wantOutputType OutputType
+		expectedName   string
 	}{
-		{"default_empty", "", "", false, false, "openai"},
-		{"openai", "openai", "", false, false, "openai"},
-		{"midjourney", "midjourney", "", true, true, "midjourney"},
+		{"default_empty", "", "", false, false, OutputTypeImage, "openai"},
+		{"openai", "openai", "", false, false, OutputTypeImage, "openai"},
+		{"midjourney", "midjourney", "", true, true, OutputTypeImage, "midjourney"},
 		// Google Imagen backend never supports cref — regardless of model name.
 		// To use Veo (which supports cref), set backend = "veo".
-		{"google", "google", "", false, false, "google"},
-		{"google_with_imagen_model", "google", "imagen-4.0-generate-001", false, false, "google"},
-		{"imagen", "imagen", "imagen-3.0-generate-002", false, false, "imagen"},
+		{"google", "google", "", false, false, OutputTypeImage, "google"},
+		{"google_with_imagen_model", "google", "imagen-4.0-generate-001", false, false, OutputTypeImage, "google"},
+		{"imagen", "imagen", "imagen-3.0-generate-002", false, false, OutputTypeImage, "imagen"},
 		// The veo and google-veo backends always support cref.
-		{"veo", "veo", "", true, false, "veo"},
-		{"google-veo", "google-veo", "", true, false, "google-veo"},
-		{"unsupported", "unsupported", "", false, false, "unsupported"},
+		{"veo", "veo", "", true, false, OutputTypeVideo, "veo"},
+		{"google-veo", "google-veo", "", true, false, OutputTypeVideo, "google-veo"},
+		{"unsupported", "unsupported", "", false, false, "", "unsupported"},
 	}
 
 	for _, tt := range tests {
@@ -1808,6 +1809,9 @@ func TestGetCapabilities(t *testing.T) {
 			}
 			if caps.SupportsSref != tt.wantSref {
 				t.Errorf("expected supports_sref %v, got %v", tt.wantSref, caps.SupportsSref)
+			}
+			if caps.OutputType != tt.wantOutputType {
+				t.Errorf("expected output_type %q, got %q", tt.wantOutputType, caps.OutputType)
 			}
 		})
 	}
@@ -1876,39 +1880,44 @@ func TestGetCapabilities_ForceOverrides(t *testing.T) {
 
 func TestBackendCapabilities(t *testing.T) {
 	tests := []struct {
-		name        string
-		caps        Capabilities
-		wantBackend string
-		wantCref    bool
-		wantSref    bool
+		name           string
+		caps           Capabilities
+		wantBackend    string
+		wantCref       bool
+		wantSref       bool
+		wantOutputType OutputType
 	}{
 		{
-			name:        "OpenAIBackend",
-			caps:        (&OpenAIBackend{}).Capabilities(),
-			wantBackend: "openai",
-			wantCref:    false,
-			wantSref:    false,
+			name:           "OpenAIBackend",
+			caps:           (&OpenAIBackend{}).Capabilities(),
+			wantBackend:    "openai",
+			wantCref:       false,
+			wantSref:       false,
+			wantOutputType: OutputTypeImage,
 		},
 		{
-			name:        "GoogleBackend",
-			caps:        (&GoogleBackend{}).Capabilities(),
-			wantBackend: "google",
-			wantCref:    false,
-			wantSref:    false,
+			name:           "GoogleBackend",
+			caps:           (&GoogleBackend{}).Capabilities(),
+			wantBackend:    "google",
+			wantCref:       false,
+			wantSref:       false,
+			wantOutputType: OutputTypeImage,
 		},
 		{
-			name:        "VeoBackend",
-			caps:        (&VeoBackend{}).Capabilities(),
-			wantBackend: "veo",
-			wantCref:    true,
-			wantSref:    false,
+			name:           "VeoBackend",
+			caps:           (&VeoBackend{}).Capabilities(),
+			wantBackend:    "veo",
+			wantCref:       true,
+			wantSref:       false,
+			wantOutputType: OutputTypeVideo,
 		},
 		{
-			name:        "MidjourneyBackend",
-			caps:        (&MidjourneyBackend{}).Capabilities(),
-			wantBackend: "midjourney",
-			wantCref:    true,
-			wantSref:    true,
+			name:           "MidjourneyBackend",
+			caps:           (&MidjourneyBackend{}).Capabilities(),
+			wantBackend:    "midjourney",
+			wantCref:       true,
+			wantSref:       true,
+			wantOutputType: OutputTypeImage,
 		},
 	}
 
@@ -1922,6 +1931,9 @@ func TestBackendCapabilities(t *testing.T) {
 			}
 			if tt.caps.SupportsSref != tt.wantSref {
 				t.Errorf("expected supports_sref=%v, got %v", tt.wantSref, tt.caps.SupportsSref)
+			}
+			if tt.caps.OutputType != tt.wantOutputType {
+				t.Errorf("expected output_type=%q, got %q", tt.wantOutputType, tt.caps.OutputType)
 			}
 		})
 	}
