@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   analyze:
+    # Reference the reusable CodeQL workflow on our feature branch
     uses: borch-ai/.github/.github/workflows/codeql.yml@feature/add-codeql-workflow
     with:
       language: "go"
