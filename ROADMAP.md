@@ -300,6 +300,10 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.25: OpenTelemetry (OTel) Tracing Instrumentation**
     *   Add trace spans to the ReAct reasoning loop and tool calling interface to monitor execution latency and trace tool interactions.
     *   [Implementation Plan](plans/phase_6/task_6_25_opentelemetry_tracing.md)
+*   [ ] **Task 6.26: Centralized Pull Request Issue Linker Subcommand & GitHub Adaptations**
+    *   Implement a native Go `powerword link-issue` subcommand to scan plan diffs and auto-link issue references to PR descriptions. Adopt and customize `.github` templates (Copilot instructions, pull request template, dependabot checks) from Aeolian.
+    *   [Implementation Plan](plans/phase_6/task_6_26_link_issue_subcommand.md)
+
 
 
 
