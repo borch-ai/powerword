@@ -212,8 +212,10 @@ func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size s
 	}
 
 	if crefURL != "" {
-		// cref_url is not natively supported by the Google Imagen backend. This path is only
-		// reachable if ForceCref was enabled in configuration to bypass the capability check.
+		// cref_url is not natively supported by the Google Imagen backend. The service layer
+		// normally rejects this via capability validation before reaching here; this path is
+		// reached when GoogleBackend.GenerateImage is called directly (e.g. in tests) or
+		// when ForceCref is enabled in config to bypass the service-level capability check.
 		fmt.Fprintln(os.Stderr, "Warning: Google Imagen backend does not natively support image-based character references (cref_url); the parameter will be ignored.")
 	}
 

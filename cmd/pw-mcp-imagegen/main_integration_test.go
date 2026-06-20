@@ -5,6 +5,7 @@ package main_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -546,6 +547,20 @@ func TestMCP_ImageGenPlugin_ForceCref_BypassesValidation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	pngBytes := createTinyPNG(t)
+	b64Data := base64.StdEncoding.EncodeToString(pngBytes)
+
+	// Mock server for Google Imagen endpoint — returns a valid base64 image response.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := fmt.Sprintf(
+			`{"predictions": [{"bytesBase64Encoded": "%s", "mimeType": "image/png"}]}`,
+			b64Data,
+		)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(resp))
+	}))
+	defer mockServer.Close()
+
 	workspaceDir, err := os.MkdirTemp("", "pw-imagegen-force-cref-*")
 	if err != nil {
 		t.Fatal(err)
@@ -567,7 +582,11 @@ force_cref = true
 
 	srvCfg := config.ServerConfig{
 		Command: pluginPath,
-		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir},
+		Env: []string{
+			"POWERWORD_WORKSPACE_ROOT=" + workspaceDir,
+			// Route all Google Imagen API calls to the mock server.
+			"GOOGLE_BASE_URL=" + mockServer.URL,
+		},
 	}
 
 	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-imagegen", srvCfg)
@@ -594,7 +613,7 @@ force_cref = true
 		t.Errorf("expected supports_cref=true with force_cref override, got: %q", capsStr)
 	}
 
-	// Calling generate with cref_url should now pass capability validation (fail on network, not capability).
+	// Generate with cref_url should bypass capability validation and succeed via the mock server.
 	resultGen, err := client.CallTool(ctx, "imagegen_generate", map[string]interface{}{
 		"prompt":   "A majestic mountain",
 		"cref_url": "http://example.com/cref.png",
@@ -602,10 +621,11 @@ force_cref = true
 	if err != nil {
 		t.Fatalf("failed to call imagegen_generate: %v", err)
 	}
-	// The request passes validation but fails at the network layer (no mock server).
-	// Assert it did NOT fail with a capability error.
 	genStr, _ := mcp.FormatToolResult(resultGen)
 	if strings.Contains(genStr, "character reference (cref_url) is not supported by the active imagegen backend") {
 		t.Errorf("expected force_cref to bypass capability validation, but got capability error: %q", genStr)
+	}
+	if resultGen.IsError {
+		t.Errorf("expected imagegen_generate to succeed with ForceCref+mock server, got error: %q", genStr)
 	}
 }

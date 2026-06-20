@@ -2000,7 +2000,22 @@ func TestGenerateImage_ImagenCrefValidation(t *testing.T) {
 	}
 
 	// Test 3: ForceCref=true bypasses the capability check for the Imagen backend.
-	// The request will proceed past validation (and fail on the actual HTTP request, which is fine).
+	// Use a mock httptest server so the test is hermetic and makes no real network requests.
+	expectedBytesForce := []byte("google-image-bytes-force-cref")
+	b64Force := base64.StdEncoding.EncodeToString(expectedBytesForce)
+	forceServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{"bytesBase64Encoded": b64Force, "mimeType": "image/jpeg"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer forceServer.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", forceServer.URL)
+
 	cfgForce := &config.Config{
 		APIKeys: config.APIKeys{
 			Gemini: "mock-key",
@@ -2018,8 +2033,7 @@ func TestGenerateImage_ImagenCrefValidation(t *testing.T) {
 	if !caps.SupportsCref {
 		t.Error("expected supports_cref=true when ForceCref is set, got false")
 	}
-	// Attempting a live generate will fail on network (no test server), but that confirms
-	// validation is no longer the blocker — any error will not mention capability.
+	// The generate call should pass capability validation and succeed via the mock server.
 	_, err = serviceForce.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
 	if err != nil && strings.Contains(err.Error(), "character reference (cref_url) is not supported by the active imagegen backend") {
 		t.Errorf("expected ForceCref to bypass capability validation, but got capability error: %v", err)
