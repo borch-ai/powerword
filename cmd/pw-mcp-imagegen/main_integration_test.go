@@ -5,6 +5,7 @@ package main_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -465,5 +466,166 @@ request_timeout = "50ms"
 	resStr, _ := mcp.FormatToolResult(resultGen)
 	if !strings.Contains(resStr, "timeout") && !strings.Contains(resStr, "deadline exceeded") && !strings.Contains(resStr, "exceeded") {
 		t.Errorf("expected timeout/deadline error in tool response, got: %q", resStr)
+	}
+}
+
+func TestMCP_ImageGenPlugin_GoogleBackend_CrefNotSupported(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	workspaceDir, err := os.MkdirTemp("", "pw-imagegen-google-caps-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// Configure google (Imagen) backend — no real API calls needed since validation fires first.
+	cfgTOML := `
+[api_keys]
+gemini = "dummy-google-key"
+[plugins.imagegen]
+backend = "google"
+google_model = "imagen-4.0-generate-001"
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "powerword.toml"), []byte(cfgTOML), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env:     []string{"POWERWORD_WORKSPACE_ROOT=" + workspaceDir},
+	}
+
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-imagegen", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() { _ = sp.GracefulShutdown(1 * time.Second) }()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	// Verify capabilities: google backend owns SupportsCref=false.
+	resultCaps, err := client.CallTool(ctx, "imagegen_get_capabilities", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("failed to call imagegen_get_capabilities: %v", err)
+	}
+	if resultCaps.IsError {
+		t.Fatalf("imagegen_get_capabilities returned error: %v", resultCaps)
+	}
+	capsStr, err := mcp.FormatToolResult(resultCaps)
+	if err != nil {
+		t.Fatalf("failed to format capabilities result: %v", err)
+	}
+	if !strings.Contains(capsStr, `"backend": "google"`) {
+		t.Errorf("expected backend 'google' in capabilities, got: %q", capsStr)
+	}
+	if !strings.Contains(capsStr, `"supports_cref": false`) {
+		t.Errorf("expected supports_cref=false for google Imagen backend, got: %q", capsStr)
+	}
+
+	// Verify that calling generate with cref_url returns a validation error.
+	resultGen, err := client.CallTool(ctx, "imagegen_generate", map[string]interface{}{
+		"prompt":   "A majestic mountain",
+		"cref_url": "http://example.com/cref.png",
+	})
+	if err != nil {
+		t.Fatalf("failed to call imagegen_generate: %v", err)
+	}
+	if !resultGen.IsError {
+		t.Fatal("expected imagegen_generate to fail on google backend with cref_url, but it succeeded")
+	}
+	genStr, _ := mcp.FormatToolResult(resultGen)
+	if !strings.Contains(genStr, "character reference (cref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected capability validation error, got: %q", genStr)
+	}
+}
+
+func TestMCP_ImageGenPlugin_ForceCref_BypassesValidation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pngBytes := createTinyPNG(t)
+	b64Data := base64.StdEncoding.EncodeToString(pngBytes)
+
+	// Mock server for Google Imagen endpoint — returns a valid base64 image response.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := fmt.Sprintf(
+			`{"predictions": [{"bytesBase64Encoded": "%s", "mimeType": "image/png"}]}`,
+			b64Data,
+		)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(resp))
+	}))
+	defer mockServer.Close()
+
+	workspaceDir, err := os.MkdirTemp("", "pw-imagegen-force-cref-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspaceDir)
+
+	// Configure google (Imagen) backend with force_cref = true.
+	cfgTOML := `
+[api_keys]
+gemini = "dummy-google-key"
+[plugins.imagegen]
+backend = "google"
+google_model = "imagen-4.0-generate-001"
+force_cref = true
+`
+	if err := os.WriteFile(filepath.Join(workspaceDir, "powerword.toml"), []byte(cfgTOML), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	srvCfg := config.ServerConfig{
+		Command: pluginPath,
+		Env: []string{
+			"POWERWORD_WORKSPACE_ROOT=" + workspaceDir,
+			// Route all Google Imagen API calls to the mock server.
+			"GOOGLE_BASE_URL=" + mockServer.URL,
+		},
+	}
+
+	sp, err := mcp.NewServerProcess(ctx, "pw-mcp-imagegen", srvCfg)
+	if err != nil {
+		t.Fatalf("failed to launch ServerProcess: %v", err)
+	}
+	defer func() { _ = sp.GracefulShutdown(1 * time.Second) }()
+
+	client := sp.Client()
+	if client == nil {
+		t.Fatal("expected MCP client to be initialized, got nil")
+	}
+
+	// With force_cref=true the capability check is bypassed: supports_cref should be true.
+	resultCaps, err := client.CallTool(ctx, "imagegen_get_capabilities", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("failed to call imagegen_get_capabilities: %v", err)
+	}
+	capsStr, err := mcp.FormatToolResult(resultCaps)
+	if err != nil {
+		t.Fatalf("failed to format capabilities result: %v", err)
+	}
+	if !strings.Contains(capsStr, `"supports_cref": true`) {
+		t.Errorf("expected supports_cref=true with force_cref override, got: %q", capsStr)
+	}
+
+	// Generate with cref_url should bypass capability validation and succeed via the mock server.
+	resultGen, err := client.CallTool(ctx, "imagegen_generate", map[string]interface{}{
+		"prompt":   "A majestic mountain",
+		"cref_url": "http://example.com/cref.png",
+	})
+	if err != nil {
+		t.Fatalf("failed to call imagegen_generate: %v", err)
+	}
+	genStr, _ := mcp.FormatToolResult(resultGen)
+	if strings.Contains(genStr, "character reference (cref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected force_cref to bypass capability validation, but got capability error: %q", genStr)
+	}
+	if resultGen.IsError {
+		t.Errorf("expected imagegen_generate to succeed with ForceCref+mock server, got error: %q", genStr)
 	}
 }

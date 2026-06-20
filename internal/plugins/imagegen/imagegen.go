@@ -166,6 +166,11 @@ func (b *OpenAIBackend) GenerateImage(ctx context.Context, prompt string, size s
 	return resp.Data[0].URL, nil
 }
 
+// Capabilities returns the feature set supported by the OpenAI DALL-E 3 backend.
+func (b *OpenAIBackend) Capabilities() Capabilities {
+	return Capabilities{Backend: "openai", SupportsCref: false, SupportsSref: false}
+}
+
 // GoogleBackend implements Imagen 3 image generation using Google AI Studio predict REST API.
 type GoogleBackend struct {
 	apiURL string
@@ -207,8 +212,11 @@ func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size s
 	}
 
 	if crefURL != "" {
-		fmt.Fprintln(os.Stderr, "Warning: Google Imagen backend does not natively support image-based character references; falling back to prepended character description.")
-		prompt = fmt.Sprintf("[Character Reference: %s] %s", crefURL, prompt)
+		// cref_url is not natively supported by the Google Imagen backend. The service layer
+		// normally rejects this via capability validation before reaching here; this path is
+		// reached when GoogleBackend.GenerateImage is called directly (e.g. in tests) or
+		// when ForceCref is enabled in config to bypass the service-level capability check.
+		fmt.Fprintln(os.Stderr, "Warning: Google Imagen backend does not natively support image-based character references (cref_url); the parameter will be ignored.")
 	}
 
 	if characterWeight != nil {
@@ -293,6 +301,12 @@ func parseGooglePrediction(bodyBytes []byte) ([]byte, string, error) {
 	return imgBytes, mimeType, nil
 }
 
+// Capabilities returns the feature set supported by the Google Imagen backend.
+// The Google Imagen API does not natively support image-based character references (cref).
+func (b *GoogleBackend) Capabilities() Capabilities {
+	return Capabilities{Backend: "google", SupportsCref: false, SupportsSref: false}
+}
+
 // VeoBackend implements Google Veo video generation.
 type VeoBackend struct {
 	apiURL          string
@@ -373,6 +387,12 @@ func (b *VeoBackend) downloadVideo(ctx context.Context, videoURI string) ([]byte
 	}
 
 	return videoBytes, nil
+}
+
+// Capabilities returns the feature set supported by the Google Veo backend.
+// The Veo API supports image-based character references (reference image input).
+func (b *VeoBackend) Capabilities() Capabilities {
+	return Capabilities{Backend: "veo", SupportsCref: true, SupportsSref: false}
 }
 
 // GenerateImage generates the video via predictLongRunning API and polls until complete.
@@ -652,6 +672,12 @@ func (b *MidjourneyBackend) SetTimeout(t time.Duration) {
 	b.httpClient.Timeout = t
 }
 
+// Capabilities returns the feature set supported by the Midjourney backend.
+// Midjourney supports both character references (--cref) and style references (--sref).
+func (b *MidjourneyBackend) Capabilities() Capabilities {
+	return Capabilities{Backend: "midjourney", SupportsCref: true, SupportsSref: true}
+}
+
 func extractTaskID(m map[string]interface{}) string {
 	for _, key := range []string{"id", "generationId", "generation_id", "task_id", "taskId", "result_id"} {
 		if val, ok := m[key]; ok {
@@ -857,24 +883,39 @@ func NewImageGenService(workspaceRoot string, cfg *config.Config) *ImageGenServi
 }
 
 // GetCapabilities returns the features supported by the active imagegen backend.
+// Capability knowledge is owned by each backend type — the service simply delegates
+// to the active backend, then applies any ForceCref/ForceSref configuration overrides.
 func (s *ImageGenService) GetCapabilities() Capabilities {
 	backend := strings.ToLower(s.cfg.Plugins.ImageGen.Backend)
 	if backend == "" {
 		backend = "openai"
 	}
-	var supportsCref, supportsSref bool
+
+	var caps Capabilities
 	switch backend {
+	case "openai":
+		caps = (&OpenAIBackend{}).Capabilities()
+	case "google", "imagen":
+		caps = (&GoogleBackend{}).Capabilities()
+		caps.Backend = backend // preserve the configured backend name
+	case "veo", "google-veo":
+		caps = (&VeoBackend{}).Capabilities()
+		caps.Backend = backend
 	case "midjourney":
-		supportsCref = true
-		supportsSref = true
-	case "google", "imagen", "veo", "google-veo":
-		supportsCref = true
+		caps = (&MidjourneyBackend{}).Capabilities()
+	default:
+		caps = Capabilities{Backend: backend}
 	}
-	return Capabilities{
-		Backend:      backend,
-		SupportsCref: supportsCref,
-		SupportsSref: supportsSref,
+
+	// Apply configuration overrides — allows operators to bypass capability restrictions
+	// if an upstream model is updated to support additional features.
+	if s.cfg.Plugins.ImageGen.ForceCref {
+		caps.SupportsCref = true
 	}
+	if s.cfg.Plugins.ImageGen.ForceSref {
+		caps.SupportsSref = true
+	}
+	return caps
 }
 
 func (s *ImageGenService) getRequestTimeout() time.Duration {

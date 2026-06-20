@@ -1450,7 +1450,8 @@ func TestGoogleBackend_CharacterReference(t *testing.T) {
 			t.Errorf("failed to decode request body: %v", err)
 		}
 
-		expectedPrompt := "[Character Reference: http://example.com/cref.png] a beautiful painting"
+		// cref_url is now ignored (no text prepend) — the plain prompt is sent as-is.
+		expectedPrompt := "a beautiful painting"
 		if len(req.Instances) == 0 || req.Instances[0].Prompt != expectedPrompt {
 			t.Errorf("expected prompt %q, got %q", expectedPrompt, req.Instances[0].Prompt)
 		}
@@ -1767,18 +1768,23 @@ func TestGetCapabilities(t *testing.T) {
 	tests := []struct {
 		name         string
 		backend      string
+		googleModel  string
 		wantCref     bool
 		wantSref     bool
 		expectedName string
 	}{
-		{"default_empty", "", false, false, "openai"},
-		{"openai", "openai", false, false, "openai"},
-		{"midjourney", "midjourney", true, true, "midjourney"},
-		{"google", "google", true, false, "google"},
-		{"imagen", "imagen", true, false, "imagen"},
-		{"veo", "veo", true, false, "veo"},
-		{"google-veo", "google-veo", true, false, "google-veo"},
-		{"unsupported", "unsupported", false, false, "unsupported"},
+		{"default_empty", "", "", false, false, "openai"},
+		{"openai", "openai", "", false, false, "openai"},
+		{"midjourney", "midjourney", "", true, true, "midjourney"},
+		// Google Imagen backend never supports cref — regardless of model name.
+		// To use Veo (which supports cref), set backend = "veo".
+		{"google", "google", "", false, false, "google"},
+		{"google_with_imagen_model", "google", "imagen-4.0-generate-001", false, false, "google"},
+		{"imagen", "imagen", "imagen-3.0-generate-002", false, false, "imagen"},
+		// The veo and google-veo backends always support cref.
+		{"veo", "veo", "", true, false, "veo"},
+		{"google-veo", "google-veo", "", true, false, "google-veo"},
+		{"unsupported", "unsupported", "", false, false, "unsupported"},
 	}
 
 	for _, tt := range tests {
@@ -1786,7 +1792,8 @@ func TestGetCapabilities(t *testing.T) {
 			cfg := &config.Config{
 				Plugins: config.PluginsConfig{
 					ImageGen: config.ImageGenConfig{
-						Backend: tt.backend,
+						Backend:     tt.backend,
+						GoogleModel: tt.googleModel,
 					},
 				},
 			}
@@ -1801,6 +1808,120 @@ func TestGetCapabilities(t *testing.T) {
 			}
 			if caps.SupportsSref != tt.wantSref {
 				t.Errorf("expected supports_sref %v, got %v", tt.wantSref, caps.SupportsSref)
+			}
+		})
+	}
+}
+
+func TestGetCapabilities_ForceOverrides(t *testing.T) {
+	t.Run("force_cref overrides imagen no-cref", func(t *testing.T) {
+		cfg := &config.Config{
+			Plugins: config.PluginsConfig{
+				ImageGen: config.ImageGenConfig{
+					Backend:     "google",
+					GoogleModel: "imagen-4.0-generate-001",
+					ForceCref:   true,
+				},
+			},
+		}
+		service := NewImageGenService(t.TempDir(), cfg)
+		caps := service.GetCapabilities()
+		if !caps.SupportsCref {
+			t.Error("expected supports_cref=true with ForceCref override, got false")
+		}
+		if caps.SupportsSref {
+			t.Error("expected supports_sref=false (not forced), got true")
+		}
+	})
+
+	t.Run("force_sref overrides openai no-sref", func(t *testing.T) {
+		cfg := &config.Config{
+			Plugins: config.PluginsConfig{
+				ImageGen: config.ImageGenConfig{
+					Backend:   "openai",
+					ForceSref: true,
+				},
+			},
+		}
+		service := NewImageGenService(t.TempDir(), cfg)
+		caps := service.GetCapabilities()
+		if caps.SupportsCref {
+			t.Error("expected supports_cref=false (not forced), got true")
+		}
+		if !caps.SupportsSref {
+			t.Error("expected supports_sref=true with ForceSref override, got false")
+		}
+	})
+
+	t.Run("both overrides", func(t *testing.T) {
+		cfg := &config.Config{
+			Plugins: config.PluginsConfig{
+				ImageGen: config.ImageGenConfig{
+					Backend:   "openai",
+					ForceCref: true,
+					ForceSref: true,
+				},
+			},
+		}
+		service := NewImageGenService(t.TempDir(), cfg)
+		caps := service.GetCapabilities()
+		if !caps.SupportsCref {
+			t.Error("expected supports_cref=true with ForceCref override, got false")
+		}
+		if !caps.SupportsSref {
+			t.Error("expected supports_sref=true with ForceSref override, got false")
+		}
+	})
+}
+
+func TestBackendCapabilities(t *testing.T) {
+	tests := []struct {
+		name        string
+		caps        Capabilities
+		wantBackend string
+		wantCref    bool
+		wantSref    bool
+	}{
+		{
+			name:        "OpenAIBackend",
+			caps:        (&OpenAIBackend{}).Capabilities(),
+			wantBackend: "openai",
+			wantCref:    false,
+			wantSref:    false,
+		},
+		{
+			name:        "GoogleBackend",
+			caps:        (&GoogleBackend{}).Capabilities(),
+			wantBackend: "google",
+			wantCref:    false,
+			wantSref:    false,
+		},
+		{
+			name:        "VeoBackend",
+			caps:        (&VeoBackend{}).Capabilities(),
+			wantBackend: "veo",
+			wantCref:    true,
+			wantSref:    false,
+		},
+		{
+			name:        "MidjourneyBackend",
+			caps:        (&MidjourneyBackend{}).Capabilities(),
+			wantBackend: "midjourney",
+			wantCref:    true,
+			wantSref:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.caps.Backend != tt.wantBackend {
+				t.Errorf("expected backend %q, got %q", tt.wantBackend, tt.caps.Backend)
+			}
+			if tt.caps.SupportsCref != tt.wantCref {
+				t.Errorf("expected supports_cref=%v, got %v", tt.wantCref, tt.caps.SupportsCref)
+			}
+			if tt.caps.SupportsSref != tt.wantSref {
+				t.Errorf("expected supports_sref=%v, got %v", tt.wantSref, tt.caps.SupportsSref)
 			}
 		})
 	}
@@ -1840,5 +1961,82 @@ func TestGenerateImage_CapabilitiesValidation(t *testing.T) {
 	_, err = serviceOpenAI.GenerateImage(context.Background(), "prompt", "1024x1024", "sref-style", "", nil)
 	if err == nil || !strings.Contains(err.Error(), "style reference (sref_url) is not supported by the active imagegen backend") {
 		t.Errorf("expected error containing 'style reference (sref_url) is not supported by the active imagegen backend', got: %v", err)
+	}
+}
+
+func TestGenerateImage_ImagenCrefValidation(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test 1: google backend with an Imagen model should reject cref_url without ForceCref.
+	cfgImagen := &config.Config{
+		APIKeys: config.APIKeys{
+			Gemini: "mock-key",
+		},
+		Plugins: config.PluginsConfig{
+			ImageGen: config.ImageGenConfig{
+				Backend:     "google",
+				GoogleModel: "imagen-4.0-generate-001",
+			},
+		},
+	}
+	serviceImagen := NewImageGenService(tmpDir, cfgImagen)
+	_, err := serviceImagen.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "character reference (cref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected cref validation error for Imagen model, got: %v", err)
+	}
+
+	// Test 2: imagen backend with default (empty) GoogleModel should also reject cref_url.
+	cfgImagenDefault := &config.Config{
+		Plugins: config.PluginsConfig{
+			ImageGen: config.ImageGenConfig{
+				Backend: "imagen",
+			},
+		},
+	}
+	serviceImagenDefault := NewImageGenService(tmpDir, cfgImagenDefault)
+	_, err = serviceImagenDefault.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
+	if err == nil || !strings.Contains(err.Error(), "character reference (cref_url) is not supported by the active imagegen backend") {
+		t.Errorf("expected cref validation error for imagen backend with default model, got: %v", err)
+	}
+
+	// Test 3: ForceCref=true bypasses the capability check for the Imagen backend.
+	// Use a mock httptest server so the test is hermetic and makes no real network requests.
+	expectedBytesForce := []byte("google-image-bytes-force-cref")
+	b64Force := base64.StdEncoding.EncodeToString(expectedBytesForce)
+	forceServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{"bytesBase64Encoded": b64Force, "mimeType": "image/jpeg"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer forceServer.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", forceServer.URL)
+
+	cfgForce := &config.Config{
+		APIKeys: config.APIKeys{
+			Gemini: "mock-key",
+		},
+		Plugins: config.PluginsConfig{
+			ImageGen: config.ImageGenConfig{
+				Backend:     "google",
+				GoogleModel: "imagen-4.0-generate-001",
+				ForceCref:   true,
+			},
+		},
+	}
+	serviceForce := NewImageGenService(tmpDir, cfgForce)
+	caps := serviceForce.GetCapabilities()
+	if !caps.SupportsCref {
+		t.Error("expected supports_cref=true when ForceCref is set, got false")
+	}
+	// The generate call should pass capability validation and succeed via the mock server.
+	// Since the mock server is hermetic, require err == nil — any error here is a regression.
+	_, err = serviceForce.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
+	if err != nil {
+		t.Errorf("expected ForceCref generate to succeed with mock server, got: %v", err)
 	}
 }
