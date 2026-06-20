@@ -94,6 +94,9 @@ region = "us-east-1"
 	foundGetLogs := false
 	foundCheckBucket := false
 	foundUploadFile := false
+	foundListRunServices := false
+	foundGetRunService := false
+	foundDeployRunService := false
 	for _, tool := range tools {
 		if tool.Name == "cloud_list_instances" {
 			foundListInstances = true
@@ -106,6 +109,15 @@ region = "us-east-1"
 		}
 		if tool.Name == "cloud_upload_file" {
 			foundUploadFile = true
+		}
+		if tool.Name == "cloud_list_run_services" {
+			foundListRunServices = true
+		}
+		if tool.Name == "cloud_get_run_service" {
+			foundGetRunService = true
+		}
+		if tool.Name == "cloud_deploy_run_service" {
+			foundDeployRunService = true
 		}
 	}
 
@@ -120,6 +132,15 @@ region = "us-east-1"
 	}
 	if !foundUploadFile {
 		t.Errorf("expected to find 'cloud_upload_file' tool, got tools: %+v", tools)
+	}
+	if !foundListRunServices {
+		t.Errorf("expected to find 'cloud_list_run_services' tool, got tools: %+v", tools)
+	}
+	if !foundGetRunService {
+		t.Errorf("expected to find 'cloud_get_run_service' tool, got tools: %+v", tools)
+	}
+	if !foundDeployRunService {
+		t.Errorf("expected to find 'cloud_deploy_run_service' tool, got tools: %+v", tools)
 	}
 
 	// 2. CallTool to check bucket (which calls noop/mock backend)

@@ -1,9 +1,9 @@
 # plan: Task 4.8: Google Cloud Run Orchestration Tools (`pw-mcp-cloud`)
 
-**Status:** Open
+**Status:** Completed
 **Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Date Completed:** 2026-06-20
+**Unit Test Coverage:** 91.00%
 
 ---
 

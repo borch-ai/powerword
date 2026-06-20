@@ -83,6 +83,33 @@ func (m *mockGCSClient) CheckBucket(ctx context.Context, projectID, bucketName s
 	return nil, nil
 }
 
+type mockGCPRunClient struct {
+	ListServicesFunc  func(ctx context.Context, projectID, region string) ([]CloudRunService, error)
+	GetServiceFunc    func(ctx context.Context, projectID, region, serviceName string) (*CloudRunService, error)
+	DeployServiceFunc func(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*CloudRunService, error)
+}
+
+func (m *mockGCPRunClient) ListServices(ctx context.Context, projectID, region string) ([]CloudRunService, error) {
+	if m.ListServicesFunc != nil {
+		return m.ListServicesFunc(ctx, projectID, region)
+	}
+	return nil, nil
+}
+
+func (m *mockGCPRunClient) GetService(ctx context.Context, projectID, region, serviceName string) (*CloudRunService, error) {
+	if m.GetServiceFunc != nil {
+		return m.GetServiceFunc(ctx, projectID, region, serviceName)
+	}
+	return nil, nil
+}
+
+func (m *mockGCPRunClient) DeployService(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*CloudRunService, error) {
+	if m.DeployServiceFunc != nil {
+		return m.DeployServiceFunc(ctx, projectID, region, serviceName, image, envVars, concurrency, cpu, memory)
+	}
+	return nil, nil
+}
+
 func TestListInstances(t *testing.T) {
 	cfg := &config.Config{
 		Plugins: config.PluginsConfig{
@@ -348,7 +375,7 @@ func TestCheckBucket(t *testing.T) {
 	}
 }
 
-//nolint:gocognit,funlen
+//nolint:gocognit,funlen,nestif
 func TestRealClientsWithMockHTTP(t *testing.T) {
 	// 1. Start a mock server to capture GCP and AWS SDK calls
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -394,6 +421,100 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 			}`
 			_, _ = w.Write([]byte(resp))
 			return
+		}
+
+		// GCP Cloud Run serving v1 API mock endpoints
+		if strings.Contains(r.URL.Path, "/apis/serving.knative.dev/v1/namespaces/") && strings.Contains(r.URL.Path, "/services") {
+			switch r.Method {
+			case "GET":
+				switch {
+				case strings.HasSuffix(r.URL.Path, "/services"):
+					// List Services
+					resp := `{
+						"kind": "ServiceList",
+						"items": [
+							{
+								"metadata": {"name": "gcp-run-service"},
+								"status": {
+									"url": "https://gcp-run-service-xyz.run.app",
+									"conditions": [{"type": "Ready", "status": "True"}]
+								},
+								"spec": {
+									"template": {
+										"spec": {
+											"containerConcurrency": 80,
+											"containers": [
+												{
+													"image": "gcr.io/test-project-123/gcp-run-service:v1",
+													"resources": {"limits": {"cpu": "1000m", "memory": "256Mi"}},
+													"env": [{"name": "FOO", "value": "BAR"}]
+												}
+											]
+										}
+									}
+								}
+							}
+						]
+					}`
+					_, _ = w.Write([]byte(resp))
+					return
+				case strings.HasSuffix(r.URL.Path, "/new-run-service"):
+					// Get Service (not found)
+					w.WriteHeader(http.StatusNotFound)
+					_, _ = w.Write([]byte(`{"error": {"code": 404, "message": "not found"}}`))
+					return
+				default:
+					// Get Service (exists)
+					resp := `{
+						"metadata": {"name": "gcp-run-service"},
+						"status": {
+							"url": "https://gcp-run-service-xyz.run.app",
+							"conditions": [{"type": "Ready", "status": "True"}]
+						},
+						"spec": {
+							"template": {
+								"spec": {
+									"containerConcurrency": 80,
+									"containers": [
+										{
+											"image": "gcr.io/test-project-123/gcp-run-service:v1",
+											"resources": {"limits": {"cpu": "1000m", "memory": "256Mi"}},
+											"env": [{"name": "FOO", "value": "BAR"}]
+										}
+									]
+								}
+							}
+						}
+					}`
+					_, _ = w.Write([]byte(resp))
+					return
+				}
+			case "POST", "PUT":
+				// Create / Replace Service
+				resp := `{
+					"metadata": {"name": "gcp-run-service"},
+					"status": {
+						"url": "https://gcp-run-service-xyz.run.app",
+						"conditions": [{"type": "Ready", "status": "True"}]
+					},
+					"spec": {
+						"template": {
+							"spec": {
+								"containerConcurrency": 80,
+								"containers": [
+									{
+										"image": "gcr.io/test-project-123/gcp-run-service:v1",
+										"resources": {"limits": {"cpu": "1000m", "memory": "256Mi"}},
+										"env": [{"name": "FOO", "value": "BAR"}]
+									}
+								]
+							}
+						}
+					}
+				}`
+				_, _ = w.Write([]byte(resp))
+				return
+			}
 		}
 
 		// AWS POST requests (EC2 / CW Logs)
@@ -583,6 +704,67 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 	}
 	if !gcsBucket2.Exists {
 		t.Errorf("expected bucket to exist")
+	}
+
+	// GCP Cloud Run client testing
+	runC := &realGCPRunClient{cfg: cfg}
+	services, err := runC.ListServices(ctx, "test-project-123", "us-central1")
+	if err != nil {
+		t.Fatalf("realGCPRunClient.ListServices failed: %v", err)
+	}
+	if len(services) != 1 || services[0].Name != "gcp-run-service" {
+		t.Errorf("unexpected list services result: %+v", services)
+	}
+
+	service, err := runC.GetService(ctx, "test-project-123", "us-central1", "gcp-run-service")
+	if err != nil {
+		t.Fatalf("realGCPRunClient.GetService failed: %v", err)
+	}
+	if service.Name != "gcp-run-service" {
+		t.Errorf("unexpected get service result: %+v", service)
+	}
+
+	// Test Deploy (existing service -> PUT ReplaceService)
+	deployed, err := runC.DeployService(ctx, "test-project-123", "us-central1", "gcp-run-service", "gcr.io/test-project-123/gcp-run-service:v1", nil, 80, "1000m", "256Mi")
+	if err != nil {
+		t.Fatalf("realGCPRunClient.DeployService (update) failed: %v", err)
+	}
+	if deployed.Name != "gcp-run-service" {
+		t.Errorf("unexpected deploy service result: %+v", deployed)
+	}
+
+	// Test Deploy (new service -> POST Create)
+	deployedNew, err := runC.DeployService(ctx, "test-project-123", "us-central1", "new-run-service", "gcr.io/test-project-123/new-run-service:v1", nil, 80, "1000m", "256Mi")
+	if err != nil {
+		t.Fatalf("realGCPRunClient.DeployService (create) failed: %v", err)
+	}
+	if deployedNew.Name != "gcp-run-service" {
+		t.Errorf("unexpected deploy service result: %+v", deployedNew)
+	}
+
+	// Test high-level methods on svc
+	services2, err := svc.ListRunServices(ctx, "us-central1")
+	if err != nil {
+		t.Fatalf("svc.ListRunServices failed: %v", err)
+	}
+	if len(services2) != 1 {
+		t.Errorf("expected 1 service, got %d", len(services2))
+	}
+
+	service2, err := svc.GetRunService(ctx, "us-central1", "gcp-run-service")
+	if err != nil {
+		t.Fatalf("svc.GetRunService failed: %v", err)
+	}
+	if service2.Name != "gcp-run-service" {
+		t.Errorf("expected gcp-run-service, got %s", service2.Name)
+	}
+
+	deployed2, err := svc.DeployRunService(ctx, "us-central1", "gcp-run-service", "gcr.io/test-project-123/gcp-run-service:v1", nil, 80, "1000m", "256Mi")
+	if err != nil {
+		t.Fatalf("svc.DeployRunService failed: %v", err)
+	}
+	if deployed2.Name != "gcp-run-service" {
+		t.Errorf("expected gcp-run-service, got %s", deployed2.Name)
 	}
 }
 
@@ -790,5 +972,146 @@ func TestCloudService_UploadFile(t *testing.T) {
 	}
 	if got != "https://public-url.com/file.png" {
 		t.Errorf("expected public URL, got: %s", got)
+	}
+}
+
+//nolint:gocognit,gocyclo,funlen
+func TestCloudService_GCPRunServices(t *testing.T) {
+	cfg := &config.Config{}
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "test-project-123")
+
+	tests := []struct {
+		name      string
+		action    func(svc *CloudService) (interface{}, error)
+		mockSetup func(m *mockGCPRunClient)
+		want      interface{}
+		wantErr   string
+	}{
+		{
+			name: "ListRunServices Success",
+			action: func(svc *CloudService) (interface{}, error) {
+				return svc.ListRunServices(context.Background(), "us-central1")
+			},
+			mockSetup: func(m *mockGCPRunClient) {
+				m.ListServicesFunc = func(ctx context.Context, projectID, region string) ([]CloudRunService, error) {
+					if projectID != "test-project-123" || region != "us-central1" {
+						return nil, errors.New("wrong params")
+					}
+					return []CloudRunService{{Name: "test-service", URL: "http://test-service"}}, nil
+				}
+			},
+			want: []CloudRunService{{Name: "test-service", URL: "http://test-service"}},
+		},
+		{
+			name: "ListRunServices Missing Region",
+			action: func(svc *CloudService) (interface{}, error) {
+				return svc.ListRunServices(context.Background(), "")
+			},
+			wantErr: "region parameter is required",
+		},
+		{
+			name: "GetRunService Success",
+			action: func(svc *CloudService) (interface{}, error) {
+				return svc.GetRunService(context.Background(), "us-central1", "test-svc")
+			},
+			mockSetup: func(m *mockGCPRunClient) {
+				m.GetServiceFunc = func(ctx context.Context, projectID, region, serviceName string) (*CloudRunService, error) {
+					if projectID != "test-project-123" || region != "us-central1" || serviceName != "test-svc" {
+						return nil, errors.New("wrong params")
+					}
+					return &CloudRunService{Name: "test-svc", URL: "http://test-svc"}, nil
+				}
+			},
+			want: &CloudRunService{Name: "test-svc", URL: "http://test-svc"},
+		},
+		{
+			name: "GetRunService Missing ServiceName",
+			action: func(svc *CloudService) (interface{}, error) {
+				return svc.GetRunService(context.Background(), "us-central1", "")
+			},
+			wantErr: "serviceName parameter is required",
+		},
+		{
+			name: "DeployRunService Success",
+			action: func(svc *CloudService) (interface{}, error) {
+				return svc.DeployRunService(context.Background(), "us-central1", "test-svc", "gcr.io/image:latest", map[string]string{"ENV": "VAL"}, 10, "1", "256Mi")
+			},
+			mockSetup: func(m *mockGCPRunClient) {
+				m.DeployServiceFunc = func(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*CloudRunService, error) {
+					if projectID != "test-project-123" || region != "us-central1" || serviceName != "test-svc" || image != "gcr.io/image:latest" {
+						return nil, errors.New("wrong params")
+					}
+					return &CloudRunService{
+						Name:        "test-svc",
+						Image:       image,
+						Concurrency: concurrency,
+						CPU:         cpu,
+						Memory:      memory,
+						EnvVars:     envVars,
+					}, nil
+				}
+			},
+			want: &CloudRunService{
+				Name:        "test-svc",
+				Image:       "gcr.io/image:latest",
+				Concurrency: 10,
+				CPU:         "1",
+				Memory:      "256Mi",
+				EnvVars:     map[string]string{"ENV": "VAL"},
+			},
+		},
+		{
+			name: "DeployRunService Missing Image",
+			action: func(svc *CloudService) (interface{}, error) {
+				return svc.DeployRunService(context.Background(), "us-central1", "test-svc", "", nil, 0, "", "")
+			},
+			wantErr: "image parameter is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &mockGCPRunClient{}
+			if tt.mockSetup != nil {
+				tt.mockSetup(m)
+			}
+			svc := NewCloudService(cfg, nil, nil, nil, nil, nil, nil)
+			svc.SetGCPRunClient(m)
+
+			got, err := tt.action(svc)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCloudService_GCPRunServices_MissingProject(t *testing.T) {
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	cfg := &config.Config{}
+	svc := NewCloudService(cfg, nil, nil, nil, nil, nil, nil)
+
+	_, err := svc.ListRunServices(context.Background(), "us-central1")
+	if err == nil || !strings.Contains(err.Error(), "GCP project ID is not configured") {
+		t.Errorf("expected missing project error, got: %v", err)
+	}
+
+	_, err = svc.GetRunService(context.Background(), "us-central1", "test-svc")
+	if err == nil || !strings.Contains(err.Error(), "GCP project ID is not configured") {
+		t.Errorf("expected missing project error, got: %v", err)
+	}
+
+	_, err = svc.DeployRunService(context.Background(), "us-central1", "test-svc", "gcr.io/img", nil, 0, "", "")
+	if err == nil || !strings.Contains(err.Error(), "GCP project ID is not configured") {
+		t.Errorf("expected missing project error, got: %v", err)
 	}
 }

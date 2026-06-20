@@ -18,6 +18,7 @@ import (
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/logging/v2"
 	"google.golang.org/api/option"
+	"google.golang.org/api/run/v1"
 
 	"github.com/borch-ai/powerword/pkg/config"
 )
@@ -48,6 +49,20 @@ type BucketMetadata struct {
 	Exists   bool              `json:"exists"`
 }
 
+// CloudRunService represents normalized GCP Cloud Run service metadata.
+type CloudRunService struct {
+	Name        string            `json:"name"`
+	URL         string            `json:"url"`
+	Image       string            `json:"image"`
+	Region      string            `json:"region"`
+	Ready       bool              `json:"ready"`
+	StatusState string            `json:"status_state"` // e.g. "Ready", "Degraded"
+	Concurrency int64             `json:"concurrency"`
+	CPU         string            `json:"cpu"`
+	Memory      string            `json:"memory"`
+	EnvVars     map[string]string `json:"env_vars,omitempty"`
+}
+
 // Client interfaces to enable clean unit testing.
 
 type EC2Client interface {
@@ -72,6 +87,12 @@ type S3Client interface {
 
 type GCSClient interface {
 	CheckBucket(ctx context.Context, projectID, bucketName string) (*BucketMetadata, error)
+}
+
+type GCPRunClient interface {
+	ListServices(ctx context.Context, projectID, region string) ([]CloudRunService, error)
+	GetService(ctx context.Context, projectID, region, serviceName string) (*CloudRunService, error)
+	DeployService(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*CloudRunService, error)
 }
 
 // Real client implementations using AWS/GCP SDKs.
@@ -373,6 +394,238 @@ func (c *realGCSClient) CheckBucket(ctx context.Context, projectID, bucketName s
 	}, nil
 }
 
+type realGCPRunClient struct {
+	cfg *config.Config
+}
+
+func (c *realGCPRunClient) getAPIService(ctx context.Context, region string) (*run.APIService, error) {
+	opts, err := getGCPOptions(c.cfg)
+	if err != nil {
+		return nil, err
+	}
+	if os.Getenv("POWERWORD_CLOUD_MOCK_ENDPOINT") == "" {
+		endpoint := fmt.Sprintf("https://%s-run.googleapis.com", region)
+		opts = append(opts, option.WithEndpoint(endpoint))
+	}
+	apiSvc, err := run.NewService(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize GCP Cloud Run client: %w", err)
+	}
+	return apiSvc, nil
+}
+
+func (c *realGCPRunClient) ListServices(ctx context.Context, projectID, region string) ([]CloudRunService, error) {
+	apiSvc, err := c.getAPIService(ctx, region)
+	if err != nil {
+		return nil, err
+	}
+
+	parent := "namespaces/" + projectID
+	result, err := apiSvc.Namespaces.Services.List(parent).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Cloud Run services: %w", err)
+	}
+
+	var services []CloudRunService
+	for _, item := range result.Items {
+		normalized := normalizeCloudRunService(item, region)
+		services = append(services, normalized)
+	}
+
+	return services, nil
+}
+
+func (c *realGCPRunClient) GetService(ctx context.Context, projectID, region, serviceName string) (*CloudRunService, error) {
+	apiSvc, err := c.getAPIService(ctx, region)
+	if err != nil {
+		return nil, err
+	}
+
+	name := fmt.Sprintf("namespaces/%s/services/%s", projectID, serviceName)
+	item, err := apiSvc.Namespaces.Services.Get(name).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Cloud Run service: %w", err)
+	}
+
+	normalized := normalizeCloudRunService(item, region)
+	return &normalized, nil
+}
+
+//nolint:gocognit,gocyclo,funlen,nestif
+func (c *realGCPRunClient) DeployService(ctx context.Context, projectID, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*CloudRunService, error) {
+	apiSvc, err := c.getAPIService(ctx, region)
+	if err != nil {
+		return nil, err
+	}
+
+	name := fmt.Sprintf("namespaces/%s/services/%s", projectID, serviceName)
+	existing, getErr := apiSvc.Namespaces.Services.Get(name).Do()
+
+	// Convert envVars map to slice of EnvVar
+	var envList []*run.EnvVar
+	for k, v := range envVars {
+		envList = append(envList, &run.EnvVar{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	var servicePayload *run.Service
+
+	if getErr == nil && existing != nil {
+		// Service exists, update it (PUT)
+		servicePayload = existing
+
+		// Ensure Spec and Template are initialized
+		if servicePayload.Spec == nil {
+			servicePayload.Spec = &run.ServiceSpec{}
+		}
+		if servicePayload.Spec.Template == nil {
+			servicePayload.Spec.Template = &run.RevisionTemplate{}
+		}
+		if servicePayload.Spec.Template.Spec == nil {
+			servicePayload.Spec.Template.Spec = &run.RevisionSpec{}
+		}
+
+		tSpec := servicePayload.Spec.Template.Spec
+		tSpec.ContainerConcurrency = concurrency
+
+		if len(tSpec.Containers) == 0 {
+			tSpec.Containers = []*run.Container{{}}
+		}
+		container := tSpec.Containers[0]
+		container.Image = image
+		container.Name = serviceName
+		container.Env = envList
+
+		// Apply resources
+		if cpu != "" || memory != "" {
+			if container.Resources == nil {
+				container.Resources = &run.ResourceRequirements{}
+			}
+			if container.Resources.Limits == nil {
+				container.Resources.Limits = make(map[string]string)
+			}
+			if cpu != "" {
+				container.Resources.Limits["cpu"] = cpu
+			}
+			if memory != "" {
+				container.Resources.Limits["memory"] = memory
+			}
+		}
+
+		var updated *run.Service
+		var replaceErr error
+		updated, replaceErr = apiSvc.Namespaces.Services.ReplaceService(name, servicePayload).Do()
+		if replaceErr != nil {
+			return nil, fmt.Errorf("failed to update Cloud Run service: %w", replaceErr)
+		}
+		normalized := normalizeCloudRunService(updated, region)
+		return &normalized, nil
+	}
+
+	// Service does not exist, create it (POST)
+	servicePayload = &run.Service{
+		ApiVersion: "serving.knative.dev/v1",
+		Kind:       "Service",
+		Metadata: &run.ObjectMeta{
+			Name:      serviceName,
+			Namespace: projectID,
+		},
+		Spec: &run.ServiceSpec{
+			Template: &run.RevisionTemplate{
+				Spec: &run.RevisionSpec{
+					ContainerConcurrency: concurrency,
+					Containers: []*run.Container{
+						{
+							Name:  serviceName,
+							Image: image,
+							Env:   envList,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Apply resources limits if specified
+	if cpu != "" || memory != "" {
+		container := servicePayload.Spec.Template.Spec.Containers[0]
+		container.Resources = &run.ResourceRequirements{
+			Limits: make(map[string]string),
+		}
+		if cpu != "" {
+			container.Resources.Limits["cpu"] = cpu
+		}
+		if memory != "" {
+			container.Resources.Limits["memory"] = memory
+		}
+	}
+
+	parent := "namespaces/" + projectID
+	created, err := apiSvc.Namespaces.Services.Create(parent, servicePayload).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Cloud Run service: %w", err)
+	}
+
+	normalized := normalizeCloudRunService(created, region)
+	return &normalized, nil
+}
+
+//nolint:gocognit,gocyclo,nestif
+func normalizeCloudRunService(service *run.Service, region string) CloudRunService {
+	normalized := CloudRunService{
+		Region: region,
+	}
+
+	if service.Metadata != nil {
+		normalized.Name = service.Metadata.Name
+	}
+
+	if service.Status != nil {
+		normalized.URL = service.Status.Url
+
+		// Parse condition for readiness
+		normalized.Ready = false
+		normalized.StatusState = "Unknown"
+		for _, cond := range service.Status.Conditions {
+			if cond.Type == "Ready" {
+				if cond.Status == "True" {
+					normalized.Ready = true
+					normalized.StatusState = "Ready"
+				} else {
+					normalized.StatusState = cond.Reason
+					if normalized.StatusState == "" {
+						normalized.StatusState = "NotReady"
+					}
+				}
+				break
+			}
+		}
+	}
+
+	if service.Spec != nil && service.Spec.Template != nil && service.Spec.Template.Spec != nil {
+		tSpec := service.Spec.Template.Spec
+		normalized.Concurrency = tSpec.ContainerConcurrency
+		if len(tSpec.Containers) > 0 {
+			container := tSpec.Containers[0]
+			normalized.Image = container.Image
+			if container.Resources != nil && container.Resources.Limits != nil {
+				normalized.CPU = container.Resources.Limits["cpu"]
+				normalized.Memory = container.Resources.Limits["memory"]
+			}
+			if len(container.Env) > 0 {
+				normalized.EnvVars = make(map[string]string)
+				for _, env := range container.Env {
+					normalized.EnvVars[env.Name] = env.Value
+				}
+			}
+		}
+	}
+
+	return normalized
+}
+
 // CloudService coordinates the invocation of the respective cloud provider clients.
 type CloudService struct {
 	cfg          *config.Config
@@ -383,6 +636,7 @@ type CloudService struct {
 	s3Client     S3Client
 	gcsClient    GCSClient
 	uploader     Uploader
+	gcpRunClient GCPRunClient
 }
 
 // NewCloudService constructs a CloudService, injecting mocks if passed, or defaulting to real clients.
@@ -418,6 +672,9 @@ func NewCloudService(cfg *config.Config, ec2 EC2Client, gce GCEClient, cw CWLogs
 	if s.uploader == nil {
 		s.uploader = NewUploader(cfg)
 	}
+	if s.gcpRunClient == nil {
+		s.gcpRunClient = &realGCPRunClient{cfg: cfg}
+	}
 
 	return s
 }
@@ -425,6 +682,11 @@ func NewCloudService(cfg *config.Config, ec2 EC2Client, gce GCEClient, cw CWLogs
 // SetUploader allows overriding the default uploader (useful for unit tests).
 func (s *CloudService) SetUploader(u Uploader) {
 	s.uploader = u
+}
+
+// SetGCPRunClient allows overriding the default GCP Run client (useful for unit tests).
+func (s *CloudService) SetGCPRunClient(c GCPRunClient) {
+	s.gcpRunClient = c
 }
 
 // UploadFile uploads the local file using the configured uploader.
@@ -646,4 +908,49 @@ func getGCPProject(cfg *config.Config) string {
 		}
 	}
 	return ""
+}
+
+// ListRunServices queries and lists Cloud Run services in the specified region.
+func (s *CloudService) ListRunServices(ctx context.Context, region string) ([]CloudRunService, error) {
+	projectID := getGCPProject(s.cfg)
+	if projectID == "" {
+		return nil, fmt.Errorf("GCP project ID is not configured")
+	}
+	if region == "" {
+		return nil, fmt.Errorf("region parameter is required")
+	}
+	return s.gcpRunClient.ListServices(ctx, projectID, region)
+}
+
+// GetRunService retrieves a Cloud Run service by name in the specified region.
+func (s *CloudService) GetRunService(ctx context.Context, region, serviceName string) (*CloudRunService, error) {
+	projectID := getGCPProject(s.cfg)
+	if projectID == "" {
+		return nil, fmt.Errorf("GCP project ID is not configured")
+	}
+	if region == "" {
+		return nil, fmt.Errorf("region parameter is required")
+	}
+	if serviceName == "" {
+		return nil, fmt.Errorf("serviceName parameter is required")
+	}
+	return s.gcpRunClient.GetService(ctx, projectID, region, serviceName)
+}
+
+// DeployRunService deploys (creates or updates) a Cloud Run service in the specified region.
+func (s *CloudService) DeployRunService(ctx context.Context, region, serviceName, image string, envVars map[string]string, concurrency int64, cpu, memory string) (*CloudRunService, error) {
+	projectID := getGCPProject(s.cfg)
+	if projectID == "" {
+		return nil, fmt.Errorf("GCP project ID is not configured")
+	}
+	if region == "" {
+		return nil, fmt.Errorf("region parameter is required")
+	}
+	if serviceName == "" {
+		return nil, fmt.Errorf("serviceName parameter is required")
+	}
+	if image == "" {
+		return nil, fmt.Errorf("image parameter is required")
+	}
+	return s.gcpRunClient.DeployService(ctx, projectID, region, serviceName, image, envVars, concurrency, cpu, memory)
 }
