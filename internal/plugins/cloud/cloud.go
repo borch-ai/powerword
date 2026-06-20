@@ -3,6 +3,7 @@ package cloud
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/logging/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/api/run/v1"
@@ -460,6 +462,12 @@ func (c *realGCPRunClient) DeployService(ctx context.Context, projectID, region,
 
 	name := fmt.Sprintf("namespaces/%s/services/%s", projectID, serviceName)
 	existing, getErr := apiSvc.Namespaces.Services.Get(name).Do()
+	if getErr != nil {
+		var gErr *googleapi.Error
+		if !errors.As(getErr, &gErr) || gErr.Code != 404 {
+			return nil, fmt.Errorf("failed to get Cloud Run service: %w", getErr)
+		}
+	}
 
 	// Convert envVars map to slice of EnvVar
 	var envList []*run.EnvVar
@@ -496,7 +504,9 @@ func (c *realGCPRunClient) DeployService(ctx context.Context, projectID, region,
 		container := tSpec.Containers[0]
 		container.Image = image
 		container.Name = serviceName
-		container.Env = envList
+		if envVars != nil {
+			container.Env = envList
+		}
 
 		// Apply resources
 		if cpu != "" || memory != "" {
@@ -617,7 +627,7 @@ func normalizeCloudRunService(service *run.Service, region string) CloudRunServi
 			if len(container.Env) > 0 {
 				normalized.EnvVars = make(map[string]string)
 				for _, env := range container.Env {
-					normalized.EnvVars[env.Name] = env.Value
+					normalized.EnvVars[env.Name] = "<redacted>"
 				}
 			}
 		}
@@ -686,7 +696,11 @@ func (s *CloudService) SetUploader(u Uploader) {
 
 // SetGCPRunClient allows overriding the default GCP Run client (useful for unit tests).
 func (s *CloudService) SetGCPRunClient(c GCPRunClient) {
-	s.gcpRunClient = c
+	if c == nil {
+		s.gcpRunClient = &realGCPRunClient{cfg: s.cfg}
+	} else {
+		s.gcpRunClient = c
+	}
 }
 
 // UploadFile uploads the local file using the configured uploader.
@@ -932,7 +946,7 @@ func (s *CloudService) GetRunService(ctx context.Context, region, serviceName st
 		return nil, fmt.Errorf("region parameter is required")
 	}
 	if serviceName == "" {
-		return nil, fmt.Errorf("serviceName parameter is required")
+		return nil, fmt.Errorf("service_name parameter is required")
 	}
 	return s.gcpRunClient.GetService(ctx, projectID, region, serviceName)
 }
@@ -947,7 +961,7 @@ func (s *CloudService) DeployRunService(ctx context.Context, region, serviceName
 		return nil, fmt.Errorf("region parameter is required")
 	}
 	if serviceName == "" {
-		return nil, fmt.Errorf("serviceName parameter is required")
+		return nil, fmt.Errorf("service_name parameter is required")
 	}
 	if image == "" {
 		return nil, fmt.Errorf("image parameter is required")

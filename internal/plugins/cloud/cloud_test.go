@@ -2,7 +2,9 @@ package cloud
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -458,17 +460,22 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 					}`
 					_, _ = w.Write([]byte(resp))
 					return
-				case strings.HasSuffix(r.URL.Path, "/new-run-service"):
+				case strings.HasSuffix(r.URL.Path, "/new-run-service") || strings.HasSuffix(r.URL.Path, "/fail-create-service"):
 					// Get Service (not found)
 					w.WriteHeader(http.StatusNotFound)
 					_, _ = w.Write([]byte(`{"error": {"code": 404, "message": "not found"}}`))
 					return
 				default:
 					// Get Service (exists)
-					resp := `{
-						"metadata": {"name": "gcp-run-service"},
+					name := "gcp-run-service"
+					parts := strings.Split(r.URL.Path, "/")
+					if len(parts) > 0 {
+						name = parts[len(parts)-1]
+					}
+					resp := fmt.Sprintf(`{
+						"metadata": {"name": "%s"},
 						"status": {
-							"url": "https://gcp-run-service-xyz.run.app",
+							"url": "https://%s-xyz.run.app",
 							"conditions": [{"type": "Ready", "status": "True"}]
 						},
 						"spec": {
@@ -477,7 +484,7 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 									"containerConcurrency": 80,
 									"containers": [
 										{
-											"image": "gcr.io/test-project-123/gcp-run-service:v1",
+											"image": "gcr.io/test-project-123/%s:v1",
 											"resources": {"limits": {"cpu": "1000m", "memory": "256Mi"}},
 											"env": [{"name": "FOO", "value": "BAR"}]
 										}
@@ -485,16 +492,50 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 								}
 							}
 						}
-					}`
+					}`, name, name, name)
+					//nolint:gosec // mock response
 					_, _ = w.Write([]byte(resp))
 					return
 				}
 			case "POST", "PUT":
 				// Create / Replace Service
-				resp := `{
-					"metadata": {"name": "gcp-run-service"},
+				name := "gcp-run-service"
+				image := "gcr.io/test-project-123/gcp-run-service:v1"
+				var reqSvc struct {
+					Metadata struct {
+						Name string `json:"name"`
+					} `json:"metadata"`
+					Spec struct {
+						Template struct {
+							Spec struct {
+								Containers []struct {
+									Image string `json:"image"`
+								} `json:"containers"`
+							} `json:"spec"`
+						} `json:"template"`
+					} `json:"spec"`
+				}
+
+				bodyBytes, _ := io.ReadAll(r.Body)
+				if err := json.Unmarshal(bodyBytes, &reqSvc); err == nil {
+					if reqSvc.Metadata.Name != "" {
+						name = reqSvc.Metadata.Name
+					}
+					if len(reqSvc.Spec.Template.Spec.Containers) > 0 && reqSvc.Spec.Template.Spec.Containers[0].Image != "" {
+						image = reqSvc.Spec.Template.Spec.Containers[0].Image
+					}
+				}
+
+				if name == "fail-create-service" || name == "fail-replace-service" {
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte(`{"error": {"code": 500, "message": "internal server error"}}`))
+					return
+				}
+
+				resp := fmt.Sprintf(`{
+					"metadata": {"name": "%s"},
 					"status": {
-						"url": "https://gcp-run-service-xyz.run.app",
+						"url": "https://%s-xyz.run.app",
 						"conditions": [{"type": "Ready", "status": "True"}]
 					},
 					"spec": {
@@ -503,7 +544,7 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 								"containerConcurrency": 80,
 								"containers": [
 									{
-										"image": "gcr.io/test-project-123/gcp-run-service:v1",
+										"image": "%s",
 										"resources": {"limits": {"cpu": "1000m", "memory": "256Mi"}},
 										"env": [{"name": "FOO", "value": "BAR"}]
 									}
@@ -511,7 +552,8 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 							}
 						}
 					}
-				}`
+				}`, name, name, image)
+				//nolint:gosec // mock response
 				_, _ = w.Write([]byte(resp))
 				return
 			}
@@ -738,8 +780,11 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("realGCPRunClient.DeployService (create) failed: %v", err)
 	}
-	if deployedNew.Name != "gcp-run-service" {
-		t.Errorf("unexpected deploy service result: %+v", deployedNew)
+	if deployedNew.Name != "new-run-service" {
+		t.Errorf("expected deployedNew.Name to be 'new-run-service', got '%s'", deployedNew.Name)
+	}
+	if deployedNew.Image != "gcr.io/test-project-123/new-run-service:v1" {
+		t.Errorf("expected deployedNew.Image to be 'gcr.io/test-project-123/new-run-service:v1', got '%s'", deployedNew.Image)
 	}
 
 	// Test high-level methods on svc
@@ -765,6 +810,21 @@ func TestRealClientsWithMockHTTP(t *testing.T) {
 	}
 	if deployed2.Name != "gcp-run-service" {
 		t.Errorf("expected gcp-run-service, got %s", deployed2.Name)
+	}
+	if deployed2.Image != "gcr.io/test-project-123/gcp-run-service:v1" {
+		t.Errorf("expected deployed2.Image to be 'gcr.io/test-project-123/gcp-run-service:v1', got '%s'", deployed2.Image)
+	}
+
+	// Test Deploy (Create path failure)
+	_, err = runC.DeployService(ctx, "test-project-123", "us-central1", "fail-create-service", "gcr.io/test-project-123/fail-create-service:v1", nil, 80, "1000m", "256Mi")
+	if err == nil {
+		t.Error("expected DeployService (create) to fail, got nil")
+	}
+
+	// Test Deploy (Replace path failure)
+	_, err = runC.DeployService(ctx, "test-project-123", "us-central1", "fail-replace-service", "gcr.io/test-project-123/fail-replace-service:v1", nil, 80, "1000m", "256Mi")
+	if err == nil {
+		t.Error("expected DeployService (replace) to fail, got nil")
 	}
 }
 
@@ -884,6 +944,23 @@ func TestRealClientsErrorsWithMockHTTP(t *testing.T) {
 	}
 	if gcsMeta.Exists {
 		t.Error("expected GCS bucket exists to be false on 500 error")
+	}
+
+	// 7. Test GCP Cloud Run client error paths
+	runC := &realGCPRunClient{cfg: cfg}
+	_, err = runC.ListServices(ctx, "test-project-123", "us-central1")
+	if err == nil {
+		t.Error("expected realGCPRunClient.ListServices to fail on 400 error, got nil")
+	}
+
+	_, err = runC.GetService(ctx, "test-project-123", "us-central1", "gcp-run-service")
+	if err == nil {
+		t.Error("expected realGCPRunClient.GetService to fail on 400 error, got nil")
+	}
+
+	_, err = runC.DeployService(ctx, "test-project-123", "us-central1", "gcp-run-service", "gcr.io/test-project-123/gcp-run-service:v1", nil, 80, "1000m", "256Mi")
+	if err == nil {
+		t.Error("expected realGCPRunClient.DeployService to fail on 400 error, got nil")
 	}
 }
 
@@ -1029,7 +1106,7 @@ func TestCloudService_GCPRunServices(t *testing.T) {
 			action: func(svc *CloudService) (interface{}, error) {
 				return svc.GetRunService(context.Background(), "us-central1", "")
 			},
-			wantErr: "serviceName parameter is required",
+			wantErr: "service_name parameter is required",
 		},
 		{
 			name: "DeployRunService Success",
