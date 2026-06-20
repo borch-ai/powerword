@@ -7,7 +7,7 @@ on:
     branches: [ main ]
     # Path filtering: only run CodeQL when Go source files or workflow config changes
     paths:
-      - '**.go'
+      - '**/*.go'
       - 'go.mod'
       - 'go.sum'
       - '.github/workflows/codeql.yml'
