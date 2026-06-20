@@ -264,10 +264,14 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 // FetchSuggestions retrieves search autocomplete queries.
 func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]string, error) {
 	escapedQuery := url.QueryEscape(query)
-	base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+	base := os.Getenv("POWERWORD_SEO_COMPLETION_ENDPOINT")
+	if base == "" {
+		base = os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+	}
 	if base == "" {
 		base = "https://completion.amazon.com"
 	}
+	base = strings.TrimSuffix(base, "/")
 	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", base, escapedQuery)
 
 	body, err := s.getWithRetry(ctx, u)
@@ -446,6 +450,7 @@ func (s *SEOService) searchCompetitorASINs(ctx context.Context, query string) []
 	if base == "" {
 		base = "https://www.amazon.com"
 	}
+	base = strings.TrimSuffix(base, "/")
 	searchURL := fmt.Sprintf("%s/s?k=%s&i=stripbooks", base, escapedQuery)
 	body, err := s.getWithRetry(ctx, searchURL)
 	if err != nil {
@@ -476,12 +481,14 @@ func (s *SEOService) AnalyzeNiche(ctx context.Context, query string, asins []str
 		resolvedASINs = s.searchCompetitorASINs(ctx, query)
 	}
 
+	base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+	if base == "" {
+		base = "https://www.amazon.com"
+	}
+	base = strings.TrimSuffix(base, "/")
+
 	competitors := make([]CompetitorBook, 0)
 	for _, asin := range resolvedASINs {
-		base := os.Getenv("POWERWORD_SEO_API_ENDPOINT")
-		if base == "" {
-			base = "https://www.amazon.com"
-		}
 		productURL := fmt.Sprintf("%s/dp/%s", base, asin)
 		body, err := s.getWithRetry(ctx, productURL)
 		if err != nil {
