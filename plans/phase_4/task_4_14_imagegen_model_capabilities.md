@@ -10,11 +10,12 @@ This task updates the `pw-mcp-imagegen` server to expose per-backend capability 
 backend-owned `Capabilities()` method, and implements operator-configurable overrides so capability
 checks can be bypassed if upstream models change.
 
-## Implementation Notes
+## User Review Required
 
 > [!NOTE]
 > This task is complete and the PR is open awaiting merge approval.
-> Copilot reviewed the PR across two commits; all 7 comments were addressed.
+> Copilot reviewed the PR across two commits; all 7 comments were addressed and no further
+> code changes are needed.
 
 ## Final Implementation
 
