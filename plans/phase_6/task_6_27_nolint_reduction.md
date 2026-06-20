@@ -2,7 +2,17 @@
 
 **Status:** Completed
 **Go Version:** 1.26
-**Unit Test Coverage Target:** 91%
+**Date Completed:** 2026-06-20
+**Unit Test Coverage:** 91.0%
+
+---
+
+## User Review Required
+
+> [!NOTE]
+> No breaking changes. This refactors multiple complex functions and repeats of `//nolint` tags to reduce total tags from 185 to 151.
+
+---
 
 The codebase currently carries **185 `//nolint` suppressions** across production and test code. The vast majority are either repeated, identical justifications for the same pattern (which can be consolidated into a single documented helper), or the result of functions that are too large to pass complexity-analysis linters (`gocognit`, `funlen`, `nestif`, `gocyclo`). This task systematically eliminates as many suppressions as possible through refactoring — without relaxing linter thresholds.
 
