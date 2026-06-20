@@ -619,7 +619,7 @@ func (s *ViralService) StitchSlideshow(ctx context.Context, slides []Slide, back
 	return outputPath, nil
 }
 
-//nolint:gosec // G704: client.Do executes request with dynamic but trusted API URL
+//nolint:gosec // G704: client.Do is flagged by gosec taint analysis since req.URL is dynamic; this sink suppression is required to compile
 func doRequest(client *http.Client, req *http.Request) (*http.Response, error) {
 	return client.Do(req)
 }

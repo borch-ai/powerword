@@ -494,10 +494,33 @@ func TestResolveCriticServerConfig_NotInPathOrBin(t *testing.T) {
 	cfg := &config.Config{
 		Servers: map[string]config.ServerConfig{}, // no critic key
 	}
-	// pw-mcp-critic won't be in PATH in test env, and bin/ probably doesn't exist
-	_, err := resolveCriticServerConfig(cfg)
-	// Either succeeds (if bin/pw-mcp-critic happens to exist) or fails — both are valid
-	_ = err
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmp, err := os.MkdirTemp("", "critic-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+
+	if chdirErr := os.Chdir(tmp); chdirErr != nil {
+		t.Fatal(chdirErr)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(cwd)
+	})
+
+	t.Setenv("PATH", "")
+
+	_, err = resolveCriticServerConfig(cfg)
+	if err == nil {
+		t.Error("expected error when pw-mcp-critic is not in PATH or bin/")
+	} else if !strings.Contains(err.Error(), "pw-mcp-critic not found") {
+		t.Errorf("expected 'pw-mcp-critic not found' error, got: %v", err)
+	}
 }
 
 func TestExtractTextContent_WithTextContent(t *testing.T) {

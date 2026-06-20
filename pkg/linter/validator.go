@@ -108,18 +108,18 @@ func scanPlanFiles(plansDir string) ([]string, error) {
 	return planFiles, nil
 }
 
-// safeReadFile reads a file whose path has been validated by the caller.
-// G304: paths passed to this function are pre-validated (workspace-scoped or config-provided).
+// safeReadFile reads a file from a path within the trusted boundary.
+// G304: path is restricted to workspace-scoped directory trees or explicitly user-configured template overrides.
 //
-//nolint:gosec // G304: all callers pre-validate the path (workspace-scoped or config-provided)
+//nolint:gosec // G304: paths are restricted to the trusted workspace boundaries or explicit user configuration overrides
 func safeReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-// safeStat stats a file whose path has been validated by the caller.
-// G304: paths passed to this function are pre-validated (workspace-scoped or config-provided).
+// safeStat stats a file from a path within the trusted boundary.
+// G304: path is restricted to workspace-scoped directory trees or explicitly user-configured template overrides.
 //
-//nolint:gosec // G304: all callers pre-validate the path (workspace-scoped or config-provided)
+//nolint:gosec // G304: paths are restricted to the trusted workspace boundaries or explicit user configuration overrides
 func safeStat(path string) (os.FileInfo, error) {
 	return os.Stat(path)
 }

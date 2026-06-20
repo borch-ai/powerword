@@ -266,7 +266,11 @@ func LoadFromWorkspace(workspaceRoot string) (*Config, error) {
 		}
 		return cfg, nil
 	}
-	return LoadConfig(cfgPath)
+	cfg, err := LoadConfig(cfgPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config from %s: %w", cfgPath, err)
+	}
+	return cfg, nil
 }
 
 // LoadConfig loads the configuration using Viper.

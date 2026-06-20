@@ -109,7 +109,7 @@ func runValidationCommand(ctx context.Context, workspaceRoot, validationCommand 
 	}
 	valCtx, valCancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer valCancel()
-	//nolint:gosec // G204: validationCommand is "make all" requested explicitly by the orchestrator/CLI configuration
+	//nolint:gosec // G204: validationCommand is dynamic by design to execute arbitrary validation commands configured by the client/orchestrator without a shell
 	cmd := execCommand(valCtx, fields[0], fields[1:]...)
 	cmd.Dir = workspaceRoot
 	out, err := cmd.CombinedOutput()
