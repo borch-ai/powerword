@@ -88,7 +88,15 @@ openai = "dummy-key"
 		t.Fatalf("failed to git init temp workspace: %v", err)
 	}
 
-	// Write a file and stage it so there is a diff
+	gitConfigUserCmd := exec.Command("git", "config", "user.name", "Test User")
+	gitConfigUserCmd.Dir = workspaceDir
+	_ = gitConfigUserCmd.Run()
+
+	gitConfigEmailCmd := exec.Command("git", "config", "user.email", "test@example.com")
+	gitConfigEmailCmd.Dir = workspaceDir
+	_ = gitConfigEmailCmd.Run()
+
+	// Write a file and commit it
 	dummyFile := filepath.Join(workspaceDir, "test.go")
 	if err := os.WriteFile(dummyFile, []byte("package main\n\nfunc main() {}\n"), 0600); err != nil {
 		t.Fatal(err)
@@ -98,6 +106,17 @@ openai = "dummy-key"
 	gitAddCmd.Dir = workspaceDir
 	if err := gitAddCmd.Run(); err != nil {
 		t.Fatalf("failed to git add: %v", err)
+	}
+
+	gitCommitCmd := exec.Command("git", "commit", "-m", "initial commit")
+	gitCommitCmd.Dir = workspaceDir
+	if err := gitCommitCmd.Run(); err != nil {
+		t.Fatalf("failed to git commit: %v", err)
+	}
+
+	// Modify the file without staging, ensuring a working-tree diff
+	if err := os.WriteFile(dummyFile, []byte("package main\n\nfunc main() {\n\tprintln(\"Hello\")\n}\n"), 0600); err != nil {
+		t.Fatal(err)
 	}
 
 	// Setup server config
