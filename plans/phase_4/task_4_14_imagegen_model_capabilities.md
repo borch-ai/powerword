@@ -10,11 +10,11 @@ This task updates the `pw-mcp-imagegen` server to expose per-backend capability 
 backend-owned `Capabilities()` method, and implements operator-configurable overrides so capability
 checks can be bypassed if upstream models change.
 
-## User Review Required
+## Implementation Notes
 
 > [!NOTE]
-> This task is complete and the PR is open. No further review is required.
-> Copilot reviewed the PR (4 comments, all addressed) and found no issues on the follow-up commit.
+> This task is complete and the PR is open awaiting merge approval.
+> Copilot reviewed the PR across two commits; all 7 comments were addressed.
 
 ## Final Implementation
 
@@ -44,8 +44,8 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 #### [MODIFY] [config.go](../../pkg/config/config.go)
 - Add `ForceCref` and `ForceSref` fields to `ImageGenConfig` struct:
   ```go
-  ForceCref bool `yaml:"force_cref" mapstructure:"force_cref"`
-  ForceSref bool `yaml:"force_sref" mapstructure:"force_sref"`
+  ForceCref bool `mapstructure:"force_cref"`
+  ForceSref bool `mapstructure:"force_sref"`
   ```
 - Add `SetDefault` calls and `bindEnv` bindings for `POWERWORD_IMAGEGEN_FORCE_CREF` / `POWERWORD_IMAGEGEN_FORCE_SREF`.
 

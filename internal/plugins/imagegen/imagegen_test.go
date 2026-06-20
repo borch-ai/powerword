@@ -2034,8 +2034,9 @@ func TestGenerateImage_ImagenCrefValidation(t *testing.T) {
 		t.Error("expected supports_cref=true when ForceCref is set, got false")
 	}
 	// The generate call should pass capability validation and succeed via the mock server.
+	// Since the mock server is hermetic, require err == nil — any error here is a regression.
 	_, err = serviceForce.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
-	if err != nil && strings.Contains(err.Error(), "character reference (cref_url) is not supported by the active imagegen backend") {
-		t.Errorf("expected ForceCref to bypass capability validation, but got capability error: %v", err)
+	if err != nil {
+		t.Errorf("expected ForceCref generate to succeed with mock server, got: %v", err)
 	}
 }
