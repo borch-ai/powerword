@@ -87,13 +87,13 @@ openai = "dummy-key"
 	if err := gitInitCmd.Run(); err != nil {
 		t.Fatalf("failed to git init temp workspace: %v", err)
 	}
-	
+
 	// Write a file and stage it so there is a diff
 	dummyFile := filepath.Join(workspaceDir, "test.go")
 	if err := os.WriteFile(dummyFile, []byte("package main\n\nfunc main() {}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	gitAddCmd := exec.Command("git", "add", "test.go")
 	gitAddCmd.Dir = workspaceDir
 	if err := gitAddCmd.Run(); err != nil {

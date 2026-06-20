@@ -595,3 +595,64 @@ func TestSleepContextCancellation(t *testing.T) {
 		t.Errorf("expected context.Canceled error, got %v", err)
 	}
 }
+
+func TestParseBaseURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		val        string
+		defaultVal string
+		want       string
+	}{
+		{
+			name:       "empty input",
+			val:        "",
+			defaultVal: "https://default.com",
+			want:       "https://default.com",
+		},
+		{
+			name:       "invalid URL format",
+			val:        "http://%4g",
+			defaultVal: "https://default.com",
+			want:       "https://default.com",
+		},
+		{
+			name:       "invalid URL scheme",
+			val:        "ftp://example.com",
+			defaultVal: "https://default.com",
+			want:       "https://default.com",
+		},
+		{
+			name:       "invalid URL empty host",
+			val:        "https://",
+			defaultVal: "https://default.com",
+			want:       "https://default.com",
+		},
+		{
+			name:       "valid URL with trailing slash",
+			val:        "https://example.com/",
+			defaultVal: "https://default.com",
+			want:       "https://example.com",
+		},
+		{
+			name:       "valid URL without trailing slash",
+			val:        "https://example.com",
+			defaultVal: "https://default.com",
+			want:       "https://example.com",
+		},
+		{
+			name:       "valid HTTP URL",
+			val:        "http://example.com",
+			defaultVal: "https://default.com",
+			want:       "http://example.com",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseBaseURL(tc.val, tc.defaultVal)
+			if got != tc.want {
+				t.Errorf("parseBaseURL(%q, %q) = %q; want %q", tc.val, tc.defaultVal, got, tc.want)
+			}
+		})
+	}
+}
