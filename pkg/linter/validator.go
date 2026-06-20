@@ -108,13 +108,27 @@ func scanPlanFiles(plansDir string) ([]string, error) {
 	return planFiles, nil
 }
 
+// safeReadFile reads a file from a path within the trusted boundary.
+// G304: path is restricted to workspace-scoped directory trees or explicitly user-configured template overrides.
+//
+//nolint:gosec // G304: paths are restricted to the trusted workspace boundaries or explicit user configuration overrides
+func safeReadFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
+}
+
+// safeStat stats a file from a path within the trusted boundary.
+// G304: path is restricted to workspace-scoped directory trees or explicitly user-configured template overrides.
+//
+//nolint:gosec // G304: paths are restricted to the trusted workspace boundaries or explicit user configuration overrides
+func safeStat(path string) (os.FileInfo, error) {
+	return os.Stat(path)
+}
+
 func resolveTemplate(workspaceRoot string, cfg *config.Config) (string, error) {
 	// 1. Workspace-specific
 	workspacePath := filepath.Join(workspaceRoot, "plans", "TEMPLATE.md")
-	//nolint:gosec
-	if _, err := os.Stat(workspacePath); err == nil {
-		//nolint:gosec
-		content, err := os.ReadFile(workspacePath)
+	if _, err := safeStat(workspacePath); err == nil {
+		content, err := safeReadFile(workspacePath)
 		if err != nil {
 			return "", fmt.Errorf("failed to read workspace plan template %s: %w", workspacePath, err)
 		}
@@ -123,10 +137,8 @@ func resolveTemplate(workspaceRoot string, cfg *config.Config) (string, error) {
 
 	// 2. Global Config
 	if cfg != nil && cfg.PlanTemplate != "" {
-		//nolint:gosec
-		if _, err := os.Stat(cfg.PlanTemplate); err == nil {
-			//nolint:gosec
-			content, err := os.ReadFile(cfg.PlanTemplate)
+		if _, err := safeStat(cfg.PlanTemplate); err == nil {
+			content, err := safeReadFile(cfg.PlanTemplate)
 			if err != nil {
 				return "", fmt.Errorf("failed to read global plan template %s: %w", cfg.PlanTemplate, err)
 			}
@@ -169,31 +181,35 @@ func parseTemplateHeaders(templateText string) ([]string, string) {
 	return headings, titlePattern
 }
 
-//nolint:gocognit,funlen
-func validateSinglePlan(workspaceRoot string, planFile string, titleRegex *regexp.Regexp, templateHeadings []string) []string {
-	var fileErrs []string
+// planParseResult holds everything extracted from one parse pass over a plan file.
+type planParseResult struct {
+	hasTitle              bool
+	seenHeadings          map[string]bool
+	status                string
+	foundGoVersion        bool
+	foundDateCompleted    bool
+	foundUnitTestCoverage bool
+	goVersionVal          string
+	dateCompletedVal      string
+	unitTestCoverageVal   string
+	links                 []planLink
+	scanErr               error
+}
 
-	//nolint:gosec
-	content, err := os.ReadFile(planFile)
-	if err != nil {
-		return []string{fmt.Sprintf("%s: failed to read file: %v", planFile, err)}
-	}
+type planLink struct {
+	lineNum  int
+	line     string
+	label    string
+	linkPath string
+}
 
-	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+// parsePlanContent scans plan file content and extracts headings, status, metadata, and links.
+func parsePlanContent(content string, titleRegex *regexp.Regexp) planParseResult {
+	result := planParseResult{seenHeadings: make(map[string]bool)}
+
+	scanner := bufio.NewScanner(strings.NewReader(content))
 	lineNum := 0
 	inCodeBlock := false
-
-	hasTitle := false
-	seenHeadings := make(map[string]bool)
-	status := ""
-
-	foundGoVersion := false
-	foundDateCompleted := false
-	foundUnitTestCoverage := false
-
-	goVersionVal := ""
-	dateCompletedVal := ""
-	unitTestCoverageVal := ""
 
 	for scanner.Scan() {
 		lineNum++
@@ -208,89 +224,97 @@ func validateSinglePlan(workspaceRoot string, planFile string, titleRegex *regex
 			continue
 		}
 
-		// Title check
-		if strings.HasPrefix(line, "# ") {
-			if titleRegex.MatchString(line) {
-				hasTitle = true
-			}
-		}
+		parseLineContent(line, lineNum, titleRegex, &result)
+	}
+	result.scanErr = scanner.Err()
+	return result
+}
 
-		// Heading tracking (only store level 2 headings)
-		if strings.HasPrefix(line, "## ") {
-			seenHeadings[strings.TrimSpace(line)] = true
-		}
-
-		// Status parsing
-		if statusMatch := statusRegex.FindStringSubmatch(line); len(statusMatch) > 1 {
-			status = statusMatch[1]
-		}
-
-		// Metadata parsing
-		if gvMatch := goVersionRegex.FindStringSubmatch(line); len(gvMatch) > 1 {
-			foundGoVersion = true
-			goVersionVal = gvMatch[1]
-		}
-		if dcMatch := dateCompletedRegex.FindStringSubmatch(line); len(dcMatch) > 1 {
-			foundDateCompleted = true
-			dateCompletedVal = dcMatch[1]
-		}
-		if utcMatch := unitTestCoverageRegex.FindStringSubmatch(line); len(utcMatch) > 1 {
-			foundUnitTestCoverage = true
-			unitTestCoverageVal = utcMatch[1]
-		}
-
-		// Links extraction
-		links := linkRegex.FindAllStringSubmatch(line, -1)
-		for _, match := range links {
-			label := match[1]
-			linkPath := match[2]
-
-			isActionHeader := strings.Contains(line, "[NEW]") || strings.Contains(line, "[MODIFY]") || strings.Contains(line, "[DELETE]")
-			isFileScheme := strings.HasPrefix(linkPath, "file://")
-
-			if isActionHeader || isFileScheme {
-				linkErrs := validateLink(workspaceRoot, planFile, lineNum, line, label, linkPath, &status)
-				if len(linkErrs) > 0 {
-					fileErrs = append(fileErrs, linkErrs...)
-				}
-			}
-		}
+func parseLineContent(line string, lineNum int, titleRegex *regexp.Regexp, result *planParseResult) {
+	if strings.HasPrefix(line, "# ") && titleRegex.MatchString(line) {
+		result.hasTitle = true
+	}
+	if strings.HasPrefix(line, "## ") {
+		result.seenHeadings[strings.TrimSpace(line)] = true
+	}
+	if m := statusRegex.FindStringSubmatch(line); len(m) > 1 {
+		result.status = m[1]
+	}
+	if m := goVersionRegex.FindStringSubmatch(line); len(m) > 1 {
+		result.foundGoVersion = true
+		result.goVersionVal = m[1]
+	}
+	if m := dateCompletedRegex.FindStringSubmatch(line); len(m) > 1 {
+		result.foundDateCompleted = true
+		result.dateCompletedVal = m[1]
+	}
+	if m := unitTestCoverageRegex.FindStringSubmatch(line); len(m) > 1 {
+		result.foundUnitTestCoverage = true
+		result.unitTestCoverageVal = m[1]
 	}
 
-	if err := scanner.Err(); err != nil {
-		fileErrs = append(fileErrs, fmt.Sprintf("%s: scanning error: %v", planFile, err))
-		return fileErrs
+	for _, match := range linkRegex.FindAllStringSubmatch(line, -1) {
+		label, linkPath := match[1], match[2]
+		isAction := strings.Contains(line, "[NEW]") || strings.Contains(line, "[MODIFY]") || strings.Contains(line, "[DELETE]")
+		if isAction || strings.HasPrefix(linkPath, "file://") {
+			result.links = append(result.links, planLink{lineNum: lineNum, line: line, label: label, linkPath: linkPath})
+		}
+	}
+}
+
+// checkCompletedMetadata returns errors for any missing/placeholder metadata fields on a completed plan.
+func checkCompletedMetadata(planFile string, r planParseResult) []string {
+	var errs []string
+	if !r.foundGoVersion || isPlaceholder(r.goVersionVal) {
+		errs = append(errs, fmt.Sprintf("%s: status is Completed but Go Version is missing or a placeholder", planFile))
+	}
+	if !r.foundDateCompleted || isPlaceholder(r.dateCompletedVal) {
+		errs = append(errs, fmt.Sprintf("%s: status is Completed but Date Completed is missing or a placeholder", planFile))
+	}
+	if !r.foundUnitTestCoverage || isPlaceholder(r.unitTestCoverageVal) {
+		errs = append(errs, fmt.Sprintf("%s: status is Completed but Unit Test Coverage is missing or a placeholder", planFile))
+	}
+	return errs
+}
+
+func validateSinglePlan(workspaceRoot string, planFile string, titleRegex *regexp.Regexp, templateHeadings []string) []string {
+	var fileErrs []string
+
+	content, err := safeReadFile(planFile)
+	if err != nil {
+		return []string{fmt.Sprintf("%s: failed to read file: %v", planFile, err)}
 	}
 
-	if !hasTitle {
+	r := parsePlanContent(string(content), titleRegex)
+
+	if r.scanErr != nil {
+		return append(fileErrs, fmt.Sprintf("%s: scanning error: %v", planFile, r.scanErr))
+	}
+
+	if !r.hasTitle {
 		fileErrs = append(fileErrs, fmt.Sprintf("%s: missing top-level plan header matching title pattern", planFile))
 	}
 
 	for _, reqHeading := range templateHeadings {
-		if !seenHeadings[reqHeading] {
+		if !r.seenHeadings[reqHeading] {
 			fileErrs = append(fileErrs, fmt.Sprintf("%s: missing heading %q", planFile, reqHeading))
 		}
 	}
 
 	if len(templateHeadings) == 0 {
-		coreHeadings := []string{"## Proposed Changes", "## Verification Plan"}
-		for _, ch := range coreHeadings {
-			if !seenHeadings[ch] {
+		for _, ch := range []string{"## Proposed Changes", "## Verification Plan"} {
+			if !r.seenHeadings[ch] {
 				fileErrs = append(fileErrs, fmt.Sprintf("%s: missing heading %q", planFile, ch))
 			}
 		}
 	}
 
-	if strings.ToLower(status) == "completed" {
-		if !foundGoVersion || isPlaceholder(goVersionVal) {
-			fileErrs = append(fileErrs, fmt.Sprintf("%s: status is Completed but Go Version is missing or a placeholder", planFile))
-		}
-		if !foundDateCompleted || isPlaceholder(dateCompletedVal) {
-			fileErrs = append(fileErrs, fmt.Sprintf("%s: status is Completed but Date Completed is missing or a placeholder", planFile))
-		}
-		if !foundUnitTestCoverage || isPlaceholder(unitTestCoverageVal) {
-			fileErrs = append(fileErrs, fmt.Sprintf("%s: status is Completed but Unit Test Coverage is missing or a placeholder", planFile))
-		}
+	if strings.ToLower(r.status) == "completed" {
+		fileErrs = append(fileErrs, checkCompletedMetadata(planFile, r)...)
+	}
+
+	for _, lnk := range r.links {
+		fileErrs = append(fileErrs, validateLink(workspaceRoot, planFile, lnk.lineNum, lnk.line, lnk.label, lnk.linkPath, &r.status)...)
 	}
 
 	return fileErrs
@@ -314,7 +338,6 @@ func isGitIgnoredOrOptional(path string) bool {
 	return false
 }
 
-//nolint:gocognit,nestif
 func validateLink(workspaceRoot, planFile string, lineNum int, line string, label string, pathStr string, status *string) []string {
 	var errs []string
 
@@ -345,25 +368,19 @@ func validateLink(workspaceRoot, planFile string, lineNum int, line string, labe
 		errs = append(errs, fmt.Sprintf("%s:%d: link label %q does not match actual file basename %q", planFile, lineNum, label, expectedBasename))
 	}
 
-	if strings.Contains(line, "[MODIFY]") {
-		if !isGitIgnoredOrOptional(absPath) {
-			//nolint:gosec
-			if fi, err := os.Stat(absPath); err != nil {
-				errs = append(errs, fmt.Sprintf("%s:%d: modified file %q does not exist on disk", planFile, lineNum, absPath))
-			} else if fi.IsDir() {
-				errs = append(errs, fmt.Sprintf("%s:%d: modified path %q is a directory, not a file", planFile, lineNum, absPath))
-			}
+	if strings.Contains(line, "[MODIFY]") && !isGitIgnoredOrOptional(absPath) {
+		if fi, err := safeStat(absPath); err != nil {
+			errs = append(errs, fmt.Sprintf("%s:%d: modified file %q does not exist on disk", planFile, lineNum, absPath))
+		} else if fi.IsDir() {
+			errs = append(errs, fmt.Sprintf("%s:%d: modified path %q is a directory, not a file", planFile, lineNum, absPath))
 		}
 	}
 
-	if strings.Contains(line, "[NEW]") && strings.ToLower(*status) == "completed" {
-		if !isGitIgnoredOrOptional(absPath) {
-			//nolint:gosec
-			if fi, err := os.Stat(absPath); err != nil {
-				errs = append(errs, fmt.Sprintf("%s:%d: completed new file %q does not exist on disk", planFile, lineNum, absPath))
-			} else if fi.IsDir() {
-				errs = append(errs, fmt.Sprintf("%s:%d: completed new path %q is a directory, not a file", planFile, lineNum, absPath))
-			}
+	if strings.Contains(line, "[NEW]") && strings.ToLower(*status) == "completed" && !isGitIgnoredOrOptional(absPath) {
+		if fi, err := safeStat(absPath); err != nil {
+			errs = append(errs, fmt.Sprintf("%s:%d: completed new file %q does not exist on disk", planFile, lineNum, absPath))
+		} else if fi.IsDir() {
+			errs = append(errs, fmt.Sprintf("%s:%d: completed new path %q is a directory, not a file", planFile, lineNum, absPath))
 		}
 	}
 
@@ -432,8 +449,6 @@ func isPathAbsolute(pathStr string) bool {
 
 // FixAbsolutePathsInPlans recursively scans the plans/ directory and fixes absolute paths,
 // mismatched labels, missing URI schemes, and auto-populates metadata on completed plans.
-//
-//nolint:gocognit,funlen,nestif
 func FixAbsolutePathsInPlans(workspaceRoot string, cfg *config.Config) (int, error) {
 	plansDir := filepath.Join(workspaceRoot, "plans")
 	planFiles, err := scanPlanFiles(plansDir)
@@ -441,12 +456,8 @@ func FixAbsolutePathsInPlans(workspaceRoot string, cfg *config.Config) (int, err
 		return 0, fmt.Errorf("failed to scan plan files: %w", err)
 	}
 
-	var goVersionLineRegex = regexp.MustCompile(`(?i)(^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Go Version\b[^:]*:\s*(?:\*\*|\*|)?\s*)(.*)`)
-	var dateCompletedLineRegex = regexp.MustCompile(`(?i)(^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Date Completed\b[^:]*:\s*(?:\*\*|\*|)?\s*)(.*)`)
-
 	goVersion := getGoVersionFromMod(workspaceRoot)
 	todayStr := time.Now().Format("2006-01-02")
-
 	modifiedCount := 0
 
 	for _, planFile := range planFiles {
@@ -454,111 +465,20 @@ func FixAbsolutePathsInPlans(workspaceRoot string, cfg *config.Config) (int, err
 			continue
 		}
 
-		//nolint:gosec
-		content, err := os.ReadFile(planFile)
+		content, err := safeReadFile(planFile)
 		if err != nil {
 			return modifiedCount, fmt.Errorf("failed to read plan file %s: %w", planFile, err)
 		}
 
 		lines := strings.Split(string(content), "\n")
-		fileModified := false
-
-		// 1. Pass: check status
-		isCompleted := false
-		for _, line := range lines {
-			if statusMatch := statusRegex.FindStringSubmatch(line); len(statusMatch) > 1 {
-				if strings.ToLower(statusMatch[1]) == "completed" {
-					isCompleted = true
-					break
-				}
-			}
-		}
-
-		// 2. Pass: edit lines
-		for i, line := range lines {
-			newLine := line
-
-			// Handle links
-			links := linkRegex.FindAllStringSubmatch(newLine, -1)
-			for _, match := range links {
-				label := match[1]
-				linkPath := match[2]
-
-				// Determine if it looks like a local codebase path (e.g. not a website, mailto, etc.)
-				isLocal := strings.HasPrefix(linkPath, "file://") ||
-					(!strings.HasPrefix(linkPath, "http://") &&
-						!strings.HasPrefix(linkPath, "https://") &&
-						!strings.Contains(linkPath, "://") &&
-						linkPath != "")
-
-				if !isLocal {
-					continue
-				}
-
-				absPath, absPathErr := getAbsolutePath(workspaceRoot, planFile, linkPath)
-				if absPathErr != nil {
-					continue
-				}
-
-				cleanRoot, absRootErr := filepath.Abs(workspaceRoot)
-				if absRootErr != nil {
-					continue
-				}
-
-				isInside := absPath == cleanRoot || strings.HasPrefix(absPath, cleanRoot+string(filepath.Separator))
-				if !isInside {
-					continue
-				}
-
-				planDir, planDirErr := filepath.Abs(filepath.Dir(planFile))
-				if planDirErr != nil {
-					continue
-				}
-
-				relPath, relPathErr := filepath.Rel(planDir, absPath)
-				if relPathErr != nil {
-					continue
-				}
-
-				relPathSlash := filepath.ToSlash(relPath)
-				expectedLinkPath := "file://" + relPathSlash
-				expectedLabel := filepath.Base(absPath)
-
-				// If it differs, replace it on the line
-				if linkPath != expectedLinkPath || strings.TrimSpace(label) != expectedLabel {
-					oldLink := fmt.Sprintf("[%s](%s)", label, linkPath)
-					newLink := fmt.Sprintf("[%s](%s)", expectedLabel, expectedLinkPath)
-					newLine = strings.Replace(newLine, oldLink, newLink, 1)
-				}
-			}
-
-			// Handle metadata if status is completed
-			if isCompleted {
-				if gvMatch := goVersionLineRegex.FindStringSubmatch(newLine); len(gvMatch) > 1 {
-					cleanVal := strings.Trim(gvMatch[2], "*_` ")
-					if isPlaceholder(cleanVal) {
-						newLine = gvMatch[1] + goVersion
-					}
-				}
-				if dcMatch := dateCompletedLineRegex.FindStringSubmatch(newLine); len(dcMatch) > 1 {
-					cleanVal := strings.Trim(dcMatch[2], "*_` ")
-					if isPlaceholder(cleanVal) {
-						newLine = dcMatch[1] + todayStr
-					}
-				}
-			}
-
-			if newLine != line {
-				lines[i] = newLine
-				fileModified = true
-			}
+		newLines, fileModified, fixErr := fixPlanFileLines(workspaceRoot, planFile, lines, goVersion, todayStr)
+		if fixErr != nil {
+			return modifiedCount, fixErr
 		}
 
 		if fileModified {
-			//nolint:gosec
-			err = os.WriteFile(planFile, []byte(strings.Join(lines, "\n")), 0600)
-			if err != nil {
-				return modifiedCount, fmt.Errorf("failed to write plan file %s: %w", planFile, err)
+			if writeErr := os.WriteFile(planFile, []byte(strings.Join(newLines, "\n")), 0600); writeErr != nil { //nolint:gosec // G306: plan files are user-owned workspace files with 0600 perms
+				return modifiedCount, fmt.Errorf("failed to write plan file %s: %w", planFile, writeErr)
 			}
 			modifiedCount++
 		}
@@ -567,10 +487,101 @@ func FixAbsolutePathsInPlans(workspaceRoot string, cfg *config.Config) (int, err
 	return modifiedCount, nil
 }
 
+// fixPlanFileLines applies link normalization and metadata patching to a slice of plan file lines.
+func fixPlanFileLines(workspaceRoot, planFile string, lines []string, goVersion, todayStr string) ([]string, bool, error) {
+	var goVersionLineRegex = regexp.MustCompile(`(?i)(^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Go Version\b[^:]*:\s*(?:\*\*|\*|)?\s*)(.*)`)
+	var dateCompletedLineRegex = regexp.MustCompile(`(?i)(^(?:\s*[-*+]?\s*)?(?:\*\*|\*)?Date Completed\b[^:]*:\s*(?:\*\*|\*|)?\s*)(.*)`)
+
+	// Determine status in a first pass
+	isCompleted := false
+	for _, line := range lines {
+		if m := statusRegex.FindStringSubmatch(line); len(m) > 1 && strings.ToLower(m[1]) == "completed" {
+			isCompleted = true
+			break
+		}
+	}
+
+	fileModified := false
+	for i, line := range lines {
+		newLine := fixLineLinks(workspaceRoot, planFile, line)
+		if isCompleted {
+			newLine = patchCompletedMetadata(newLine, goVersionLineRegex, dateCompletedLineRegex, goVersion, todayStr)
+		}
+		if newLine != line {
+			lines[i] = newLine
+			fileModified = true
+		}
+	}
+	return lines, fileModified, nil
+}
+
+// fixLineLinks rewrites any local file links on a single line to use relative paths and correct labels.
+func fixLineLinks(workspaceRoot, planFile, line string) string {
+	for _, match := range linkRegex.FindAllStringSubmatch(line, -1) {
+		label, linkPath := match[1], match[2]
+
+		isLocal := strings.HasPrefix(linkPath, "file://") ||
+			(!strings.HasPrefix(linkPath, "http://") &&
+				!strings.HasPrefix(linkPath, "https://") &&
+				!strings.Contains(linkPath, "://") &&
+				linkPath != "")
+		if !isLocal {
+			continue
+		}
+
+		absPath, err := getAbsolutePath(workspaceRoot, planFile, linkPath)
+		if err != nil {
+			continue
+		}
+
+		cleanRoot, err := filepath.Abs(workspaceRoot)
+		if err != nil {
+			continue
+		}
+
+		isInside := absPath == cleanRoot || strings.HasPrefix(absPath, cleanRoot+string(filepath.Separator))
+		if !isInside {
+			continue
+		}
+
+		planDir, err := filepath.Abs(filepath.Dir(planFile))
+		if err != nil {
+			continue
+		}
+
+		relPath, err := filepath.Rel(planDir, absPath)
+		if err != nil {
+			continue
+		}
+
+		expectedLinkPath := "file://" + filepath.ToSlash(relPath)
+		expectedLabel := filepath.Base(absPath)
+
+		if linkPath != expectedLinkPath || strings.TrimSpace(label) != expectedLabel {
+			line = strings.Replace(line, fmt.Sprintf("[%s](%s)", label, linkPath), fmt.Sprintf("[%s](%s)", expectedLabel, expectedLinkPath), 1)
+		}
+	}
+	return line
+}
+
+// patchCompletedMetadata fills in placeholder Go Version and Date Completed fields on completed plan lines.
+func patchCompletedMetadata(line string, goVersionRe, dateCompletedRe *regexp.Regexp, goVersion, todayStr string) string {
+	if m := goVersionRe.FindStringSubmatch(line); len(m) > 1 {
+		if isPlaceholder(strings.Trim(m[2], "*_` ")) {
+			return m[1] + goVersion
+		}
+	}
+	if m := dateCompletedRe.FindStringSubmatch(line); len(m) > 1 {
+		if isPlaceholder(strings.Trim(m[2], "*_` ")) {
+			return m[1] + todayStr
+		}
+	}
+	return line
+}
+
 func getGoVersionFromMod(workspaceRoot string) string {
 	goModPath := filepath.Join(workspaceRoot, "go.mod")
-	//nolint:gosec
-	content, err := os.ReadFile(goModPath)
+	content, err := safeReadFile(goModPath)
 	if err == nil {
 		scanner := bufio.NewScanner(strings.NewReader(string(content)))
 		for scanner.Scan() {

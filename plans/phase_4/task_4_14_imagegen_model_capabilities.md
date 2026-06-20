@@ -42,7 +42,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 
 ### Configuration Layer
 
-#### [MODIFY] [config.go](../../pkg/config/config.go)
+#### [MODIFY] [config.go](file://../../pkg/config/config.go)
 - Add `ForceCref` and `ForceSref` fields to `ImageGenConfig` struct:
   ```go
   ForceCref bool `mapstructure:"force_cref"`
@@ -52,7 +52,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 
 ### Capabilities Service
 
-#### [MODIFY] [imagegen.go](../../internal/plugins/imagegen/imagegen.go)
+#### [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
 - Add `Capabilities()` method to `OpenAIBackend`, `GoogleBackend`, `VeoBackend`, `MidjourneyBackend`.
 - Refactor `GetCapabilities()` on `ImageGenService` to delegate to the active backend type (via
   zero-value struct instance), then apply `ForceCref`/`ForceSref` overrides.
@@ -63,7 +63,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 
 ### Tests
 
-#### [MODIFY] [imagegen_test.go](../../internal/plugins/imagegen/imagegen_test.go)
+#### [MODIFY] [imagegen_test.go](file://../../internal/plugins/imagegen/imagegen_test.go)
 - `TestBackendCapabilities`: table-driven test verifying each backend's `Capabilities()` directly.
 - `TestGetCapabilities`: updated table (removed model-name cases; google/imagen always `false`).
 - `TestGetCapabilities_ForceOverrides`: verifies ForceCref/ForceSref override behavior (3 sub-tests).
@@ -71,7 +71,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
   cref and ForceCref bypasses it.
 - `TestGoogleBackend_CharacterReference`: updated to expect plain prompt (no text prepend).
 
-#### [MODIFY] [main_integration_test.go](../../cmd/pw-mcp-imagegen/main_integration_test.go)
+#### [MODIFY] [main_integration_test.go](file://../../cmd/pw-mcp-imagegen/main_integration_test.go)
 - `TestMCP_ImageGenPlugin_GoogleBackend_CrefNotSupported`: verifies `supports_cref: false` over MCP
   and that `cref_url` returns a capability validation error for the google/Imagen backend.
 - `TestMCP_ImageGenPlugin_ForceCref_BypassesValidation`: hermetic test with mock Imagen server;

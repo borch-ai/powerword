@@ -103,7 +103,6 @@ type realEC2Client struct {
 	cfg *config.Config
 }
 
-//nolint:gocognit,gocyclo
 func (c *realEC2Client) DescribeInstances(ctx context.Context, region string, tags map[string]string) ([]Instance, error) {
 	awsCfg, err := getAWSConfig(ctx, c.cfg, region)
 	if err != nil {
@@ -135,44 +134,48 @@ func (c *realEC2Client) DescribeInstances(ctx context.Context, region string, ta
 	var list []Instance
 	for _, reservation := range result.Reservations {
 		for _, inst := range reservation.Instances {
-			name := ""
-			for _, t := range inst.Tags {
-				if aws.ToString(t.Key) == "Name" {
-					name = aws.ToString(t.Value)
-					break
-				}
-			}
-			ip := aws.ToString(inst.PublicIpAddress)
-			if ip == "" {
-				ip = aws.ToString(inst.PrivateIpAddress)
-			}
-			state := ""
-			if inst.State != nil {
-				state = string(inst.State.Name)
-			}
-			zone := ""
-			if inst.Placement != nil {
-				zone = aws.ToString(inst.Placement.AvailabilityZone)
-			}
-			list = append(list, Instance{
-				ID:        aws.ToString(inst.InstanceId),
-				Name:      name,
-				Provider:  "aws",
-				State:     state,
-				Type:      string(inst.InstanceType),
-				IPAddress: ip,
-				Zone:      zone,
-			})
+			list = append(list, mapEC2Instance(inst))
 		}
 	}
 	return list, nil
+}
+
+// mapEC2Instance converts an EC2 instance API object to the domain Instance type.
+func mapEC2Instance(inst ec2types.Instance) Instance {
+	name := ""
+	for _, t := range inst.Tags {
+		if aws.ToString(t.Key) == "Name" {
+			name = aws.ToString(t.Value)
+			break
+		}
+	}
+	ip := aws.ToString(inst.PublicIpAddress)
+	if ip == "" {
+		ip = aws.ToString(inst.PrivateIpAddress)
+	}
+	state := ""
+	if inst.State != nil {
+		state = string(inst.State.Name)
+	}
+	zone := ""
+	if inst.Placement != nil {
+		zone = aws.ToString(inst.Placement.AvailabilityZone)
+	}
+	return Instance{
+		ID:        aws.ToString(inst.InstanceId),
+		Name:      name,
+		Provider:  "aws",
+		State:     state,
+		Type:      string(inst.InstanceType),
+		IPAddress: ip,
+		Zone:      zone,
+	}
 }
 
 type realGCEClient struct {
 	cfg *config.Config
 }
 
-//nolint:gocognit,gocyclo
 func (c *realGCEClient) ListInstances(ctx context.Context, projectID, zone string, tags map[string]string) ([]Instance, error) {
 	opts, err := getGCPOptions(c.cfg)
 	if err != nil {
@@ -200,35 +203,40 @@ func (c *realGCEClient) ListInstances(ctx context.Context, projectID, zone strin
 
 	var list []Instance
 	for _, inst := range result.Items {
-		ip := ""
-		for _, ni := range inst.NetworkInterfaces {
-			if ni.NetworkIP != "" {
-				ip = ni.NetworkIP
-			}
-			for _, ac := range ni.AccessConfigs {
-				if ac.NatIP != "" {
-					ip = ac.NatIP
-				}
-			}
-		}
-
-		// zone name is a URL path in API (e.g., https://.../zones/us-central1-a)
-		zoneName := inst.Zone
-		if idx := strings.LastIndex(zoneName, "/"); idx != -1 {
-			zoneName = zoneName[idx+1:]
-		}
-
-		list = append(list, Instance{
-			ID:        fmt.Sprintf("%d", inst.Id),
-			Name:      inst.Name,
-			Provider:  "gcp",
-			State:     inst.Status,
-			Type:      inst.MachineType[strings.LastIndex(inst.MachineType, "/")+1:],
-			IPAddress: ip,
-			Zone:      zoneName,
-		})
+		list = append(list, mapGCEInstance(inst))
 	}
 	return list, nil
+}
+
+// mapGCEInstance converts a GCP Compute Engine instance API object to the domain Instance type.
+func mapGCEInstance(inst *compute.Instance) Instance {
+	ip := ""
+	for _, ni := range inst.NetworkInterfaces {
+		if ni.NetworkIP != "" {
+			ip = ni.NetworkIP
+		}
+		for _, ac := range ni.AccessConfigs {
+			if ac.NatIP != "" {
+				ip = ac.NatIP
+			}
+		}
+	}
+
+	// zone name is a URL path in API (e.g., https://.../zones/us-central1-a)
+	zoneName := inst.Zone
+	if idx := strings.LastIndex(zoneName, "/"); idx != -1 {
+		zoneName = zoneName[idx+1:]
+	}
+
+	return Instance{
+		ID:        fmt.Sprintf("%d", inst.Id),
+		Name:      inst.Name,
+		Provider:  "gcp",
+		State:     inst.Status,
+		Type:      inst.MachineType[strings.LastIndex(inst.MachineType, "/")+1:],
+		IPAddress: ip,
+		Zone:      zoneName,
+	}
 }
 
 type realCWLogsClient struct {

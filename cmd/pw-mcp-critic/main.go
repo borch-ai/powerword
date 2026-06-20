@@ -46,21 +46,9 @@ func run() error {
 		return err
 	}
 
-	cfgPath := filepath.Join(workspaceRoot, "powerword.toml")
-	var cfg *config.Config
-
-	//nolint:gosec // cfgPath is constructed from validated workspaceRoot
-	if _, statErr := os.Stat(cfgPath); os.IsNotExist(statErr) {
-		cfg, err = config.LoadConfig("")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to load default config: %v\n", err)
-			cfg = &config.Config{}
-		}
-	} else {
-		cfg, err = config.LoadConfig(cfgPath)
-		if err != nil {
-			return fmt.Errorf("failed to load configuration from %s: %w", cfgPath, err)
-		}
+	cfg, err := config.LoadFromWorkspace(workspaceRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	srv, err := critic.SetupServer(workspaceRoot, cfg)

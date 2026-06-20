@@ -457,13 +457,13 @@ func (b *VeoBackend) resolveReferenceImage(ctx context.Context, crefURL string) 
 		return nil, fmt.Errorf("failed to download character reference image: %w", err)
 	}
 	return map[string]interface{}{
-		"imageBytes": base64.StdEncoding.EncodeToString(imageBytes),
-		"mimeType":   contentType,
+		"bytesBase64Encoded": base64.StdEncoding.EncodeToString(imageBytes),
+		"mimeType":           contentType,
 	}, nil
 }
 
 func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string, crefURL string, characterWeight *int) (string, error) {
-	aspectRatio := "1:1"
+	aspectRatio := "16:9" // Default to 16:9 since Veo does not support 1:1
 	switch size {
 	case "1024x1792":
 		aspectRatio = "9:16"
@@ -541,6 +541,45 @@ func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string, crefU
 	return initResp.Name, nil
 }
 
+type veoError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type veoResponse struct {
+	GeneratedVideos []struct {
+		Video struct {
+			URI string `json:"uri"`
+		} `json:"video"`
+	} `json:"generatedVideos"`
+	GenerateVideoResponse *struct {
+		GeneratedSamples []struct {
+			Video struct {
+				URI string `json:"uri"`
+			} `json:"video"`
+		} `json:"generatedSamples"`
+	} `json:"generateVideoResponse"`
+}
+
+func (r *veoResponse) extractVideoURI() string {
+	if r == nil {
+		return ""
+	}
+	if r.GenerateVideoResponse != nil && len(r.GenerateVideoResponse.GeneratedSamples) > 0 {
+		return r.GenerateVideoResponse.GeneratedSamples[0].Video.URI
+	}
+	if len(r.GeneratedVideos) > 0 {
+		return r.GeneratedVideos[0].Video.URI
+	}
+	return ""
+}
+
+type veoOpStatus struct {
+	Done     bool         `json:"done"`
+	Error    *veoError    `json:"error,omitempty"`
+	Response *veoResponse `json:"response,omitempty"`
+}
+
 func (b *VeoBackend) pollOnceVeo(ctx context.Context, opName string) (bool, []byte, error) {
 	opURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/%s?key=%s", strings.TrimPrefix(opName, "/"), b.apiKey)
 	if baseURL := os.Getenv("GOOGLE_BASE_URL"); baseURL != "" {
@@ -569,21 +608,7 @@ func (b *VeoBackend) pollOnceVeo(ctx context.Context, opName string) (bool, []by
 		return false, nil, nil // retry
 	}
 
-	var opStatus struct {
-		Done  bool `json:"done"`
-		Error *struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error,omitempty"`
-		Response *struct {
-			GeneratedVideos []struct {
-				Video struct {
-					URI string `json:"uri"`
-				} `json:"video"`
-			} `json:"generatedVideos"`
-		} `json:"response,omitempty"`
-	}
-
+	var opStatus veoOpStatus
 	if err := json.Unmarshal(pBytes, &opStatus); err != nil {
 		return false, nil, nil // retry
 	}
@@ -593,12 +618,9 @@ func (b *VeoBackend) pollOnceVeo(ctx context.Context, opName string) (bool, []by
 	}
 
 	if opStatus.Done {
-		if opStatus.Response == nil || len(opStatus.Response.GeneratedVideos) == 0 {
-			return false, nil, fmt.Errorf("veo completed but returned no video metadata: %s", string(pBytes))
-		}
-		videoURI := opStatus.Response.GeneratedVideos[0].Video.URI
+		videoURI := opStatus.Response.extractVideoURI()
 		if videoURI == "" {
-			return false, nil, fmt.Errorf("veo completed but video URI is empty: %s", string(pBytes))
+			return false, nil, fmt.Errorf("veo completed but returned no video metadata: %s", string(pBytes))
 		}
 
 		videoBytes, err := b.downloadVideo(ctx, videoURI)

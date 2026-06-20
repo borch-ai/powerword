@@ -84,8 +84,9 @@ func NewWorkspaceSnapshot(ctx context.Context, dir string) (*WorkspaceSnapshot, 
 
 		// Re-apply stash immediately so the agent can see and modify the changes, preserving index state
 		if err = gitutil.StashApply(ctx, targetDir, 0); err != nil {
-			// Clean up stash if apply fails
-			//nolint:errcheck
+			// Best-effort cleanup: drop the stash we just created if apply fails.
+			// The error from StashDrop is intentionally discarded — the original
+			// apply error is what the caller needs to act on.
 			_ = gitutil.StashDrop(ctx, targetDir, 0)
 			return nil, fmt.Errorf("failed to apply stashed changes: %w", err)
 		}

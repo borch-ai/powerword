@@ -300,9 +300,12 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.25: OpenTelemetry (OTel) Tracing Instrumentation**
     *   Add trace spans to the ReAct reasoning loop and tool calling interface to monitor execution latency and trace tool interactions.
     *   [Implementation Plan](plans/phase_6/task_6_25_opentelemetry_tracing.md)
-*   [ ] **Task 6.26: Centralized Pull Request Issue Linker Subcommand & GitHub Adaptations**
+*   [x] **Task 6.26: Centralized Pull Request Issue Linker Subcommand & GitHub Adaptations**
     *   Implement a native Go `powerword link-issue` subcommand to scan plan diffs and auto-link issue references to PR descriptions. Adopt and customize `.github` templates (Copilot instructions, pull request template, dependabot checks) from Aeolian.
     *   [Implementation Plan](plans/phase_6/task_6_26_link_issue_subcommand.md)
+*   [x] **Task 6.27: Reduce `//nolint` Suppressions to Absolute Minimum**
+    *   Systematically eliminate the 185 `//nolint` tags in the codebase through two strategies: (1) consolidating repeated, identically-justified `gosec` suppressions into single documented helper functions (`safeReadFile`, `runFFmpeg`, `newTrustedRequest`, `LoadFromWorkspace`), and (2) decomposing the large functions that carry `gocognit`, `funlen`, `nestif`, and `gocyclo` suppressions into smaller, independently unit-testable helpers. Also audits and removes stale/redundant suppressions.
+    *   [Implementation Plan](plans/phase_6/task_6_27_nolint_reduction.md)
 
 
 
