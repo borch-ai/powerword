@@ -15,12 +15,13 @@ on:
     - cron: '0 0 * * 1'
 
 permissions:
+  actions: read
   contents: read
   security-events: write
 
 jobs:
   analyze:
-    # Reference the reusable CodeQL workflow on our feature branch
-    uses: borch-ai/.github/.github/workflows/codeql.yml@feature/add-codeql-workflow
+    # Reference the reusable CodeQL workflow on main branch
+    uses: borch-ai/.github/.github/workflows/codeql.yml@main
     with:
       language: "go"
