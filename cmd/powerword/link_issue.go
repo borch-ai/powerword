@@ -35,17 +35,16 @@ func newLinkIssueCmd() *cobra.Command {
 				baseRef = os.Getenv("BASE_REF")
 			}
 
-			// Auto-detection using gh CLI if parameters are missing
-			if prNumber == "" || baseRef == "" {
-				cmd.Printf("PR number or base ref not provided, attempting to auto-detect via gh CLI...\n")
+			// Only invoke gh auto-detection when PR number is still unknown.
+			// baseRef can safely default to "main" without requiring gh.
+			if prNumber == "" {
+				cmd.Printf("PR number not provided, attempting to auto-detect via gh CLI...\n")
 				detPR, detBase, err := detectPRInfo(ctx)
 				if err != nil {
 					return err
 				}
-				if prNumber == "" {
-					prNumber = detPR
-				}
-				if baseRef == "" {
+				prNumber = detPR
+				if baseRef == "" && detBase != "" {
 					baseRef = detBase
 				}
 			}

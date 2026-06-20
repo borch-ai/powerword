@@ -45,12 +45,13 @@ func LinkTaskIssue(ctx context.Context, prNumber, baseRef string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Current PR description:\n----------------------\n%s\n----------------------\n", prBody)
+	fmt.Printf("Retrieved PR description (%d bytes).\n", len(prBody))
 
 	// 5. Check which Issue IDs are missing from description
 	var missingRefs []string
+	// GitHub recognises all of: close/closes/closed, fix/fixes/fixed, resolve/resolves/resolved
 	for _, id := range orderedIssueIDs {
-		pattern := fmt.Sprintf(`(?i)(?:closes|resolves|fixes)\s+#%s\b`, id)
+		pattern := fmt.Sprintf(`(?i)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#%s\b`, id)
 		re := regexp.MustCompile(pattern)
 		if !re.MatchString(prBody) {
 			missingRefs = append(missingRefs, id)
@@ -151,7 +152,11 @@ func updatePRBody(ctx context.Context, prNumber, prBody string, missingRefs []st
 
 	marker := "<!-- Auto-linked via CI plan checker -->"
 	if !strings.Contains(newBody, marker) {
-		newBody += "\n" + marker
+		// Only add a leading newline separator when there is existing body content.
+		if len(newBody) > 0 {
+			newBody += "\n"
+		}
+		newBody += marker
 	}
 
 	for _, id := range missingRefs {

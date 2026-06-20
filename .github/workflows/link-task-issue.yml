@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   link-issue:
+    # Skip when the PR body was edited by the bot itself to avoid an infinite trigger loop.
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -23,9 +25,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Build powerword
+        run: go build -o /tmp/powerword ./cmd/powerword
+
       - name: Run Issue Linking Command
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: go run ./cmd/powerword link-issue
+        run: /tmp/powerword link-issue
