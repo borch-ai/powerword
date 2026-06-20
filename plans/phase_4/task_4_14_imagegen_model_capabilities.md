@@ -1,10 +1,29 @@
 # plan: Task 4.14: Model-Level Imagegen Capabilities Mapping & Overrides
 
-**Status:** Pending
+**Status:** Completed
+**Date Completed:** 2026-06-20
 **Go Version:** 1.26.4
-**Unit Test Coverage:** 91.0% (Target)
+**Unit Test Coverage:** 91.2% (Actual)
 
-This task updates the `pw-mcp-imagegen` server to dynamically map capability flags based on the configured model, and implements manual configuration overrides to prevent capability checks from blocking runs if upstream models are updated.
+This task updates the `pw-mcp-imagegen` server to expose per-backend capability flags and implements
+manual configuration overrides so capability checks can be bypassed if upstream models change.
+
+## Final Implementation
+
+**Architecture: Backend-Owned Capabilities**
+
+Instead of the service doing model-name string matching, each backend struct owns its own capabilities
+via a `Capabilities()` method:
+- `OpenAIBackend.Capabilities()` → `{supports_cref: false, supports_sref: false}`
+- `GoogleBackend.Capabilities()` → `{supports_cref: false, supports_sref: false}` (Imagen never supports cref)
+- `VeoBackend.Capabilities()` → `{supports_cref: true, supports_sref: false}`
+- `MidjourneyBackend.Capabilities()` → `{supports_cref: true, supports_sref: true}`
+
+`ImageGenService.GetCapabilities()` delegates to the active backend type (via a zero-value instance),
+then applies `ForceCref`/`ForceSref` overrides from configuration.
+
+The legacy cref text-prepend fallback in `GoogleBackend.GenerateImage()` was removed. If `cref_url` is
+provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a validation error.
 
 ## Proposed Changes
 
