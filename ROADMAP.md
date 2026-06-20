@@ -179,6 +179,10 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.14: Backend-Owned Imagegen Capabilities Mapping & Overrides**
     *   Add a `Capabilities()` method to each imagegen backend struct so each backend type owns and reports its own capability set. Refactor `ImageGenService.GetCapabilities()` to delegate to the active backend type. Add `force_cref`/`force_sref` config overrides (with env var bindings) to bypass capability checks when upstream models change.
     *   [Implementation Plan](plans/phase_4/task_4_14_imagegen_model_capabilities.md)
+*   [ ] **Task 4.15: Imagegen Capabilities Output Type Field**
+    *   Extend the image generation capabilities schema to include a new `output_type` field indicating whether a backend generates still images or videos. Update the Google Imagen, DALL-E, Midjourney, and Google Veo backends to report their respective output types.
+    *   [Implementation Plan](plans/phase_4/task_4_15_imagegen_capabilities_output_type.md)
+
 
 
 ---
