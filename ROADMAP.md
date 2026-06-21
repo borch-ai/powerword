@@ -179,6 +179,10 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.14: Backend-Owned Imagegen Capabilities Mapping & Overrides**
     *   Add a `Capabilities()` method to each imagegen backend struct so each backend type owns and reports its own capability set. Refactor `ImageGenService.GetCapabilities()` to delegate to the active backend type. Add `force_cref`/`force_sref` config overrides (with env var bindings) to bypass capability checks when upstream models change.
     *   [Implementation Plan](plans/phase_4/task_4_14_imagegen_model_capabilities.md)
+*   [x] **Task 4.15: Imagegen Capabilities Output Type Field**
+    *   Extend the image generation capabilities schema to include a new `output_type` field indicating whether a backend generates still images or videos. Update the Google Imagen, DALL-E, Midjourney, and Google Veo backends to report their respective output types.
+    *   [Implementation Plan](plans/phase_4/task_4_15_imagegen_capabilities_output_type.md)
+
 
 
 ---
@@ -306,6 +310,10 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.27: Reduce `//nolint` Suppressions to Absolute Minimum**
     *   Systematically eliminate the 185 `//nolint` tags in the codebase through two strategies: (1) consolidating repeated, identically-justified `gosec` suppressions into single documented helper functions (`safeReadFile`, `runFFmpeg`, `newTrustedRequest`, `LoadFromWorkspace`), and (2) decomposing the large functions that carry `gocognit`, `funlen`, `nestif`, and `gocyclo` suppressions into smaller, independently unit-testable helpers. Also audits and removes stale/redundant suppressions.
     *   [Implementation Plan](plans/phase_6/task_6_27_nolint_reduction.md)
+*   [x] **Task 6.28: Advanced Integration & Subprocess Testing Suite Expansion**
+    *   Expand the integration test suite to include subprocess stdio tests for the remaining MCP servers (`pw-mcp-critic`, `pw-mcp-linter`, `pw-mcp-kdp-math`, `pw-mcp-seo`). Add compiled CLI tests for `powerword review` and `powerword link-issue` subcommands using mock stub dependencies.
+    *   [Implementation Plan](plans/phase_6/task_6_28_integration_tests_expansion.md)
+
 
 
 

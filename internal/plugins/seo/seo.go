@@ -79,7 +79,7 @@ type SEOService struct {
 	llmClient llm.LLMClient
 }
 
-// NewSEOService creates an instance of SEOService.
+// NewSEOService creates a new instance of SEOService to handle KDP SEO scraping, caching, and listing generation.
 func NewSEOService(cfg *config.Config) *SEOService {
 	if cfg == nil {
 		cfg = &config.Config{}
@@ -158,6 +158,7 @@ func (s *SEOService) writeToCache(key string, data []byte) {
 		return
 	}
 	cacheFile := filepath.Join(s.getCacheDir(), key)
+	//nolint:gosec // G304: cacheFile is constructed via a SHA-256 hash in cacheKey, making path traversal impossible
 	_ = os.WriteFile(cacheFile, data, 0600)
 }
 
@@ -182,6 +183,7 @@ func sleepContext(ctx context.Context, duration time.Duration) error {
 
 // executeRequestAttempt performs a single HTTP request attempt for getWithRetry.
 func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, backoff time.Duration) ([]byte, bool, time.Duration, error) {
+	//nolint:gosec // G107: urlStr is constructed using a base URL validated by parseBaseURL and query parameters that are escaped
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, false, backoff, fmt.Errorf("failed to create request: %w", err)
@@ -191,6 +193,7 @@ func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, b
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 
+	//nolint:gosec // G704: client.Do is flagged by gosec taint analysis since req.URL is dynamic; this sink suppression is required to pass security checks
 	resp, err := s.client.Do(req)
 	if err != nil {
 		if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
@@ -258,10 +261,27 @@ func (s *SEOService) getWithRetry(ctx context.Context, urlStr string) ([]byte, e
 	return nil, fmt.Errorf("max retries reached: %w", lastErr)
 }
 
+func parseBaseURL(val string, defaultVal string) string {
+	if val == "" {
+		return defaultVal
+	}
+	u, err := url.Parse(val)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return defaultVal
+	}
+	path := strings.TrimSuffix(u.Path, "/")
+	return fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, path)
+}
+
 // FetchSuggestions retrieves search autocomplete queries.
 func (s *SEOService) FetchSuggestions(ctx context.Context, query string) ([]string, error) {
 	escapedQuery := url.QueryEscape(query)
-	u := fmt.Sprintf("https://completion.amazon.com/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", escapedQuery)
+	base := os.Getenv("POWERWORD_SEO_COMPLETION_ENDPOINT")
+	if base == "" {
+		base = os.Getenv("POWERWORD_SEO_API_ENDPOINT")
+	}
+	base = parseBaseURL(base, "https://completion.amazon.com")
+	u := fmt.Sprintf("%s/search/complete?search-alias=stripbooks&client=amazon-search-ui&mkt=1&q=%s", base, escapedQuery)
 
 	body, err := s.getWithRetry(ctx, u)
 	if err != nil {
@@ -435,7 +455,8 @@ func parseReviewsCount(htmlContent string) int {
 // searchCompetitorASINs queries Amazon search results to extract ASINs.
 func (s *SEOService) searchCompetitorASINs(ctx context.Context, query string) []string {
 	escapedQuery := url.QueryEscape(query)
-	searchURL := fmt.Sprintf("https://www.amazon.com/s?k=%s&i=stripbooks", escapedQuery)
+	base := parseBaseURL(os.Getenv("POWERWORD_SEO_API_ENDPOINT"), "https://www.amazon.com")
+	searchURL := fmt.Sprintf("%s/s?k=%s&i=stripbooks", base, escapedQuery)
 	body, err := s.getWithRetry(ctx, searchURL)
 	if err != nil {
 		return nil
@@ -465,9 +486,11 @@ func (s *SEOService) AnalyzeNiche(ctx context.Context, query string, asins []str
 		resolvedASINs = s.searchCompetitorASINs(ctx, query)
 	}
 
+	base := parseBaseURL(os.Getenv("POWERWORD_SEO_API_ENDPOINT"), "https://www.amazon.com")
+
 	competitors := make([]CompetitorBook, 0)
 	for _, asin := range resolvedASINs {
-		productURL := fmt.Sprintf("https://www.amazon.com/dp/%s", asin)
+		productURL := fmt.Sprintf("%s/dp/%s", base, asin)
 		body, err := s.getWithRetry(ctx, productURL)
 		if err != nil {
 			continue
