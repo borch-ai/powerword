@@ -25,3 +25,4 @@ jobs:
     uses: borch-ai/.github/.github/workflows/codeql.yml@main
     with:
       language: "go"
+    secrets: inherit

@@ -183,7 +183,7 @@ func sleepContext(ctx context.Context, duration time.Duration) error {
 
 // executeRequestAttempt performs a single HTTP request attempt for getWithRetry.
 func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, backoff time.Duration) ([]byte, bool, time.Duration, error) {
-	//nolint:gosec // G107: urlStr base is configured via a trusted environment variable
+	//nolint:gosec // G107: urlStr is constructed using a base URL validated by parseBaseURL and query parameters that are escaped
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
 		return nil, false, backoff, fmt.Errorf("failed to create request: %w", err)
@@ -193,7 +193,7 @@ func (s *SEOService) executeRequestAttempt(ctx context.Context, urlStr string, b
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 
-	//nolint:gosec // G704: client.Do is flagged by gosec taint analysis since req.URL is dynamic; this sink suppression is required to compile
+	//nolint:gosec // G704: client.Do is flagged by gosec taint analysis since req.URL is dynamic; this sink suppression is required to pass security checks
 	resp, err := s.client.Do(req)
 	if err != nil {
 		if sleepErr := sleepContext(ctx, backoff); sleepErr != nil {
