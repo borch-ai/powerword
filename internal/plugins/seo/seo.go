@@ -269,7 +269,8 @@ func parseBaseURL(val string, defaultVal string) string {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return defaultVal
 	}
-	return strings.TrimSuffix(val, "/")
+	path := strings.TrimSuffix(u.Path, "/")
+	return fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, path)
 }
 
 // FetchSuggestions retrieves search autocomplete queries.

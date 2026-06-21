@@ -645,6 +645,24 @@ func TestParseBaseURL(t *testing.T) {
 			defaultVal: "https://default.com",
 			want:       "http://example.com",
 		},
+		{
+			name:       "URL with query parameters",
+			val:        "https://example.com?query=1",
+			defaultVal: "https://default.com",
+			want:       "https://example.com",
+		},
+		{
+			name:       "URL with fragment",
+			val:        "https://example.com#fragment",
+			defaultVal: "https://default.com",
+			want:       "https://example.com",
+		},
+		{
+			name:       "URL with query, fragment, path and trailing slash",
+			val:        "https://example.com/prefix/?query=1#frag",
+			defaultVal: "https://default.com",
+			want:       "https://example.com/prefix",
+		},
 	}
 
 	for _, tc := range tests {
