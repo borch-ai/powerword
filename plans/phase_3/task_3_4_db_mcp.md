@@ -80,5 +80,9 @@ Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_l
 
 ### PR Review
 - PR [#127](https://github.com/borch-ai/powerword/pull/127) opened on `feat/task-3.4-db-inspector-plugin`
-- All 4 Copilot findings addressed (PRAGMA injection, WITH/EXPLAIN DML bypass, comment, bounded init ctx)
-- Review loop completed with zero outstanding comments
+- All Copilot findings addressed across iterative review rounds:
+  - PRAGMA injection, `WITH`/`EXPLAIN` DML bypass, comments, and bounded init context handled.
+  - SQLite and DuckDB DSN path rewriting issue resolved by parsing and rebuilding query parameters cleanly instead of applying global regex replacements.
+  - Handled override checks for `_query_only` and `access_mode` parameters when conflicting values are specified.
+  - Simplified the `contains` helper assertions in `internal/mcp/translator_test.go` by replacing them with the standard library `strings.Contains`.
+- Review loop completed with all feedback addressed and verified.
