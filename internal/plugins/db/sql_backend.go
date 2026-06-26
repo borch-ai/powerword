@@ -16,9 +16,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	// DuckDB driver (CGO required — deliberate exception for pw-mcp-db).
-	// The duckdb build tag gates this import so the rest of the codebase
-	// (CGO_ENABLED=0) is not affected when pw-mcp-db is excluded from the
-	// standard build.
+	// This package always requires CGO_ENABLED=1; there is no build tag
+	// gating this import. Only cmd/pw-mcp-db should import this package.
 	_ "github.com/duckdb/duckdb-go/v2"
 )
 
@@ -147,7 +146,10 @@ func listTablesQuery(dialect string) string {
 
 // DescribeTable returns column metadata for the given table name.
 func (b *sqlBackend) DescribeTable(ctx context.Context, table string) ([]ColumnInfo, error) {
-	query, args := describeTableQuery(b.dialect, table)
+	query, args, err := describeTableQuery(b.dialect, table)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := b.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("describe table %q failed: %w", table, err)
@@ -169,38 +171,58 @@ func (b *sqlBackend) DescribeTable(ctx context.Context, table string) ([]ColumnI
 	return cols, rows.Err()
 }
 
+// validateIdentifier checks that a SQL identifier (table or column name) contains
+// only safe characters. This prevents SQL injection in PRAGMA statements and other
+// contexts where the driver does not support bound parameters.
+func validateIdentifier(name string) error {
+	if name == "" {
+		return fmt.Errorf("identifier must not be empty")
+	}
+	for _, r := range name {
+		if ('a' <= r && r <= 'z') || ('A' <= r && r <= 'Z') || ('0' <= r && r <= '9') || r == '_' || r == '.' {
+			continue
+		}
+		return fmt.Errorf("unsafe character %q in table name %q", r, name)
+	}
+	return nil
+}
+
 // describeTableQuery returns the dialect-specific INFORMATION_SCHEMA query and args.
 // For SQLite, args is nil — the table name is embedded directly in the PRAGMA statement
 // because modernc.org/sqlite does not support pragma_table_info() as a virtual table
-// with parameterised input.
-func describeTableQuery(dialect, table string) (string, []any) {
+// with parameterised input. The table name is validated by validateIdentifier before
+// interpolation to prevent injection.
+func describeTableQuery(dialect, table string) (string, []any, error) {
 	switch dialect {
 	case "mysql":
 		return `SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY, COLUMN_DEFAULT
 			FROM information_schema.COLUMNS
 			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
-			ORDER BY ORDINAL_POSITION`, []any{table}
+			ORDER BY ORDINAL_POSITION`, []any{table}, nil
 	case "sqlite":
-		// PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-		// We select columns directly and reformat to the 5-column layout.
-		// The table name is embedded as a literal because the PRAGMA statement
-		// does not accept bound parameters.
-		//nolint:gosec // G201: table name is validated upstream by the agent; no user-controlled input reaches this path in production
-		return fmt.Sprintf(`SELECT name, type,
+		if err := validateIdentifier(table); err != nil {
+			return "", nil, fmt.Errorf("describe table: %w", err)
+		}
+		// The table name is embedded as a literal because pragma_table_info()
+		// does not accept bound parameters; validateIdentifier above ensures
+		// the name contains only safe characters.
+		//nolint:gosec // G201: table name is allow-listed to [a-zA-Z0-9_.] by validateIdentifier
+		q := fmt.Sprintf(`SELECT name, type,
 			CASE WHEN "notnull" = 1 THEN 'NO' ELSE 'YES' END,
 			CASE WHEN pk > 0 THEN 'PRIMARY' ELSE '' END,
 			dflt_value
-			FROM pragma_table_info('%s')`, table), nil
+			FROM pragma_table_info('%s')`, table)
+		return q, nil, nil
 	case "duckdb":
 		return `SELECT column_name, data_type, is_nullable, '' AS key, column_default
 			FROM information_schema.columns
 			WHERE table_schema = 'main' AND table_name = ?
-			ORDER BY ordinal_position`, []any{table}
+			ORDER BY ordinal_position`, []any{table}, nil
 	default: // postgres
 		return `SELECT column_name, udt_name, is_nullable, '' AS key, column_default
 			FROM information_schema.columns
 			WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_name = $1
-			ORDER BY ordinal_position`, []any{table}
+			ORDER BY ordinal_position`, []any{table}, nil
 	}
 }
 

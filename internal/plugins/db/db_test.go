@@ -675,3 +675,48 @@ func TestRealBQRowIterator_Next(t *testing.T) {
 		_ = it.Next(&dst)
 	}()
 }
+
+// ---------------------------------------------------------------------------
+// Tests for Copilot-flagged security fixes
+// ---------------------------------------------------------------------------
+
+func TestValidateReadOnly_WithDML_Rejected(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		query string
+	}{
+		{"with delete", "WITH cte AS (SELECT 1) DELETE FROM users WHERE id IN (SELECT id FROM cte)"},
+		{"with update", "WITH src AS (SELECT 1 AS x) UPDATE users SET name='x' FROM src"},
+		{"with insert", "WITH vals AS (SELECT 1) INSERT INTO users SELECT * FROM vals"},
+		{"with merge", "WITH src AS (SELECT 1) MERGE users USING src ON users.id = src.id WHEN MATCHED THEN DELETE"},
+		{"explain update", "EXPLAIN UPDATE users SET name='x'"},
+		{"explain delete", "EXPLAIN DELETE FROM users"},
+		{"explain insert", "EXPLAIN INSERT INTO users VALUES(1)"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if err := validateReadOnly(tc.query); err == nil {
+				t.Errorf("expected error for %q (WITH/EXPLAIN + DML), got nil", tc.query)
+			}
+		})
+	}
+}
+
+func TestValidateIdentifier(t *testing.T) {
+	t.Parallel()
+	valid := []string{"users", "my_table", "schema.table", "Table123", "t"}
+	for _, name := range valid {
+		if err := validateIdentifier(name); err != nil {
+			t.Errorf("validateIdentifier(%q) should pass, got: %v", name, err)
+		}
+	}
+	invalid := []string{"", "users; DROP TABLE", "tab'le", "my-table", "tab(le", "us rs"}
+	for _, name := range invalid {
+		if err := validateIdentifier(name); err == nil {
+			t.Errorf("validateIdentifier(%q) should fail but passed", name)
+		}
+	}
+}

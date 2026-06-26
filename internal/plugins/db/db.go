@@ -72,15 +72,18 @@ func NewDBService(cfg *config.DBConfig) (*DBService, error) {
 	}
 
 	var b Backend
+	// Use a bounded context for init so PingContext never hangs indefinitely.
+	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer initCancel()
 	switch strings.ToLower(cfg.Backend) {
 	case "postgres", "postgresql":
-		b, err = newSQLBackend(context.Background(), "postgres", cfg.DSN)
+		b, err = newSQLBackend(initCtx, "postgres", cfg.DSN)
 	case "mysql":
-		b, err = newSQLBackend(context.Background(), "mysql", cfg.DSN)
+		b, err = newSQLBackend(initCtx, "mysql", cfg.DSN)
 	case "sqlite", "sqlite3":
-		b, err = newSQLBackend(context.Background(), "sqlite", cfg.DSN)
+		b, err = newSQLBackend(initCtx, "sqlite", cfg.DSN)
 	case "duckdb":
-		b, err = newSQLBackend(context.Background(), "duckdb", cfg.DSN)
+		b, err = newSQLBackend(initCtx, "duckdb", cfg.DSN)
 	case "bigquery":
 		b, err = newBigQueryBackend(cfg.DSN)
 	default:
@@ -147,7 +150,10 @@ func (s *DBService) ShowLocks(ctx context.Context) ([]LockInfo, error) {
 	return s.backend.ShowLocks(ctx)
 }
 
-// allowedReadKeywords is the set of SQL statement types that are safe to execute.
+// allowedReadKeywords is the set of SQL statement-opener keywords that are safe
+// to execute. WITH and EXPLAIN are included but require secondary validation
+// (see validateReadOnly) to reject patterns like "WITH ... DELETE" or
+// "EXPLAIN UPDATE ..." that could carry write intent.
 var allowedReadKeywords = map[string]bool{
 	"SELECT":   true,
 	"SHOW":     true,
@@ -158,8 +164,19 @@ var allowedReadKeywords = map[string]bool{
 	"PRAGMA":   true, // SQLite / DuckDB diagnostic commands
 }
 
+// writeKeywords is the set of SQL keywords that indicate a mutating statement.
+var writeKeywords = map[string]bool{
+	"INSERT": true, "UPDATE": true, "DELETE": true, "MERGE": true,
+	"DROP": true, "CREATE": true, "ALTER": true, "TRUNCATE": true,
+	"GRANT": true, "REVOKE": true, "REPLACE": true, "CALL": true,
+}
+
 // validateReadOnly inspects each semicolon-delimited statement in the query string
 // and returns an error if any statement begins with a non-read keyword.
+// For statements starting with WITH or EXPLAIN, it additionally scans all tokens
+// for write keywords to reject patterns such as "WITH ... DELETE ..." or
+// "EXPLAIN UPDATE ...", which are valid on BigQuery and other engines that lack
+// a session-level read-only mode.
 func validateReadOnly(query string) error {
 	if strings.TrimSpace(query) == "" {
 		return fmt.Errorf("query must not be empty")
@@ -181,6 +198,16 @@ func validateReadOnly(query string) error {
 		keyword := strings.ToUpper(fields[0])
 		if !allowedReadKeywords[keyword] {
 			return fmt.Errorf("query rejected: statement starting with %q is not allowed (only read-only queries are permitted)", keyword)
+		}
+		// WITH and EXPLAIN can precede DML on BigQuery and other engines that
+		// do not enforce session read-only mode at the driver level. Scan all
+		// subsequent tokens for write keywords to catch these patterns.
+		if keyword == "WITH" || keyword == "EXPLAIN" {
+			for _, tok := range fields[1:] {
+				if writeKeywords[strings.ToUpper(tok)] {
+					return fmt.Errorf("query rejected: %q statement contains write keyword %q", keyword, strings.ToUpper(tok))
+				}
+			}
 		}
 	}
 	return nil

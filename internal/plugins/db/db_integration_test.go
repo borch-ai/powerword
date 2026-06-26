@@ -252,7 +252,11 @@ func TestIntegration_ResolveDriver_MySQL(t *testing.T) {
 func TestIntegration_DescribeTableQuery_AllDialects(t *testing.T) {
 	t.Parallel()
 	for _, dialect := range []string{"postgres", "mysql", "sqlite", "duckdb"} {
-		query, args := describeTableQuery(dialect, "users")
+		query, args, err := describeTableQuery(dialect, "users")
+		if err != nil {
+			t.Errorf("describeTableQuery(%q) unexpected error: %v", dialect, err)
+			continue
+		}
 		if query == "" {
 			t.Errorf("describeTableQuery(%q) returned empty query", dialect)
 		}
