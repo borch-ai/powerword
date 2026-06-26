@@ -85,4 +85,8 @@ Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_l
   - SQLite and DuckDB DSN path rewriting issue resolved by parsing and rebuilding query parameters cleanly instead of applying global regex replacements.
   - Handled override checks for `_query_only` and `access_mode` parameters when conflicting values are specified.
   - Simplified the `contains` helper assertions in `internal/mcp/translator_test.go` by replacing them with the standard library `strings.Contains`.
+  - Resolved semicolon splitting issues inside SQL string literals and comments by introducing `stripCommentsAndStrings` (with linter-compliant decomposed helpers to satisfy `gocognit` and `nestif` complexity rules).
+  - Secured PostgreSQL and MySQL connection pools against connection recreation by appending read-only transaction session configurations directly to their connection DSNs.
+  - Masked DSN credentials in ping error logs to prevent credential leakage.
+  - Excluded CGO compilation in the default Makefile `test` target by forcing `CGO_ENABLED=0` to keep local unit tests fast and toolchain-agnostic.
 - Review loop completed with all feedback addressed and verified.
