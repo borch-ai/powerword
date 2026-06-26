@@ -978,6 +978,15 @@ func Test_ResolveDriver_SQLiteAlreadyHasParam(t *testing.T) {
 	if !strings.Contains(dsnPath, "_query_only.db") {
 		t.Errorf("expected file path to remain intact, got: %q", dsnPath)
 	}
+
+	// Verify that _query_only in path with other query parameters is not rewritten and correct param is appended
+	_, dsnPathWithParam := resolveDriver("sqlite", "/tmp/_query_only.db?cache=shared&_query_only=false")
+	if !strings.HasPrefix(dsnPathWithParam, "/tmp/_query_only.db?") {
+		t.Errorf("expected path to remain intact, got: %q", dsnPathWithParam)
+	}
+	if !strings.Contains(dsnPathWithParam, "_query_only=true") || strings.Contains(dsnPathWithParam, "false") {
+		t.Errorf("expected _query_only=false to be overridden to true, got: %q", dsnPathWithParam)
+	}
 }
 
 func Test_ResolveDriver_DuckDB(t *testing.T) {
@@ -999,6 +1008,15 @@ func Test_ResolveDriver_DuckDB(t *testing.T) {
 	_, dsnPath := resolveDriver("duckdb", "/tmp/access_mode.duckdb")
 	if !strings.Contains(dsnPath, "access_mode.duckdb") {
 		t.Errorf("expected file path to remain intact, got: %q", dsnPath)
+	}
+
+	// Verify that access_mode in path with query parameters is not rewritten and correct param is appended
+	_, dsnPathWithParam := resolveDriver("duckdb", "/tmp/access_mode.duckdb?cache=shared&access_mode=READ_WRITE")
+	if !strings.HasPrefix(dsnPathWithParam, "/tmp/access_mode.duckdb?") {
+		t.Errorf("expected path to remain intact, got: %q", dsnPathWithParam)
+	}
+	if !strings.Contains(dsnPathWithParam, "access_mode=READ_ONLY") || strings.Contains(dsnPathWithParam, "READ_WRITE") {
+		t.Errorf("expected access_mode=READ_WRITE to be overridden to READ_ONLY, got: %q", dsnPathWithParam)
 	}
 }
 

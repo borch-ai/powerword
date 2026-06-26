@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"strings"
 	"testing"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -103,23 +104,10 @@ func TestFormatToolResult_ImageAndEmbeddedContent(t *testing.T) {
 	if got == "" {
 		t.Error("expected non-empty formatted result")
 	}
-	if !contains(got, "[Image data:") {
+	if !strings.Contains(got, "[Image data:") {
 		t.Errorf("expected image data tag in output, got %q", got)
 	}
-	if !contains(got, "[Embedded Resource:") {
+	if !strings.Contains(got, "[Embedded Resource:") {
 		t.Errorf("expected embedded resource tag in output, got %q", got)
 	}
-}
-
-func contains(s, sub string) bool {
-	return containsStr(s, sub)
-}
-
-func containsStr(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

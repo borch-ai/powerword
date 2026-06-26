@@ -68,29 +68,37 @@ func resolveDriver(dialect, dsn string) (string, string) {
 	case "sqlite":
 		// modernc.org/sqlite registers as "sqlite".
 		// Enforce _query_only=true at the driver level, overriding any existing value.
-		re := regexp.MustCompile(`([?&])_query_only(=[^&]*)?`)
-		if re.MatchString(dsn) {
-			dsn = re.ReplaceAllString(dsn, "${1}_query_only=true")
+		parts := strings.SplitN(dsn, "?", 2)
+		if len(parts) == 1 {
+			dsn = parts[0] + "?_query_only=true"
 		} else {
-			sep := "?"
-			if strings.Contains(dsn, "?") {
-				sep = "&"
+			params := strings.Split(parts[1], "&")
+			var newParams []string
+			for _, p := range params {
+				if !strings.HasPrefix(p, "_query_only=") && p != "_query_only" {
+					newParams = append(newParams, p)
+				}
 			}
-			dsn = dsn + sep + "_query_only=true"
+			newParams = append(newParams, "_query_only=true")
+			dsn = parts[0] + "?" + strings.Join(newParams, "&")
 		}
 		return "sqlite", dsn
 	case "duckdb":
 		// DuckDB driver registers as "duckdb".
 		// Enforce access_mode=READ_ONLY at the driver level, overriding any existing value.
-		re := regexp.MustCompile(`([?&])access_mode(=[^&]*)?`)
-		if re.MatchString(dsn) {
-			dsn = re.ReplaceAllString(dsn, "${1}access_mode=READ_ONLY")
+		parts := strings.SplitN(dsn, "?", 2)
+		if len(parts) == 1 {
+			dsn = parts[0] + "?access_mode=READ_ONLY"
 		} else {
-			sep := "?"
-			if strings.Contains(dsn, "?") {
-				sep = "&"
+			params := strings.Split(parts[1], "&")
+			var newParams []string
+			for _, p := range params {
+				if !strings.HasPrefix(p, "access_mode=") && p != "access_mode" {
+					newParams = append(newParams, p)
+				}
 			}
-			dsn = dsn + sep + "access_mode=READ_ONLY"
+			newParams = append(newParams, "access_mode=READ_ONLY")
+			dsn = parts[0] + "?" + strings.Join(newParams, "&")
 		}
 		return "duckdb", dsn
 	case "mysql":
