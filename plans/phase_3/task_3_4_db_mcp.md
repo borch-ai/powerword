@@ -2,7 +2,7 @@
 
 **Status:** Complete — PR [#127](https://github.com/borch-ai/powerword/pull/127) awaiting merge
 **Date Completed:** 2026-06-26
-**Go Version:** 1.24
+**Go Version:** 1.26.4
 **Unit Test Coverage:** 91.0%
 
 This task implements `pw-mcp-db`, a vendor-agnostic read-only database MCP server supporting
