@@ -5,7 +5,6 @@ package db
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -201,7 +200,7 @@ func (b *bigQueryBackend) QueryRead(ctx context.Context, query string, limit int
 
 // injectBQLimit appends a LIMIT clause if not already present.
 func injectBQLimit(query string, limit int) string {
-	if regexp.MustCompile(`(?i)\bLIMIT\b`).MatchString(query) {
+	if limitRegex.MatchString(query) {
 		return query
 	}
 	return fmt.Sprintf("%s LIMIT %d", strings.TrimRight(query, "; \t\n"), limit)

@@ -7,12 +7,15 @@ package db
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/borch-ai/powerword/pkg/config"
 )
+
+var limitRegex = regexp.MustCompile(`(?i)\bLIMIT\b`)
 
 // Backend defines the read-only operations any database backend must implement.
 // All implementations must enforce read-only access at the driver or session level.
@@ -173,24 +176,19 @@ var writeKeywords = map[string]bool{
 	"GRANT": true, "REVOKE": true, "REPLACE": true, "CALL": true,
 }
 
-// validateReadOnly inspects each semicolon-delimited statement in the query string
-// and returns an error if any statement begins with a non-read keyword.
-// For statements starting with WITH or EXPLAIN, it additionally scans all tokens
-// for write keywords to reject patterns such as "WITH ... DELETE ..." or
-// "EXPLAIN UPDATE ...", which are valid on BigQuery and other engines that lack
-// a session-level read-only mode.
+// validateReadOnly inspects the query string and returns an error if it contains
+// multiple statements or any mutating operations. It utilizes stripCommentsAndStrings
+// to safely identify semicolon statement delimiters, ignoring those inside comments
+// and string literals.
 func validateReadOnly(query string) error {
-	if strings.TrimSpace(query) == "" {
+	stripped := stripCommentsAndStrings(query)
+	if strings.TrimSpace(stripped) == "" {
 		return fmt.Errorf("query must not be empty")
 	}
 	var nonDbStmts []string
-	for _, stmt := range strings.Split(query, ";") {
+	for _, stmt := range strings.Split(stripped, ";") {
 		stmt = strings.TrimFunc(stmt, unicode.IsSpace)
 		if stmt == "" {
-			continue
-		}
-		// Strip leading comments to see if the statement is purely a comment
-		if stripLeadingComments(stmt) == "" {
 			continue
 		}
 		nonDbStmts = append(nonDbStmts, stmt)
@@ -202,7 +200,7 @@ func validateReadOnly(query string) error {
 		return fmt.Errorf("query must not be empty")
 	}
 
-	stmt := stripLeadingComments(nonDbStmts[0])
+	stmt := nonDbStmts[0]
 	// Extract the first token using alphanumeric split
 	fields := strings.FieldsFunc(stmt, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
@@ -225,6 +223,86 @@ func validateReadOnly(query string) error {
 		}
 	}
 	return nil
+}
+
+// stripCommentsAndStrings strips SQL comments (block comments /* ... */ and line comments -- ... or # ...)
+// and replaces the content of string literals ('...', "...", `...`) with empty literals (”, "", “).
+// Semicolons inside these stripped regions will not be seen when splitting on semicolons to detect
+// multi-statement queries.
+func stripCommentsAndStrings(query string) string {
+	var sb strings.Builder
+	runes := []rune(query)
+	n := len(runes)
+	i := 0
+	for i < n {
+		r := runes[i]
+		if r == '/' && i+1 < n && runes[i+1] == '*' {
+			i = stripBlockComment(runes, i)
+			sb.WriteRune(' ')
+			continue
+		}
+		if r == '-' && i+1 < n && runes[i+1] == '-' {
+			i = stripLineComment(runes, i)
+			sb.WriteRune(' ')
+			continue
+		}
+		if r == '#' {
+			i = stripLineComment(runes, i)
+			sb.WriteRune(' ')
+			continue
+		}
+		if r == '\'' || r == '"' || r == '`' {
+			var replacement string
+			replacement, i = stripQuote(runes, i, r)
+			sb.WriteString(replacement)
+			continue
+		}
+		sb.WriteRune(r)
+		i++
+	}
+	return sb.String()
+}
+
+func stripBlockComment(runes []rune, i int) int {
+	n := len(runes)
+	i += 2 // skip /*
+	for i < n {
+		if runes[i] == '*' && i+1 < n && runes[i+1] == '/' {
+			return i + 2
+		}
+		i++
+	}
+	return i
+}
+
+func stripLineComment(runes []rune, i int) int {
+	n := len(runes)
+	i++ // skip -- or #
+	for i < n && runes[i] != '\n' {
+		i++
+	}
+	return i
+}
+
+func stripQuote(runes []rune, i int, quoteRune rune) (string, int) {
+	n := len(runes)
+	i++ // skip opening quote
+	for i < n {
+		if runes[i] == quoteRune {
+			if i+1 < n && runes[i+1] == quoteRune {
+				i += 2
+				continue
+			}
+			i++
+			break
+		}
+		if runes[i] == '\\' && i+1 < n {
+			i += 2
+			continue
+		}
+		i++
+	}
+	return string(quoteRune) + string(quoteRune), i
 }
 
 // stripLeadingComments removes all leading block comments (/* … */) and line comments (-- or #) from a SQL statement.

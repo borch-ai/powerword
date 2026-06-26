@@ -90,6 +90,9 @@ func TestValidateReadOnly_Allowed(t *testing.T) {
 		{"leading block comment", "/* analytics */ SELECT count(*) FROM events"},
 		{"empty second stmt", "SELECT 1;"},
 		{"comment only statement", "SELECT 1; /* just a comment */"},
+		{"semicolon in string", "SELECT ';' AS semi, 'hello; world' AS val"},
+		{"semicolon in comment", "SELECT 1 -- my comment; here\n"},
+		{"semicolon in block comment", "SELECT 1 /* comment; */"},
 	}
 
 	for _, tc := range cases {
@@ -1025,8 +1028,26 @@ func Test_ResolveDriver_Postgres(t *testing.T) {
 	if name != "postgres" {
 		t.Errorf("expected driver 'postgres', got %q", name)
 	}
-	if dsn != "postgres://localhost/db" {
-		t.Errorf("postgres DSN should be unchanged, got %q", dsn)
+	if !strings.Contains(dsn, "default_transaction_read_only%3Don") {
+		t.Errorf("expected default_transaction_read_only to be set, got %q", dsn)
+	}
+
+	// Test URL format with existing options
+	_, dsnUrl := resolveDriver("postgres", "postgres://localhost/db?options=-c%20search_path%3Dpublic")
+	if !strings.Contains(dsnUrl, "options=-c%20search_path%3Dpublic%20-c%20default_transaction_read_only%3Don") {
+		t.Errorf("expected options to be appended, got %q", dsnUrl)
+	}
+
+	// Test key-value DSN format
+	_, dsnKV := resolveDriver("postgres", "host=localhost dbname=test")
+	if !strings.Contains(dsnKV, "options='-c default_transaction_read_only=on'") {
+		t.Errorf("expected options to be set in KV format, got %q", dsnKV)
+	}
+
+	// Test key-value DSN format with existing options
+	_, dsnKVOpt := resolveDriver("postgres", "host=localhost dbname=test options='-c search_path=public'")
+	if !strings.Contains(dsnKVOpt, "options='-c search_path=public -c default_transaction_read_only=on'") {
+		t.Errorf("expected options to be appended in KV format, got %q", dsnKVOpt)
 	}
 }
 
@@ -1035,8 +1056,34 @@ func Test_ResolveDriver_MySQL(t *testing.T) {
 	if name != "mysql" {
 		t.Errorf("expected driver 'mysql', got %q", name)
 	}
-	if dsn != "user:pass@tcp(localhost)/db" {
-		t.Errorf("mysql DSN should be unchanged, got %q", dsn)
+	if !strings.Contains(dsn, "sessionVariables=transaction_read_only=1,tx_read_only=1") {
+		t.Errorf("expected sessionVariables to be set, got %q", dsn)
+	}
+
+	// Test with existing sessionVariables
+	_, dsnSess := resolveDriver("mysql", "user:pass@tcp(localhost)/db?sessionVariables=sql_mode=TRADITIONAL")
+	if !strings.Contains(dsnSess, "sessionVariables=sql_mode=TRADITIONAL,transaction_read_only=1,tx_read_only=1") {
+		t.Errorf("expected sessionVariables to be appended, got %q", dsnSess)
+	}
+}
+
+func TestNewSQLBackend_PingErrorMasksDSN(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// Try to open a postgres backend with a credentials-containing DSN that will fail to ping
+	secretDSN := "postgres://" + "secret_user:" + "secret_password" + "@127.0.0.1:9999/nonexistent_db"
+	_, err := newSQLBackend(ctx, "postgres", secretDSN)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if strings.Contains(err.Error(), "secret_password") {
+		t.Errorf("error leaked secret credentials in DSN: %v", err)
+	}
+	if strings.Contains(err.Error(), "secret_user") {
+		t.Errorf("error leaked username in DSN: %v", err)
 	}
 }
 

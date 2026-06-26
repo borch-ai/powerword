@@ -48,7 +48,7 @@ func newSQLBackend(ctx context.Context, dialect, dsn string) (Backend, error) {
 
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("failed to ping %s at %q: %w", dialect, dsn, err)
+		return nil, fmt.Errorf("failed to ping %s database: %w", dialect, err)
 	}
 
 	// Apply session-level read-only guardrail where the driver supports it.
@@ -102,10 +102,82 @@ func resolveDriver(dialect, dsn string) (string, string) {
 		}
 		return "duckdb", dsn
 	case "mysql":
-		return "mysql", dsn
+		return "mysql", appendMySQLReadOnly(dsn)
 	default: // postgres / postgresql
-		return "postgres", dsn
+		return "postgres", appendPostgresReadOnly(dsn)
 	}
+}
+
+// appendPostgresReadOnly appends Postgres connection parameters to enforce read-only transactions
+// at the connection level. It works on both URL DSNs and key-value DSNs.
+func appendPostgresReadOnly(dsn string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		return appendPostgresURLReadOnly(dsn)
+	}
+	return appendPostgresKVReadOnly(dsn)
+}
+
+func appendPostgresURLReadOnly(dsn string) string {
+	parts := strings.SplitN(dsn, "?", 2)
+	if len(parts) == 1 {
+		return parts[0] + "?options=-c%20default_transaction_read_only%3Don"
+	}
+	params := strings.Split(parts[1], "&")
+	var newParams []string
+	found := false
+	for _, p := range params {
+		if strings.HasPrefix(p, "options=") {
+			found = true
+			val := strings.TrimPrefix(p, "options=")
+			newParams = append(newParams, "options="+val+"%20-c%20default_transaction_read_only%3Don")
+		} else {
+			newParams = append(newParams, p)
+		}
+	}
+	if !found {
+		newParams = append(newParams, "options=-c%20default_transaction_read_only%3Don")
+	}
+	return parts[0] + "?" + strings.Join(newParams, "&")
+}
+
+func appendPostgresKVReadOnly(dsn string) string {
+	reQuote := regexp.MustCompile(`\boptions\s*=\s*'([^']*)'`)
+	if reQuote.MatchString(dsn) {
+		return reQuote.ReplaceAllString(dsn, "options='${1} -c default_transaction_read_only=on'")
+	}
+	reDQuote := regexp.MustCompile(`\boptions\s*=\s*"([^"]*)"`)
+	if reDQuote.MatchString(dsn) {
+		return reDQuote.ReplaceAllString(dsn, `options="${1} -c default_transaction_read_only=on"`)
+	}
+	reNoQuote := regexp.MustCompile(`\boptions\s*=\s*([^\s]+)`)
+	if reNoQuote.MatchString(dsn) {
+		return reNoQuote.ReplaceAllString(dsn, "options='${1} -c default_transaction_read_only=on'")
+	}
+	return dsn + " options='-c default_transaction_read_only=on'"
+}
+
+// appendMySQLReadOnly appends MySQL session variables parameter to enforce read-only transactions.
+func appendMySQLReadOnly(dsn string) string {
+	parts := strings.SplitN(dsn, "?", 2)
+	if len(parts) == 1 {
+		return parts[0] + "?sessionVariables=transaction_read_only=1,tx_read_only=1"
+	}
+	params := strings.Split(parts[1], "&")
+	var newParams []string
+	found := false
+	for _, p := range params {
+		if strings.HasPrefix(p, "sessionVariables=") {
+			found = true
+			val := strings.TrimPrefix(p, "sessionVariables=")
+			newParams = append(newParams, "sessionVariables="+val+",transaction_read_only=1,tx_read_only=1")
+		} else {
+			newParams = append(newParams, p)
+		}
+	}
+	if !found {
+		newParams = append(newParams, "sessionVariables=transaction_read_only=1,tx_read_only=1")
+	}
+	return parts[0] + "?" + strings.Join(newParams, "&")
 }
 
 // applyReadOnlySession executes session-level read-only commands for backends
@@ -310,7 +382,7 @@ func applyLimit(query string, limit int, dialect string) string {
 	trimmed := strings.TrimSuffix(query, ";")
 	trimmed = strings.TrimSpace(trimmed)
 
-	if regexp.MustCompile(`(?i)\bLIMIT\b`).MatchString(trimmed) {
+	if limitRegex.MatchString(trimmed) {
 		return query
 	}
 	return fmt.Sprintf("SELECT * FROM (%s) _pw_q LIMIT %d", trimmed, limit)
