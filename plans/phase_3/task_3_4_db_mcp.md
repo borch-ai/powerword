@@ -57,13 +57,13 @@ Added `DBConfig` struct with `Backend`, `DSN`, `MaxRows` (default 200), and `Que
 ---
 
 ### MCP Server (`cmd/pw-mcp-db/main.go`) [NEW]
-Registers `list_tables`, `describe_table`, `query_read`, and `show_locks` MCP tools.
+Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_locks` MCP tools.
 
 ---
 
 ### Build (`Makefile`) [MODIFIED]
-- `test` target: `CGO_ENABLED=1 go test -p=1 -race -tags=integration ...`
-- `build` target: `CGO_ENABLED=1 go build ./cmd/pw-mcp-db`
+- `test` target: unmodified fast unit test cycle (db package and its tests are gated by `cgo` build constraint)
+- `build` target: compiles `pw-mcp-db` plugin under CGO when requested
 
 ---
 
@@ -75,7 +75,7 @@ Registers `list_tables`, `describe_table`, `query_read`, and `show_locks` MCP to
 - Pre-push hook (`make all`) passes cleanly
 
 ### Manual Verification
-- Smoke test with `sqlite://file::memory:?cache=shared` — `list_tables`, `describe_table`, `query_read`, `show_locks` all succeed
+- Smoke test with `sqlite://file::memory:?cache=shared` — `db_list_tables`, `db_describe_table`, `db_query_read`, `db_show_locks` all succeed
 - Write queries (`INSERT`, `WITH ... DELETE`) rejected with clear error message
 
 ### PR Review

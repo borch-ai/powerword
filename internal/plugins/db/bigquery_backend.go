@@ -1,3 +1,5 @@
+//go:build cgo
+
 package db
 
 import (
@@ -82,7 +84,7 @@ type bigQueryBackend struct {
 }
 
 // newBigQueryBackend constructs a BigQuery backend from a "projectID/datasetID" DSN.
-func newBigQueryBackend(dsn string) (Backend, error) {
+func newBigQueryBackend(ctx context.Context, dsn string) (Backend, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("BigQuery DSN is required in the format \"projectID/datasetID\"")
 	}
@@ -93,7 +95,7 @@ func newBigQueryBackend(dsn string) (Backend, error) {
 	projectID := parts[0]
 	datasetID := parts[1]
 
-	c, err := bigquery.NewClient(context.Background(), projectID)
+	c, err := bigquery.NewClient(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BigQuery client for project %q: %w", projectID, err)
 	}

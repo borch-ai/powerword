@@ -1,3 +1,5 @@
+//go:build cgo
+
 // Package db implements the pw-mcp-db database inspector plugin.
 // It exposes read-only database introspection tools via the Model Context Protocol.
 package db
@@ -85,7 +87,7 @@ func NewDBService(cfg *config.DBConfig) (*DBService, error) {
 	case "duckdb":
 		b, err = newSQLBackend(initCtx, "duckdb", cfg.DSN)
 	case "bigquery":
-		b, err = newBigQueryBackend(cfg.DSN)
+		b, err = newBigQueryBackend(initCtx, cfg.DSN)
 	default:
 		return nil, fmt.Errorf("unsupported db backend %q: must be one of postgres, mysql, sqlite, duckdb, bigquery", cfg.Backend)
 	}
@@ -186,11 +188,11 @@ func validateReadOnly(query string) error {
 		if stmt == "" {
 			continue
 		}
-		// Strip leading block comments /* … */
-		stmt = stripLeadingComment(stmt)
-		// Extract the first token
+		// Strip leading comments (block and line comments)
+		stmt = stripLeadingComments(stmt)
+		// Extract the first token using alphanumeric split
 		fields := strings.FieldsFunc(stmt, func(r rune) bool {
-			return unicode.IsSpace(r) || r == '('
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
 		})
 		if len(fields) == 0 {
 			continue
@@ -213,15 +215,35 @@ func validateReadOnly(query string) error {
 	return nil
 }
 
-// stripLeadingComment removes a leading /* … */ block comment from a SQL statement.
-func stripLeadingComment(s string) string {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "/*") {
-		return s
+// stripLeadingComments removes all leading block comments (/* … */) and line comments (-- or #) from a SQL statement.
+func stripLeadingComments(s string) string {
+	for {
+		s = strings.TrimSpace(s)
+		if strings.HasPrefix(s, "/*") {
+			end := strings.Index(s, "*/")
+			if end == -1 {
+				return s
+			}
+			s = s[end+2:]
+			continue
+		}
+		if strings.HasPrefix(s, "--") {
+			end := strings.Index(s, "\n")
+			if end == -1 {
+				return ""
+			}
+			s = s[end+1:]
+			continue
+		}
+		if strings.HasPrefix(s, "#") {
+			end := strings.Index(s, "\n")
+			if end == -1 {
+				return ""
+			}
+			s = s[end+1:]
+			continue
+		}
+		break
 	}
-	end := strings.Index(s, "*/")
-	if end == -1 {
-		return s
-	}
-	return strings.TrimSpace(s[end+2:])
+	return strings.TrimSpace(s)
 }

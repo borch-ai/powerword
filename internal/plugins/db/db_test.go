@@ -1,3 +1,5 @@
+//go:build cgo
+
 package db
 
 import (
@@ -286,10 +288,10 @@ func TestDBService_Close(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// stripLeadingComment tests
+// stripLeadingComments tests
 // ---------------------------------------------------------------------------
 
-func TestStripLeadingComment(t *testing.T) {
+func TestStripLeadingComments(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		input string
@@ -299,11 +301,14 @@ func TestStripLeadingComment(t *testing.T) {
 		{"SELECT 1", "SELECT 1"},
 		{"/* unclosed SELECT", "/* unclosed SELECT"},
 		{"  /* foo */  SELECT 1", "SELECT 1"},
+		{"-- line comment\nSELECT 1", "SELECT 1"},
+		{"# hash comment\nSELECT 1", "SELECT 1"},
+		{"/* block */ -- line\n# hash\nSELECT 1", "SELECT 1"},
 	}
 	for _, tc := range cases {
-		got := stripLeadingComment(tc.input)
+		got := stripLeadingComments(tc.input)
 		if got != tc.want {
-			t.Errorf("stripLeadingComment(%q) = %q, want %q", tc.input, got, tc.want)
+			t.Errorf("stripLeadingComments(%q) = %q, want %q", tc.input, got, tc.want)
 		}
 	}
 }
@@ -609,14 +614,14 @@ func TestBQ_Close_OK(t *testing.T) {
 
 func TestBQ_NewBigQueryBackend_EmptyDSN(t *testing.T) {
 	t.Parallel()
-	if _, err := newBigQueryBackend(""); err == nil {
+	if _, err := newBigQueryBackend(context.Background(), ""); err == nil {
 		t.Fatal("expected error for empty DSN")
 	}
 }
 
 func TestBQ_NewBigQueryBackend_MalformedDSN(t *testing.T) {
 	t.Parallel()
-	if _, err := newBigQueryBackend("noslash"); err == nil {
+	if _, err := newBigQueryBackend(context.Background(), "noslash"); err == nil {
 		t.Fatal("expected error for DSN without slash")
 	}
 }

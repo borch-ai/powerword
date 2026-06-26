@@ -1,3 +1,5 @@
+//go:build cgo
+
 package db
 
 import (
@@ -221,7 +223,7 @@ func describeTableQuery(dialect, table string) (string, []any, error) {
 	default: // postgres
 		return `SELECT column_name, udt_name, is_nullable, '' AS key, column_default
 			FROM information_schema.columns
-			WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_name = $1
+			WHERE table_schema = current_schema() AND table_name = $1
 			ORDER BY ordinal_position`, []any{table}, nil
 	}
 }
@@ -276,14 +278,27 @@ func (b *sqlBackend) QueryRead(ctx context.Context, query string, limit int) (*Q
 // present. This is a best-effort safeguard; the primary limit is enforced by the
 // row-count break in QueryRead.
 func applyLimit(query string, limit int, dialect string) string {
-	upper := strings.ToUpper(strings.TrimSpace(query))
+	query = strings.TrimSpace(query)
+	// Skip subquery-wrapping if query contains multiple non-empty statements.
+	var nonCount int
+	for _, stmt := range strings.Split(query, ";") {
+		if strings.TrimSpace(stmt) != "" {
+			nonCount++
+		}
+	}
+	if nonCount > 1 {
+		return query
+	}
+
+	// Single statement: trim trailing semicolon.
+	trimmed := strings.TrimSuffix(query, ";")
+	trimmed = strings.TrimSpace(trimmed)
+
+	upper := strings.ToUpper(trimmed)
 	if strings.Contains(upper, " LIMIT ") || strings.HasSuffix(upper, "LIMIT") {
 		return query
 	}
-	if dialect == "postgres" {
-		return fmt.Sprintf("SELECT * FROM (%s) _pw_q LIMIT %d", query, limit)
-	}
-	return fmt.Sprintf("SELECT * FROM (%s) _pw_q LIMIT %d", query, limit)
+	return fmt.Sprintf("SELECT * FROM (%s) _pw_q LIMIT %d", trimmed, limit)
 }
 
 // ShowLocks returns active long-running queries and locks. Returns an empty slice
