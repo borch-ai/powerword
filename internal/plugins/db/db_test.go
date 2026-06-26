@@ -304,6 +304,8 @@ func TestStripLeadingComments(t *testing.T) {
 		{"-- line comment\nSELECT 1", "SELECT 1"},
 		{"# hash comment\nSELECT 1", "SELECT 1"},
 		{"/* block */ -- line\n# hash\nSELECT 1", "SELECT 1"},
+		{"-- line comment without newline", ""},
+		{"# hash comment without newline", ""},
 	}
 	for _, tc := range cases {
 		got := stripLeadingComments(tc.input)
@@ -330,6 +332,14 @@ func TestApplyLimit_ExistingLimit(t *testing.T) {
 	q := applyLimit("SELECT * FROM users LIMIT 50", 100, "postgres")
 	if q != "SELECT * FROM users LIMIT 50" {
 		t.Errorf("expected existing limit to be preserved, got: %q", q)
+	}
+}
+
+func TestApplyLimit_MultiStatement(t *testing.T) {
+	t.Parallel()
+	q := applyLimit("SELECT * FROM users; SELECT * FROM products;", 100, "postgres")
+	if q != "SELECT * FROM users; SELECT * FROM products;" {
+		t.Errorf("expected multi-statement query to not be wrapped, got %q", q)
 	}
 }
 
@@ -624,6 +634,11 @@ func TestBQ_NewBigQueryBackend_MalformedDSN(t *testing.T) {
 	if _, err := newBigQueryBackend(context.Background(), "noslash"); err == nil {
 		t.Fatal("expected error for DSN without slash")
 	}
+}
+
+func TestBQ_NewBigQueryBackend_ValidDSN_Error(t *testing.T) {
+	t.Parallel()
+	_, _ = newBigQueryBackend(context.Background(), "test-proj/test-dataset")
 }
 
 // ---------------------------------------------------------------------------
