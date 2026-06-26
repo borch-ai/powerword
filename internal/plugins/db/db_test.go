@@ -337,6 +337,17 @@ func TestApplyLimit_ExistingLimit(t *testing.T) {
 	if q != "SELECT * FROM users LIMIT 50" {
 		t.Errorf("expected existing limit to be preserved, got: %q", q)
 	}
+
+	// Verify that limit preceded by newline or tab is also preserved
+	qNewline := applyLimit("SELECT * FROM users\nLIMIT 50", 100, "postgres")
+	if qNewline != "SELECT * FROM users\nLIMIT 50" {
+		t.Errorf("expected existing newline limit to be preserved, got: %q", qNewline)
+	}
+
+	qTab := applyLimit("SELECT * FROM users\tLIMIT 50", 100, "postgres")
+	if qTab != "SELECT * FROM users\tLIMIT 50" {
+		t.Errorf("expected existing tab limit to be preserved, got: %q", qTab)
+	}
 }
 
 func TestApplyLimit_MultiStatement(t *testing.T) {
@@ -364,6 +375,17 @@ func TestInjectBQLimit_ExistingLimit(t *testing.T) {
 	q := injectBQLimit("SELECT * FROM t LIMIT 5", 100)
 	if q != "SELECT * FROM t LIMIT 5" {
 		t.Errorf("expected existing limit preserved, got: %q", q)
+	}
+
+	// Verify that limit preceded by newline or tab is also preserved
+	qNewline := injectBQLimit("SELECT * FROM t\nLIMIT 5", 100)
+	if qNewline != "SELECT * FROM t\nLIMIT 5" {
+		t.Errorf("expected existing newline limit preserved, got: %q", qNewline)
+	}
+
+	qTab := injectBQLimit("SELECT * FROM t\tLIMIT 5", 100)
+	if qTab != "SELECT * FROM t\tLIMIT 5" {
+		t.Errorf("expected existing tab limit preserved, got: %q", qTab)
 	}
 }
 

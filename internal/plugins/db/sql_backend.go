@@ -302,8 +302,7 @@ func applyLimit(query string, limit int, dialect string) string {
 	trimmed := strings.TrimSuffix(query, ";")
 	trimmed = strings.TrimSpace(trimmed)
 
-	upper := strings.ToUpper(trimmed)
-	if strings.Contains(upper, " LIMIT ") || strings.HasSuffix(upper, "LIMIT") {
+	if regexp.MustCompile(`(?i)\bLIMIT\b`).MatchString(trimmed) {
 		return query
 	}
 	return fmt.Sprintf("SELECT * FROM (%s) _pw_q LIMIT %d", trimmed, limit)
