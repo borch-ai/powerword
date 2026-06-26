@@ -40,7 +40,7 @@ func seedSQLiteFile(t *testing.T, path string) {
 		`INSERT INTO users (name, age) VALUES ('Carol', 35)`,
 	}
 	for _, stmt := range stmts {
-		if _, err := db.Exec(stmt); err != nil {
+		if _, err := db.ExecContext(context.Background(), stmt); err != nil {
 			t.Fatalf("seed stmt %q: %v", stmt, err)
 		}
 	}
