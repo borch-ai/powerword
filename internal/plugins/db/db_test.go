@@ -88,7 +88,6 @@ func TestValidateReadOnly_Allowed(t *testing.T) {
 		{"desc", "DESC orders"},
 		{"pragma", "PRAGMA table_info('users')"},
 		{"leading block comment", "/* analytics */ SELECT count(*) FROM events"},
-		{"multi stmt selects", "SELECT 1; SELECT 2"},
 		{"empty second stmt", "SELECT 1;"},
 		{"comment only statement", "SELECT 1; /* just a comment */"},
 	}
@@ -120,6 +119,7 @@ func TestValidateReadOnly_Rejected(t *testing.T) {
 		{"revoke", "REVOKE ALL ON users FROM admin"},
 		{"create", "CREATE TABLE t (id INT)"},
 		{"mixed valid then invalid", "SELECT 1; DROP TABLE users"},
+		{"multi stmt selects", "SELECT 1; SELECT 2"},
 		{"empty", ""},
 		{"only whitespace", "   \t\n   "},
 	}
@@ -950,6 +950,12 @@ func Test_ResolveDriver_SQLiteAlreadyHasParam(t *testing.T) {
 	if !strings.Contains(dsnOverride, "_query_only=true") || strings.Contains(dsnOverride, "false") {
 		t.Errorf("expected _query_only=false to be overridden to true, got: %q", dsnOverride)
 	}
+
+	// Verify that _query_only in the file path itself is not rewritten
+	_, dsnPath := resolveDriver("sqlite", "/tmp/_query_only.db")
+	if !strings.Contains(dsnPath, "_query_only.db") {
+		t.Errorf("expected file path to remain intact, got: %q", dsnPath)
+	}
 }
 
 func Test_ResolveDriver_DuckDB(t *testing.T) {
@@ -965,6 +971,12 @@ func Test_ResolveDriver_DuckDB(t *testing.T) {
 	_, dsnOverride := resolveDriver("duckdb", "/tmp/test.duckdb?access_mode=READ_WRITE")
 	if !strings.Contains(dsnOverride, "access_mode=READ_ONLY") || strings.Contains(dsnOverride, "READ_WRITE") {
 		t.Errorf("expected access_mode=READ_WRITE to be overridden to READ_ONLY, got: %q", dsnOverride)
+	}
+
+	// Verify that access_mode in the file path itself is not rewritten
+	_, dsnPath := resolveDriver("duckdb", "/tmp/access_mode.duckdb")
+	if !strings.Contains(dsnPath, "access_mode.duckdb") {
+		t.Errorf("expected file path to remain intact, got: %q", dsnPath)
 	}
 }
 

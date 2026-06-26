@@ -68,9 +68,9 @@ func resolveDriver(dialect, dsn string) (string, string) {
 	case "sqlite":
 		// modernc.org/sqlite registers as "sqlite".
 		// Enforce _query_only=true at the driver level, overriding any existing value.
-		re := regexp.MustCompile(`_query_only(=[^&]*)?`)
+		re := regexp.MustCompile(`([?&])_query_only(=[^&]*)?`)
 		if re.MatchString(dsn) {
-			dsn = re.ReplaceAllString(dsn, "_query_only=true")
+			dsn = re.ReplaceAllString(dsn, "${1}_query_only=true")
 		} else {
 			sep := "?"
 			if strings.Contains(dsn, "?") {
@@ -82,9 +82,9 @@ func resolveDriver(dialect, dsn string) (string, string) {
 	case "duckdb":
 		// DuckDB driver registers as "duckdb".
 		// Enforce access_mode=READ_ONLY at the driver level, overriding any existing value.
-		re := regexp.MustCompile(`access_mode(=[^&]*)?`)
+		re := regexp.MustCompile(`([?&])access_mode(=[^&]*)?`)
 		if re.MatchString(dsn) {
-			dsn = re.ReplaceAllString(dsn, "access_mode=READ_ONLY")
+			dsn = re.ReplaceAllString(dsn, "${1}access_mode=READ_ONLY")
 		} else {
 			sep := "?"
 			if strings.Contains(dsn, "?") {

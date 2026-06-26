@@ -183,32 +183,44 @@ func validateReadOnly(query string) error {
 	if strings.TrimSpace(query) == "" {
 		return fmt.Errorf("query must not be empty")
 	}
+	var nonDbStmts []string
 	for _, stmt := range strings.Split(query, ";") {
 		stmt = strings.TrimFunc(stmt, unicode.IsSpace)
 		if stmt == "" {
 			continue
 		}
-		// Strip leading comments (block and line comments)
-		stmt = stripLeadingComments(stmt)
-		// Extract the first token using alphanumeric split
-		fields := strings.FieldsFunc(stmt, func(r rune) bool {
-			return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
-		})
-		if len(fields) == 0 {
+		// Strip leading comments to see if the statement is purely a comment
+		if stripLeadingComments(stmt) == "" {
 			continue
 		}
-		keyword := strings.ToUpper(fields[0])
-		if !allowedReadKeywords[keyword] {
-			return fmt.Errorf("query rejected: statement starting with %q is not allowed (only read-only queries are permitted)", keyword)
-		}
-		// WITH and EXPLAIN can precede DML on BigQuery and other engines that
-		// do not enforce session read-only mode at the driver level. Scan all
-		// subsequent tokens for write keywords to catch these patterns.
-		if keyword == "WITH" || keyword == "EXPLAIN" {
-			for _, tok := range fields[1:] {
-				if writeKeywords[strings.ToUpper(tok)] {
-					return fmt.Errorf("query rejected: %q statement contains write keyword %q", keyword, strings.ToUpper(tok))
-				}
+		nonDbStmts = append(nonDbStmts, stmt)
+	}
+	if len(nonDbStmts) > 1 {
+		return fmt.Errorf("query rejected: multi-statement queries are not allowed")
+	}
+	if len(nonDbStmts) == 0 {
+		return fmt.Errorf("query must not be empty")
+	}
+
+	stmt := stripLeadingComments(nonDbStmts[0])
+	// Extract the first token using alphanumeric split
+	fields := strings.FieldsFunc(stmt, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_'
+	})
+	if len(fields) == 0 {
+		return fmt.Errorf("query must not be empty")
+	}
+	keyword := strings.ToUpper(fields[0])
+	if !allowedReadKeywords[keyword] {
+		return fmt.Errorf("query rejected: statement starting with %q is not allowed (only read-only queries are permitted)", keyword)
+	}
+	// WITH and EXPLAIN can precede DML on BigQuery and other engines that
+	// do not enforce session read-only mode at the driver level. Scan all
+	// subsequent tokens for write keywords to catch these patterns.
+	if keyword == "WITH" || keyword == "EXPLAIN" {
+		for _, tok := range fields[1:] {
+			if writeKeywords[strings.ToUpper(tok)] {
+				return fmt.Errorf("query rejected: %q statement contains write keyword %q", keyword, strings.ToUpper(tok))
 			}
 		}
 	}
