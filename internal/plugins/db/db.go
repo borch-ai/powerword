@@ -1,4 +1,4 @@
-//go:build cgo
+//go:build cgo && integration
 
 // Package db implements the pw-mcp-db database inspector plugin.
 // It exposes read-only database introspection tools via the Model Context Protocol.

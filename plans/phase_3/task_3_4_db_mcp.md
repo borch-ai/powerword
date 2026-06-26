@@ -39,7 +39,7 @@ Added `DBConfig` struct with `Backend`, `DSN`, `MaxRows` (default 200), and `Que
 - `sqlBackend` wraps `database/sql` for Postgres, MySQL, SQLite, DuckDB
 - `resolveDriver()` maps dialect → driver + session-level read-only DSN modifications
 - `applyReadOnlySession()` sets dialect-specific read-only pragmas/modes on connection open
-- DuckDB is the deliberate CGO exception; CGO_ENABLED=1 is always required for this package
+- DuckDB is the deliberate CGO exception; CGO_ENABLED=1 and `cgo && integration` build constraints are always required for this package
 
 #### [NEW] [bigquery_backend.go](../../internal/plugins/db/bigquery_backend.go)
 - `bigQueryBackend` wraps BQ client behind interfaces for full testability
@@ -62,17 +62,19 @@ Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_l
 ---
 
 ### Build (`Makefile`) [MODIFIED]
-- `test` target: unmodified fast unit test cycle (db package and its tests are gated by `cgo` build constraint)
-- `build` target: compiles `pw-mcp-db` plugin under CGO when requested
+- `test` target: unmodified fast unit test cycle; CGO is enabled by default so the race detector works, but the CGO-dependent `db` package is gated by `cgo && integration` build constraints to avoid compiler toolchain requirements during normal test runs.
+- `build` target: compiles `pw-mcp-db` plugin under CGO and using the `integration` tag when requested.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- `make lint` — 0 issues
-- `make check-coverage` — 91.0% ✅ (threshold maintained after all additions)
-- Pre-push hook (`make all`) passes cleanly
+- `make test` — standard unit tests run cleanly without compiling `internal/plugins/db/...` or requiring CGO toolchains.
+- `make check-coverage` — 91.2% ✅ (threshold maintained above 91.0% after gating the db package).
+- `make test-db` — explicitly runs the CGO-dependent `db` plugin tests using CGO_ENABLED=1 and the `integration` tag.
+- `make lint` and `make markdown-lint` — 0 issues.
+- Pre-push hook (`make all`) passes cleanly.
 
 ### Manual Verification
 - Smoke test with `sqlite://file::memory:?cache=shared` — `db_list_tables`, `db_describe_table`, `db_query_read`, `db_show_locks` all succeed
