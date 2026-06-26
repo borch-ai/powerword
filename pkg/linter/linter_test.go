@@ -164,6 +164,17 @@ func TestLintMarkdown_OrderedListPrefix(t *testing.T) {
 			expectError: true,
 			errorMsg:    "invalid ordered list prefix 3; expected 1 or sequential 2",
 		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			runOrderedListTest(t, tc)
+		})
+	}
+}
+
+// TestLintMarkdown_OrderedListReset covers the resetListStack branch paths.
+func TestLintMarkdown_OrderedListReset(t *testing.T) {
+	tests := []orderedListTestCase{
 		{
 			name: "smaller indentation resets nested list",
 			content: `
@@ -174,6 +185,15 @@ Paragraph text at outer level
 `,
 			expectError: true,
 			errorMsg:    "ordered list must start with 1, got 2",
+		},
+		{
+			name: "indented non-list text does not pop outer list",
+			content: `
+1. item 1
+  Some indented text (more indent than outer list, less than would be a sublist)
+2. item 2
+`,
+			expectError: false,
 		},
 	}
 

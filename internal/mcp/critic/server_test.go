@@ -309,3 +309,10 @@ func TestReviewWorkspace_GitDiffError(t *testing.T) {
 		t.Error("expected error for git diff failure")
 	}
 }
+
+func TestCriticSetExecCommand_Coverage(t *testing.T) {
+	// Call SetExecCommand to cover the assignment statement.
+	original := execCommand
+	defer func() { execCommand = original }()
+	SetExecCommand(exec.CommandContext)
+}

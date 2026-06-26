@@ -1,4 +1,4 @@
-.PHONY: all build install test test-integration test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans
+.PHONY: all build install test test-integration test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans build-db-plugin
 
 # Go parameters
 GOCMD=go
@@ -29,6 +29,8 @@ LINTER_PLUGIN=pw-mcp-linter
 CLOUD_PLUGIN=pw-mcp-cloud
 COVERAGE_PLUGIN=pw-mcp-coverage
 YOUTUBE_PLUGIN=pw-mcp-youtube
+# pw-mcp-db requires CGO_ENABLED=1 (DuckDB driver) — deliberate exception; all other plugins use CGO_ENABLED=0.
+DB_PLUGIN=pw-mcp-db
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
@@ -56,6 +58,8 @@ build:
 	@if [ -d cmd/$(CLOUD_PLUGIN) ]; then $(GOBUILD) -o bin/$(CLOUD_PLUGIN) ./cmd/$(CLOUD_PLUGIN); fi
 	@if [ -d cmd/$(COVERAGE_PLUGIN) ]; then $(GOBUILD) -o bin/$(COVERAGE_PLUGIN) ./cmd/$(COVERAGE_PLUGIN); fi
 	@if [ -d cmd/$(YOUTUBE_PLUGIN) ]; then $(GOBUILD) -o bin/$(YOUTUBE_PLUGIN) ./cmd/$(YOUTUBE_PLUGIN); fi
+	# pw-mcp-db uses CGO_ENABLED=1 for the DuckDB driver (deliberate exception).
+	@if [ -d cmd/$(DB_PLUGIN) ]; then CGO_ENABLED=1 $(GOBUILD) -o bin/$(DB_PLUGIN) ./cmd/$(DB_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -76,6 +80,8 @@ install:
 	@if [ -d cmd/$(CLOUD_PLUGIN) ]; then $(GOCMD) install ./cmd/$(CLOUD_PLUGIN); fi
 	@if [ -d cmd/$(COVERAGE_PLUGIN) ]; then $(GOCMD) install ./cmd/$(COVERAGE_PLUGIN); fi
 	@if [ -d cmd/$(YOUTUBE_PLUGIN) ]; then $(GOCMD) install ./cmd/$(YOUTUBE_PLUGIN); fi
+	# pw-mcp-db uses CGO_ENABLED=1 for the DuckDB driver (deliberate exception).
+	@if [ -d cmd/$(DB_PLUGIN) ]; then CGO_ENABLED=1 $(GOCMD) install ./cmd/$(DB_PLUGIN); fi
 
 
 install-hooks:
@@ -87,10 +93,10 @@ install-hooks:
 
 
 test:
-	$(GOTEST) -p=1 -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
+	CGO_ENABLED=1 $(GOTEST) -p=1 -v -race -tags=integration -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
 
 test-integration:
-	$(GOTEST) -v -tags=integration ./...
+	CGO_ENABLED=1 $(GOTEST) -v -tags=integration ./...
 
 check-coverage: test
 	$(GOCMD) run ./cmd/powerword check-coverage $(MIN_COVERAGE) coverage.out
@@ -125,3 +131,8 @@ clean:
 	$(GOCLEAN)
 	rm -rf bin/
 	rm -f coverage.out
+
+# Standalone target to build only pw-mcp-db with CGO enabled.
+build-db-plugin:
+	mkdir -p bin
+	CGO_ENABLED=1 $(GOBUILD) -o bin/$(DB_PLUGIN) ./cmd/$(DB_PLUGIN)

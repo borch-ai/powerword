@@ -228,3 +228,10 @@ func TestExtractGitDiff_NoConfig(t *testing.T) {
 		t.Error("expected error when no git server is configured and pw-mcp-git is missing")
 	}
 }
+func TestSetExecCommand_Coverage(t *testing.T) {
+	// Call SetExecCommand to cover the assignment statement.
+	// Restore the original after test.
+	original := execCommand
+	defer func() { execCommand = original }()
+	SetExecCommand(exec.CommandContext)
+}

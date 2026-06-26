@@ -113,6 +113,14 @@ type YouTubeConfig struct {
 	RefreshToken string `mapstructure:"refresh_token"`
 }
 
+// DBConfig holds parameters for the db inspector plugin.
+type DBConfig struct {
+	Backend      string `mapstructure:"backend"`       // "postgres", "mysql", "sqlite", "duckdb", "bigquery"
+	DSN          string `mapstructure:"dsn"`           // connection string; for bigquery: "project/dataset"
+	MaxRows      int    `mapstructure:"max_rows"`      // max rows returned per query (default: 200)
+	QueryTimeout string `mapstructure:"query_timeout"` // per-query deadline, e.g. "10s" (default: "10s")
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
@@ -122,6 +130,7 @@ type PluginsConfig struct {
 	Trends   TrendsConfig   `mapstructure:"trends"`
 	Cloud    CloudConfig    `mapstructure:"cloud"`
 	YouTube  YouTubeConfig  `mapstructure:"youtube"`
+	DB       DBConfig       `mapstructure:"db"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -369,6 +378,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("plugins.youtube.client_id", "")
 	v.SetDefault("plugins.youtube.client_secret", "")
 	v.SetDefault("plugins.youtube.refresh_token", "")
+	v.SetDefault("plugins.db.backend", "")
+	v.SetDefault("plugins.db.dsn", "")
+	v.SetDefault("plugins.db.max_rows", 200)
+	v.SetDefault("plugins.db.query_timeout", "10s")
 }
 
 // bindEnvVars binds all known environment variable overrides to their Viper config paths.
@@ -436,6 +449,10 @@ func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.youtube.client_id", "POWERWORD_YOUTUBE_CLIENT_ID")
 	bindEnv(v, "plugins.youtube.client_secret", "POWERWORD_YOUTUBE_CLIENT_SECRET")
 	bindEnv(v, "plugins.youtube.refresh_token", "POWERWORD_YOUTUBE_REFRESH_TOKEN")
+	bindEnv(v, "plugins.db.backend", "POWERWORD_DB_BACKEND")
+	bindEnv(v, "plugins.db.dsn", "POWERWORD_DB_DSN")
+	bindEnv(v, "plugins.db.max_rows", "POWERWORD_DB_MAX_ROWS")
+	bindEnv(v, "plugins.db.query_timeout", "POWERWORD_DB_QUERY_TIMEOUT")
 }
 
 func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {

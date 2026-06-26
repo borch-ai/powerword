@@ -714,3 +714,37 @@ None.
 		t.Errorf("expected no validation errors for ignored powerword.toml file, got: %v", err)
 	}
 }
+func TestIsPlaceholder_DirectCoverage(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		val      string
+		wantTrue bool
+	}{
+		{"1.26.0", false},                 // real version → return false (previously uncovered)
+		{"2026-01-01", false},             // real date → return false
+		{"Go Version Here", true},         // contains "GO VERSION" → return true (previously uncovered)
+		{"Date Completed Here", true},     // contains "DATE COMPLETED"
+		{"Unit Test Coverage Here", true}, // contains "UNIT TEST COVERAGE"
+		{"", true},                        // empty after trim
+		{"[TBD]", true},                   // bracket placeholder
+		{"TBD", true},                     // TBD literal
+	}
+	for _, tc := range cases {
+		got := isPlaceholder(tc.val)
+		if got != tc.wantTrue {
+			t.Errorf("isPlaceholder(%q) = %v, want %v", tc.val, got, tc.wantTrue)
+		}
+	}
+}
+
+func TestIsGitIgnoredOrOptional_EnvPrefix(t *testing.T) {
+	t.Parallel()
+	// .env.production has the .env. prefix — previously uncovered branch.
+	if !isGitIgnoredOrOptional("/workspace/.env.production") {
+		t.Error("expected .env.production to be optional")
+	}
+	// A normal file should not be optional.
+	if isGitIgnoredOrOptional("/workspace/main.go") {
+		t.Error("expected main.go to not be optional")
+	}
+}
