@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 
 	// Pure-Go SQLite driver (no CGO required).
@@ -60,28 +61,35 @@ func newSQLBackend(ctx context.Context, dialect, dsn string) (Backend, error) {
 }
 
 // resolveDriver returns the registered driver name and the final DSN to use.
-// For SQLite we append the read-only query parameter.
-// For DuckDB we append the access_mode parameter.
+// For SQLite we append and override the read-only query parameter to ensure it is true.
+// For DuckDB we append and override the access_mode parameter to ensure it is READ_ONLY.
 func resolveDriver(dialect, dsn string) (string, string) {
 	switch dialect {
 	case "sqlite":
 		// modernc.org/sqlite registers as "sqlite".
-		// Append _query_only to enforce read-only mode at the driver level.
-		sep := "?"
-		if strings.Contains(dsn, "?") {
-			sep = "&"
-		}
-		if !strings.Contains(dsn, "_query_only") {
+		// Enforce _query_only=true at the driver level, overriding any existing value.
+		re := regexp.MustCompile(`_query_only(=[^&]*)?`)
+		if re.MatchString(dsn) {
+			dsn = re.ReplaceAllString(dsn, "_query_only=true")
+		} else {
+			sep := "?"
+			if strings.Contains(dsn, "?") {
+				sep = "&"
+			}
 			dsn = dsn + sep + "_query_only=true"
 		}
 		return "sqlite", dsn
 	case "duckdb":
 		// DuckDB driver registers as "duckdb".
-		sep := "?"
-		if strings.Contains(dsn, "?") {
-			sep = "&"
-		}
-		if !strings.Contains(dsn, "access_mode") {
+		// Enforce access_mode=READ_ONLY at the driver level, overriding any existing value.
+		re := regexp.MustCompile(`access_mode(=[^&]*)?`)
+		if re.MatchString(dsn) {
+			dsn = re.ReplaceAllString(dsn, "access_mode=READ_ONLY")
+		} else {
+			sep := "?"
+			if strings.Contains(dsn, "?") {
+				sep = "&"
+			}
 			dsn = dsn + sep + "access_mode=READ_ONLY"
 		}
 		return "duckdb", dsn

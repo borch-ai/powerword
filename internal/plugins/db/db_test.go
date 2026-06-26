@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -943,6 +944,12 @@ func Test_ResolveDriver_SQLiteAlreadyHasParam(t *testing.T) {
 	if count > 1 {
 		t.Errorf("_query_only appears more than once in DSN: %q", dsn)
 	}
+
+	// Verify that _query_only=false is overridden to true
+	_, dsnOverride := resolveDriver("sqlite", "/tmp/test.db?_query_only=false")
+	if !strings.Contains(dsnOverride, "_query_only=true") || strings.Contains(dsnOverride, "false") {
+		t.Errorf("expected _query_only=false to be overridden to true, got: %q", dsnOverride)
+	}
 }
 
 func Test_ResolveDriver_DuckDB(t *testing.T) {
@@ -952,6 +959,12 @@ func Test_ResolveDriver_DuckDB(t *testing.T) {
 	}
 	if dsn == "/tmp/test.duckdb" {
 		t.Error("expected access_mode to be appended to DuckDB DSN")
+	}
+
+	// Verify that access_mode=READ_WRITE is overridden to READ_ONLY
+	_, dsnOverride := resolveDriver("duckdb", "/tmp/test.duckdb?access_mode=READ_WRITE")
+	if !strings.Contains(dsnOverride, "access_mode=READ_ONLY") || strings.Contains(dsnOverride, "READ_WRITE") {
+		t.Errorf("expected access_mode=READ_WRITE to be overridden to READ_ONLY, got: %q", dsnOverride)
 	}
 }
 

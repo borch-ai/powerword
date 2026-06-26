@@ -59,7 +59,8 @@ build:
 	@if [ -d cmd/$(COVERAGE_PLUGIN) ]; then $(GOBUILD) -o bin/$(COVERAGE_PLUGIN) ./cmd/$(COVERAGE_PLUGIN); fi
 	@if [ -d cmd/$(YOUTUBE_PLUGIN) ]; then $(GOBUILD) -o bin/$(YOUTUBE_PLUGIN) ./cmd/$(YOUTUBE_PLUGIN); fi
 	# pw-mcp-db uses CGO_ENABLED=1 for the DuckDB driver (deliberate exception).
-	@if [ -d cmd/$(DB_PLUGIN) ]; then CGO_ENABLED=1 $(GOBUILD) -o bin/$(DB_PLUGIN) ./cmd/$(DB_PLUGIN); fi
+	# Gated by POWERWORD_BUILD_DB=1 to avoid CGO compiler toolchain requirements by default.
+	@if [ -d cmd/$(DB_PLUGIN) ] && [ "$(POWERWORD_BUILD_DB)" = "1" ]; then CGO_ENABLED=1 $(GOBUILD) -o bin/$(DB_PLUGIN) ./cmd/$(DB_PLUGIN); fi
 
 install:
 	$(GOCMD) install $(LDFLAGS) ./cmd/powerword
@@ -81,7 +82,8 @@ install:
 	@if [ -d cmd/$(COVERAGE_PLUGIN) ]; then $(GOCMD) install ./cmd/$(COVERAGE_PLUGIN); fi
 	@if [ -d cmd/$(YOUTUBE_PLUGIN) ]; then $(GOCMD) install ./cmd/$(YOUTUBE_PLUGIN); fi
 	# pw-mcp-db uses CGO_ENABLED=1 for the DuckDB driver (deliberate exception).
-	@if [ -d cmd/$(DB_PLUGIN) ]; then CGO_ENABLED=1 $(GOCMD) install ./cmd/$(DB_PLUGIN); fi
+	# Gated by POWERWORD_BUILD_DB=1 to avoid CGO compiler toolchain requirements by default.
+	@if [ -d cmd/$(DB_PLUGIN) ] && [ "$(POWERWORD_BUILD_DB)" = "1" ]; then CGO_ENABLED=1 $(GOCMD) install ./cmd/$(DB_PLUGIN); fi
 
 
 install-hooks:
