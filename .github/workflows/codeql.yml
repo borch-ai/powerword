@@ -1,0 +1,32 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '30 20 * * 1' # 20:30 on Mondays
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze-go:
+    name: Analyze (Go)
+    uses: borch-ai/.github/.github/workflows/codeql.yml@main
+    with:
+      language: go
+      build-mode: manual
+      build-command: "make build"
+    secrets: inherit
+
+  analyze-python:
+    name: Analyze (Python)
+    uses: borch-ai/.github/.github/workflows/codeql.yml@main
+    with:
+      language: python
+      build-mode: none
+    secrets: inherit
