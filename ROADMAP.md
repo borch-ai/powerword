@@ -11,6 +11,7 @@ Powerword is the **infrastructure layer** of the Borch-AI publishing stack. It p
 - **Pithos** imports `pkg/llm`, `pkg/telemetry`; invokes `pw-mcp-imagegen`, `pw-mcp-seo`, `pw-mcp-kdp-math` binaries.
 - **Kiln** invokes `pw-mcp-seo`, `pw-mcp-imagegen` directly; drives Pithos as a subprocess.
 - **Lamplighter** — future consumer of `pw-mcp-telemetry` for real-time cost dashboards.
+- **Lighthouse** — the telemetry sink. `pkg/telemetry` will optionally forward session metrics to Lighthouse's `POST /api/telemetry` on command exit (opt-in via `LIGHTHOUSE_URL`).
 
 Powerword **does not depend on** any sibling project. Additions to this roadmap that are clearly domain-specific to publishing or kiln orchestration should be implemented here as MCP servers, then *consumed* by the appropriate sibling.
 
@@ -182,6 +183,9 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.15: Imagegen Capabilities Output Type Field**
     *   Extend the image generation capabilities schema to include a new `output_type` field indicating whether a backend generates still images or videos. Update the Google Imagen, DALL-E, Midjourney, and Google Veo backends to report their respective output types.
     *   [Implementation Plan](plans/phase_4/task_4_15_imagegen_capabilities_output_type.md)
+*   [ ] **Task 4.16: Lighthouse Telemetry HTTP Adapter (`pkg/telemetry`)**
+    *   Extend `pkg/telemetry` with an optional HTTP adapter that submits session metrics (project, command, stage, duration\_ms, cost\_usd, tokens\_in, tokens\_out, tokens\_cached) to a Lighthouse `POST /api/telemetry` endpoint on command exit. Enabled via `LIGHTHOUSE_URL` environment variable — no-ops silently if unset so no existing callers break. The adapter runs in a goroutine with a short deadline to avoid blocking the CLI exit. All sibling tools (Pithos, Aeolian, Kiln) that import `pkg/telemetry` get this capability for free once the adapter is merged. Blocked on Lighthouse Task 1.4.
+    *   [Implementation Plan](plans/phase_4/task_4_16_lighthouse_telemetry_adapter.md)
 
 
 

@@ -695,4 +695,3 @@ backend = "veo"
 		t.Errorf("expected output_type='video' for veo backend, got: %q", capsStr)
 	}
 }
-

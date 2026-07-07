@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"strings"
 	"testing"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -73,5 +74,40 @@ func TestFormatToolResult(t *testing.T) {
 	formattedEmptyErr, _ := FormatToolResult(emptyErrResult)
 	if formattedEmptyErr != "Error: Tool execution failed with an unknown error" {
 		t.Errorf("expected 'Error: Tool execution failed with an unknown error', got '%s'", formattedEmptyErr)
+	}
+}
+func TestFormatToolResult_NilResult(t *testing.T) {
+	t.Parallel()
+	got, err := FormatToolResult(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Errorf("expected empty string for nil result, got %q", got)
+	}
+}
+
+func TestFormatToolResult_ImageAndEmbeddedContent(t *testing.T) {
+	t.Parallel()
+	result := &mcpsdk.CallToolResult{
+		Content: []mcpsdk.Content{
+			&mcpsdk.ImageContent{MIMEType: "image/png"},
+			&mcpsdk.EmbeddedResource{
+				Resource: &mcpsdk.ResourceContents{URI: "file:///some/resource"},
+			},
+		},
+	}
+	got, err := FormatToolResult(result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == "" {
+		t.Error("expected non-empty formatted result")
+	}
+	if !strings.Contains(got, "[Image data:") {
+		t.Errorf("expected image data tag in output, got %q", got)
+	}
+	if !strings.Contains(got, "[Embedded Resource:") {
+		t.Errorf("expected embedded resource tag in output, got %q", got)
 	}
 }
