@@ -1,4 +1,4 @@
-.PHONY: all build install test test-integration test-db test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans build-db-plugin
+.PHONY: all build install test test-fast test-integration test-db test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans build-db-plugin
 
 # Go parameters
 GOCMD=go
@@ -95,14 +95,17 @@ install-hooks:
 
 
 test:
-	$(GOTEST) -p=1 -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
+	$(GOTEST) -v -race -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/... ./pkg/...
+
+test-fast:
+	$(GOTEST) -v ./internal/... ./pkg/...
 
 test-integration:
 	CGO_ENABLED=1 $(GOTEST) -v -tags=integration ./...
 
 # Run all database plugin tests (requires CGO and integration tags)
 test-db:
-	CGO_ENABLED=1 $(GOTEST) -p=1 -v -race -tags=integration -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/plugins/db/...
+	CGO_ENABLED=1 $(GOTEST) -v -race -tags=integration -coverprofile=coverage.out -coverpkg=./internal/...,./pkg/... ./internal/plugins/db/...
 
 check-coverage: test
 	$(GOCMD) run ./cmd/powerword check-coverage $(MIN_COVERAGE) coverage.out

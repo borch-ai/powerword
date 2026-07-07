@@ -2,22 +2,42 @@ package review
 
 import (
 	"context"
+	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
+func mockLinkIssueCmd(name string, args []string, diffOut string, prBody string, errCmd string) Cmd {
+	return &mockCmd{
+		outputFunc: func() ([]byte, error) {
+			if errCmd == name {
+				return nil, fmt.Errorf("mock error")
+			}
+			if name == "git" && len(args) > 0 && args[0] == "diff" {
+				return []byte(diffOut), nil
+			}
+			if name == "gh" && len(args) > 1 && args[0] == "pr" && args[1] == "view" {
+				return []byte(prBody), nil
+			}
+			return []byte("success"), nil
+		},
+		runFunc: func() error {
+			if errCmd == name {
+				return fmt.Errorf("mock error")
+			}
+			return nil
+		},
+	}
+}
+
 func TestLinkTaskIssue_NoPlansModified(t *testing.T) {
 	origExec := execCommand
 	defer func() { execCommand = origExec }()
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		if name == "git" && args[0] == "diff" {
-			return exec.CommandContext(ctx, "echo", "internal/review/link_issue.go")
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+		return mockLinkIssueCmd(name, args, "internal/review/link_issue.go", "", "")
 	}
 
 	err := LinkTaskIssue(context.Background(), "123", "main")
@@ -56,11 +76,8 @@ func TestLinkTaskIssue_NoIssuesInPlans(t *testing.T) {
 	}
 	defer func() { _ = os.Chdir(origWd) }()
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		if name == "git" && args[0] == "diff" {
-			return exec.CommandContext(ctx, "echo", "plans/task_1.md\nplans/non_existent.md")
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+		return mockLinkIssueCmd(name, args, "plans/task_1.md\nplans/non_existent.md", "", "")
 	}
 
 	err = LinkTaskIssue(context.Background(), "123", "main")
@@ -97,14 +114,8 @@ func TestLinkTaskIssue_AllIssuesAlreadyLinked(t *testing.T) {
 	}
 	defer func() { _ = os.Chdir(origWd) }()
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		if name == "git" && args[0] == "diff" {
-			return exec.CommandContext(ctx, "echo", "plans/task_1.md")
-		}
-		if name == "gh" && args[0] == "pr" && args[1] == "view" {
-			return exec.CommandContext(ctx, "echo", `{"body": "This fixes #45 description."}`)
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+		return mockLinkIssueCmd(name, args, "plans/task_1.md", `{"body": "This fixes #45 description."}`, "")
 	}
 
 	err = LinkTaskIssue(context.Background(), "123", "main")
@@ -144,7 +155,7 @@ func TestLinkTaskIssue_LinksMissingIssues(t *testing.T) {
 	var capturedBody string
 	var editCalled bool
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
 		return mockExecForMissingIssues(ctx, name, args, &editCalled, &capturedBody)
 	}
 
@@ -166,35 +177,39 @@ func TestLinkTaskIssue_LinksMissingIssues(t *testing.T) {
 }
 
 // Helper to keep TestLinkTaskIssue_LinksMissingIssues cognitive complexity low
-func mockExecForMissingIssues(ctx context.Context, name string, args []string, editCalled *bool, capturedBody *string) *exec.Cmd {
-	if name == "git" && args[0] == "diff" {
-		return exec.CommandContext(ctx, "echo", "plans/task_1.md")
-	}
-	if name == "gh" && args[0] == "pr" && args[1] == "view" {
-		return exec.CommandContext(ctx, "echo", `{"body": "This closes #45."}`)
-	}
-	if name == "gh" && args[0] == "pr" && args[1] == "edit" {
-		*editCalled = true
-		for i, arg := range args {
-			if arg == "--body-file" && i+1 < len(args) {
-				content, _ := os.ReadFile(args[i+1])
-				*capturedBody = string(content)
+func mockExecForMissingIssues(ctx context.Context, name string, args []string, editCalled *bool, capturedBody *string) Cmd {
+	return &mockCmd{
+		outputFunc: func() ([]byte, error) {
+			if name == "git" && len(args) > 0 && args[0] == "diff" {
+				return []byte("plans/task_1.md"), nil
 			}
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+			if name == "gh" && len(args) > 1 && args[0] == "pr" && args[1] == "view" {
+				return []byte(`{"body": "This closes #45."}`), nil
+			}
+			return []byte("success"), nil
+		},
+		runFunc: func() error {
+			if name == "gh" && len(args) > 1 && args[0] == "pr" && args[1] == "edit" {
+				*editCalled = true
+				for i, arg := range args {
+					if arg == "--body-file" && i+1 < len(args) {
+						content, _ := os.ReadFile(args[i+1])
+						*capturedBody = string(content)
+					}
+				}
+				return nil
+			}
+			return nil
+		},
 	}
-	return exec.CommandContext(ctx, "echo", "success")
 }
 
 func TestLinkTaskIssue_GitDiffError(t *testing.T) {
 	origExec := execCommand
 	defer func() { execCommand = origExec }()
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		if name == "git" && args[0] == "diff" {
-			return exec.CommandContext(ctx, "false")
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+		return mockLinkIssueCmd(name, args, "", "", "git")
 	}
 
 	err := LinkTaskIssue(context.Background(), "123", "main")
@@ -231,14 +246,11 @@ func TestLinkTaskIssue_PRViewError(t *testing.T) {
 	}
 	defer func() { _ = os.Chdir(origWd) }()
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		if name == "git" && args[0] == "diff" {
-			return exec.CommandContext(ctx, "echo", "plans/task_1.md")
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+		if name == "gh" && len(args) > 1 && args[0] == "pr" && args[1] == "view" {
+			return mockLinkIssueCmd(name, args, "plans/task_1.md", "", "gh")
 		}
-		if name == "gh" && args[0] == "pr" && args[1] == "view" {
-			return exec.CommandContext(ctx, "false")
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+		return mockLinkIssueCmd(name, args, "plans/task_1.md", "", "")
 	}
 
 	err = LinkTaskIssue(context.Background(), "123", "main")
@@ -275,17 +287,11 @@ func TestLinkTaskIssue_PREditError(t *testing.T) {
 	}
 	defer func() { _ = os.Chdir(origWd) }()
 
-	execCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		if name == "git" && args[0] == "diff" {
-			return exec.CommandContext(ctx, "echo", "plans/task_1.md")
+	execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+		if name == "gh" && len(args) > 1 && args[0] == "pr" && args[1] == "edit" {
+			return mockLinkIssueCmd(name, args, "plans/task_1.md", `{"body": "This has nothing."}`, "gh")
 		}
-		if name == "gh" && args[0] == "pr" && args[1] == "view" {
-			return exec.CommandContext(ctx, "echo", `{"body": "This has nothing."}`)
-		}
-		if name == "gh" && args[0] == "pr" && args[1] == "edit" {
-			return exec.CommandContext(ctx, "false")
-		}
-		return exec.CommandContext(ctx, "echo", "success")
+		return mockLinkIssueCmd(name, args, "plans/task_1.md", `{"body": "This has nothing."}`, "")
 	}
 
 	err = LinkTaskIssue(context.Background(), "123", "main")

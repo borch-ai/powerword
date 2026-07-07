@@ -16,8 +16,8 @@ var loopRunLoop = loop.RunLoop
 
 func runCommand(ctx context.Context, name string, args ...string) error {
 	cmd := execCommand(ctx, name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.SetStdout(os.Stdout)
+	cmd.SetStderr(os.Stderr)
 	return cmd.Run()
 }
 
