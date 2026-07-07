@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"sync/atomic"
@@ -224,28 +223,7 @@ func TestRunAutonomousLoop_GitRollbackSuccess(t *testing.T) {
 	defer func() { execCommand = origExec }()
 
 	origGitutilExec := gitutil.ExecCommand
-	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "git" {
-			if len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
-				//nolint:gosec // G204: safe static command for test stub
-				return exec.CommandContext(ctx, "true")
-			}
-			if len(args) > 1 && args[0] == "rev-parse" {
-				if args[1] == "--show-toplevel" {
-					//nolint:gosec // G204: safe static command for test stub
-					return exec.CommandContext(ctx, "echo", ".")
-				}
-				if args[1] == "--is-inside-work-tree" {
-					//nolint:gosec // G204: safe static command for test stub
-					return exec.CommandContext(ctx, "echo", "true")
-				}
-			}
-			//nolint:gosec // G204: safe dynamic command wrapper for test stub
-			return exec.CommandContext(ctx, "echo", args...)
-		}
-		//nolint:gosec // G204: safe dynamic command wrapper for test stub
-		return exec.CommandContext(ctx, command, args...)
-	}
+	gitutil.ExecCommand = mockOSCmd
 	defer func() { gitutil.ExecCommand = origGitutilExec }()
 
 	origExtract := ExtractGitDiff
@@ -293,28 +271,7 @@ func TestRunAutonomousLoop_GitRollbackFailure(t *testing.T) {
 	defer func() { execCommand = origExec }()
 
 	origGitutilExec := gitutil.ExecCommand
-	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "git" {
-			if len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
-				//nolint:gosec // G204: safe static command for test stub
-				return exec.CommandContext(ctx, "true")
-			}
-			if len(args) > 1 && args[0] == "rev-parse" {
-				if args[1] == "--show-toplevel" {
-					//nolint:gosec // G204: safe static command for test stub
-					return exec.CommandContext(ctx, "echo", ".")
-				}
-				if args[1] == "--is-inside-work-tree" {
-					//nolint:gosec // G204: safe static command for test stub
-					return exec.CommandContext(ctx, "echo", "true")
-				}
-			}
-			//nolint:gosec // G204: safe dynamic command wrapper for test stub
-			return exec.CommandContext(ctx, "echo", args...)
-		}
-		//nolint:gosec // G204: safe dynamic command wrapper for test stub
-		return exec.CommandContext(ctx, command, args...)
-	}
+	gitutil.ExecCommand = mockOSCmd
 	defer func() { gitutil.ExecCommand = origGitutilExec }()
 
 	origExtract := ExtractGitDiff

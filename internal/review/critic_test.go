@@ -3,7 +3,6 @@ package review
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,75 +18,6 @@ import (
 
 func init() {
 	checkMakefileExists = func() bool { return true }
-}
-
-type mockCmd struct {
-	runFunc            func() error
-	outputFunc         func() ([]byte, error)
-	combinedOutputFunc func() ([]byte, error)
-	stdout             io.Writer
-	stderr             io.Writer
-	dir                string
-}
-
-func (m *mockCmd) Run() error {
-	if m.runFunc != nil {
-		return m.runFunc()
-	}
-	return nil
-}
-
-func (m *mockCmd) Output() ([]byte, error) {
-	if m.outputFunc != nil {
-		return m.outputFunc()
-	}
-	return nil, nil
-}
-
-func (m *mockCmd) CombinedOutput() ([]byte, error) {
-	if m.combinedOutputFunc != nil {
-		return m.combinedOutputFunc()
-	}
-	return nil, nil
-}
-
-func (m *mockCmd) SetStdout(w io.Writer) { m.stdout = w }
-func (m *mockCmd) SetStderr(w io.Writer) { m.stderr = w }
-func (m *mockCmd) SetDir(dir string)     { m.dir = dir }
-
-func mockReviewExec(command string, args []string) Cmd {
-	return &mockCmd{
-		runFunc: func() error {
-			if command == "fail" {
-				return fmt.Errorf("command failed")
-			}
-			return nil
-		},
-		outputFunc: func() ([]byte, error) {
-			if command == "gh" {
-				if len(args) > 0 && args[0] == "gh_invalid" {
-					return []byte("invalid json"), nil
-				}
-				return []byte(`{"body": "### Goal\ntest\n### Proposed Changes\nchanges\n### Verification Plan\nverif"}`), nil
-			}
-			if command == "fail" {
-				return nil, fmt.Errorf("command failed")
-			}
-			return []byte("success"), nil
-		},
-		combinedOutputFunc: func() ([]byte, error) {
-			if command == "make" {
-				if len(args) > 0 && args[0] == "fail" {
-					return []byte("mock make failed"), fmt.Errorf("make error")
-				}
-				return []byte("mock make all success"), nil
-			}
-			if command == "fail" {
-				return nil, fmt.Errorf("command failed")
-			}
-			return []byte("success"), nil
-		},
-	}
 }
 
 func TestParseIssueBody(t *testing.T) {
@@ -147,6 +77,63 @@ func newTestConfig(endpoint string, gitDiffVal string, openAIKey string) *config
 }
 
 // TestHelperProcess is used to mock exec.Command
+func handleMcpCritic() {
+	cfg := &config.Config{
+		CriticProvider: "openai",
+		CriticModel:    "gpt-4",
+		CriticEndpoint: os.Getenv("CRITIC_ENDPOINT"),
+		APIKeys: config.APIKeys{
+			OpenAI: os.Getenv("MOCK_OPENAI_API_KEY"),
+		},
+	}
+	critic.SetExecCommand(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestHelperProcess", "--", name}
+		cs = append(cs, args...)
+		//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+		return cmd
+	})
+	critic.ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
+		val := os.Getenv("MOCK_GIT_DIFF")
+		if val == "error" {
+			return "", fmt.Errorf("git command failed")
+		}
+		return val, nil
+	}
+
+	srv, err := critic.SetupServer(os.TempDir(), cfg)
+	if err != nil {
+		os.Exit(1)
+	}
+	transport := &mcp.StdioTransport{}
+	if err := srv.Run(context.Background(), transport); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
+func handleGit(args []string) {
+	if len(args) > 2 && args[1] == "status" && args[2] == "--porcelain" {
+		os.Exit(0)
+	}
+	if len(args) > 2 && args[1] == "rev-parse" {
+		if args[2] == "--show-toplevel" {
+			_, _ = fmt.Fprintln(os.Stdout, ".")
+			os.Exit(0)
+		}
+		if args[2] == "--is-inside-work-tree" {
+			_, _ = fmt.Fprintln(os.Stdout, "true")
+			os.Exit(0)
+		}
+	}
+	if len(args) > 1 {
+		_, _ = fmt.Fprintln(os.Stdout, strings.Join(args[1:], " "))
+	}
+	os.Exit(0)
+}
+
+// TestHelperProcess is used to mock exec.Command
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -163,60 +150,28 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 	cmd := args[0]
-	if cmd == "pw-mcp-critic" {
-		cfg := &config.Config{
-			CriticProvider: "openai",
-			CriticModel:    "gpt-4",
-			CriticEndpoint: os.Getenv("CRITIC_ENDPOINT"),
-			APIKeys: config.APIKeys{
-				OpenAI: os.Getenv("MOCK_OPENAI_API_KEY"),
-			},
-		}
-		critic.SetExecCommand(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", name}
-			cs = append(cs, args...)
-			//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-			return cmd
-		})
-		critic.ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-			val := os.Getenv("MOCK_GIT_DIFF")
-			if val == "error" {
-				return "", fmt.Errorf("git command failed")
-			}
-			return val, nil
-		}
-
-		srv, err := critic.SetupServer(os.TempDir(), cfg)
-		if err != nil {
-			os.Exit(1)
-		}
-		transport := &mcp.StdioTransport{}
-		if err := srv.Run(context.Background(), transport); err != nil {
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-	if cmd == "make" {
+	switch cmd {
+	case "pw-mcp-critic":
+		handleMcpCritic()
+	case "git":
+		handleGit(args)
+	case "make":
 		_, _ = fmt.Fprint(os.Stdout, "mock make all success")
 		os.Exit(0)
-	}
-	if cmd == "gh" {
+	case "gh":
 		_, _ = fmt.Fprint(os.Stdout, `{"body": "### Goal\ntest\n### Proposed Changes\nchanges\n### Verification Plan\nverif"}`)
 		os.Exit(0)
-	}
-	if cmd == "gh_invalid" {
+	case "gh_invalid":
 		_, _ = fmt.Fprint(os.Stdout, `invalid json`)
 		os.Exit(0)
-	}
-	if cmd == "echo" {
+	case "echo":
 		if len(args) > 1 {
 			_, _ = fmt.Fprintln(os.Stdout, strings.Join(args[1:], " "))
 		}
 		os.Exit(0)
-	}
-	if cmd == "fail" {
+	case "true":
+		os.Exit(0)
+	case "fail":
 		os.Exit(1)
 	}
 	os.Exit(1)
