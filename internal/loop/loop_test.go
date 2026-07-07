@@ -2,11 +2,15 @@ package loop
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/borch-ai/powerword/pkg/config"
@@ -717,5 +721,113 @@ func TestRunLoop_ResumeSession_WithPromptError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cannot provide a prompt when resuming a session") {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestRunLoop_LighthouseTelemetry(t *testing.T) {
+	oldNewClient := newClient
+	defer func() { newClient = oldNewClient }()
+
+	mockClient := &mockLLMClient{
+		genResps: []*llm.Message{
+			{
+				Content: "Hello world!",
+				Usage:   &llm.TokenUsage{InputTokens: 100, OutputTokens: 200},
+			},
+		},
+	}
+	newClient = func(cfg *config.Config) (llm.LLMClient, error) {
+		return mockClient, nil
+	}
+
+	var (
+		mu          sync.Mutex
+		receivedVal telemetry.TelemetryEvent
+		received    bool
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		received = true
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read request body: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.Unmarshal(body, &receivedVal); err != nil {
+			t.Errorf("failed to unmarshal JSON: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	originalURL := os.Getenv("LIGHTHOUSE_URL")
+	originalKey := os.Getenv("LIGHTHOUSE_API_KEY")
+	defer func() {
+		setEnvHelper(t, "LIGHTHOUSE_URL", originalURL)
+		setEnvHelper(t, "LIGHTHOUSE_API_KEY", originalKey)
+	}()
+
+	setEnvHelper(t, "LIGHTHOUSE_URL", server.URL)
+	setEnvHelper(t, "LIGHTHOUSE_API_KEY", "secret")
+
+	ctx := context.Background()
+	cfg := &config.Config{
+		Verbose:           true,
+		Model:             "test-model",
+		MaxLoopIterations: 3,
+		Pricing: map[string]telemetry.ModelPricing{
+			"test-model": {Input: 1.0, Output: 2.0},
+		},
+	}
+
+	err := RunLoop(ctx, cfg, "test prompt")
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	telemetry.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if !received {
+		t.Fatal("expected mock server to receive telemetry submission")
+	}
+
+	if receivedVal.Project != "powerword" {
+		t.Errorf("expected Project powerword, got %s", receivedVal.Project)
+	}
+	if receivedVal.Command != "run" {
+		t.Errorf("expected Command run, got %s", receivedVal.Command)
+	}
+	if receivedVal.Stage != "react_loop" {
+		t.Errorf("expected Stage react_loop, got %s", receivedVal.Stage)
+	}
+	if receivedVal.TokensIn != 100 {
+		t.Errorf("expected TokensIn 100, got %d", receivedVal.TokensIn)
+	}
+	if receivedVal.TokensOut != 200 {
+		t.Errorf("expected TokensOut 200, got %d", receivedVal.TokensOut)
+	}
+	if receivedVal.CostUSD != 0.0005 {
+		t.Errorf("expected CostUSD 0.0005, got %f", receivedVal.CostUSD)
+	}
+	if receivedVal.Meta["model"] != "test-model" {
+		t.Errorf("expected Meta model test-model, got %s", receivedVal.Meta["model"])
+	}
+}
+
+func setEnvHelper(t *testing.T, key, value string) {
+	t.Helper()
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("failed to set env var %s: %v", key, err)
 	}
 }
