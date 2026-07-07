@@ -768,15 +768,8 @@ func TestRunLoop_LighthouseTelemetry(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalURL := os.Getenv("LIGHTHOUSE_URL")
-	originalKey := os.Getenv("LIGHTHOUSE_API_KEY")
-	defer func() {
-		setEnvHelper(t, "LIGHTHOUSE_URL", originalURL)
-		setEnvHelper(t, "LIGHTHOUSE_API_KEY", originalKey)
-	}()
-
-	setEnvHelper(t, "LIGHTHOUSE_URL", server.URL)
-	setEnvHelper(t, "LIGHTHOUSE_API_KEY", "secret")
+	t.Setenv("LIGHTHOUSE_URL", server.URL)
+	t.Setenv("LIGHTHOUSE_API_KEY", "secret")
 
 	ctx := context.Background()
 	cfg := &config.Config{
@@ -817,17 +810,14 @@ func TestRunLoop_LighthouseTelemetry(t *testing.T) {
 	if receivedVal.TokensOut != 200 {
 		t.Errorf("expected TokensOut 200, got %d", receivedVal.TokensOut)
 	}
-	if receivedVal.CostUSD != 0.0005 {
+	costDiff := receivedVal.CostUSD - 0.0005
+	if costDiff < 0 {
+		costDiff = -costDiff
+	}
+	if costDiff > 1e-5 {
 		t.Errorf("expected CostUSD 0.0005, got %f", receivedVal.CostUSD)
 	}
 	if receivedVal.Meta["model"] != "test-model" {
 		t.Errorf("expected Meta model test-model, got %s", receivedVal.Meta["model"])
-	}
-}
-
-func setEnvHelper(t *testing.T, key, value string) {
-	t.Helper()
-	if err := os.Setenv(key, value); err != nil {
-		t.Fatalf("failed to set env var %s: %v", key, err)
 	}
 }

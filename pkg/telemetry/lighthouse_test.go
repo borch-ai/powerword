@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"sync"
 	"testing"
 )
@@ -112,8 +111,8 @@ func TestLighthouseAdapter_Submit_Error(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !containsString(err.Error(), "unexpected status code: 401") {
-		t.Errorf("expected 'unexpected status code: 401' error, got %v", err)
+	if !containsString(err.Error(), "unexpected status code 401") {
+		t.Errorf("expected 'unexpected status code 401' error, got %v", err)
 	}
 }
 
@@ -139,15 +138,8 @@ func TestSubmitToLighthouse_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	originalURL := os.Getenv("LIGHTHOUSE_URL")
-	originalKey := os.Getenv("LIGHTHOUSE_API_KEY")
-	defer func() {
-		setEnvHelper(t, "LIGHTHOUSE_URL", originalURL)
-		setEnvHelper(t, "LIGHTHOUSE_API_KEY", originalKey)
-	}()
-
-	setEnvHelper(t, "LIGHTHOUSE_URL", server.URL)
-	setEnvHelper(t, "LIGHTHOUSE_API_KEY", "secret")
+	t.Setenv("LIGHTHOUSE_URL", server.URL)
+	t.Setenv("LIGHTHOUSE_API_KEY", "secret")
 
 	// We override the default Client by setting custom HTTP client or just let it use default.
 	// Since SubmitToLighthouse builds its own adapter with standard http.Client{}, we don't pass
@@ -164,23 +156,11 @@ func TestSubmitToLighthouse_Success(t *testing.T) {
 }
 
 func TestSubmitToLighthouse_NoURL(t *testing.T) {
-	originalURL := os.Getenv("LIGHTHOUSE_URL")
-	defer func() {
-		setEnvHelper(t, "LIGHTHOUSE_URL", originalURL)
-	}()
-
-	setEnvHelper(t, "LIGHTHOUSE_URL", "")
+	t.Setenv("LIGHTHOUSE_URL", "")
 
 	// This should return immediately and not trigger any wait
 	SubmitToLighthouse(TelemetryEvent{Project: "test-noop"})
 	Wait()
-}
-
-func setEnvHelper(t *testing.T, key, value string) {
-	t.Helper()
-	if err := os.Setenv(key, value); err != nil {
-		t.Fatalf("failed to set env var %s: %v", key, err)
-	}
 }
 
 func containsString(s, substr string) bool {

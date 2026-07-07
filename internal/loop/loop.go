@@ -235,8 +235,15 @@ func submitTelemetry(startTime time.Time, tracker *telemetry.UsageTracker, prici
 		errMsg = err.Error()
 	}
 
+	resolvedModel := model
+	if len(tracker.ModelUsages) == 1 {
+		for k := range tracker.ModelUsages {
+			resolvedModel = k
+		}
+	}
+
 	meta := map[string]string{
-		"model": model,
+		"model": resolvedModel,
 	}
 	if sessionID != "" {
 		meta["session_id"] = sessionID

@@ -72,7 +72,12 @@ func (a *LighthouseAdapter) Submit(ctx context.Context, e TelemetryEvent) error 
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		bodyStr := strings.TrimSpace(string(bodyBytes))
+		if bodyStr != "" {
+			return fmt.Errorf("unexpected status code %d (%s): %s", resp.StatusCode, resp.Status, bodyStr)
+		}
+		return fmt.Errorf("unexpected status code %d (%s)", resp.StatusCode, resp.Status)
 	}
 
 	return nil
