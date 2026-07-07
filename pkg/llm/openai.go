@@ -251,3 +251,27 @@ func (o *OpenAIClient) ListModels(ctx context.Context) ([]string, error) {
 	}
 	return models, nil
 }
+
+// Embed computes vector embeddings for the provided texts.
+func (o *OpenAIClient) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+
+	req := openai.EmbeddingRequest{
+		Input: texts,
+		Model: openai.SmallEmbedding3, // "text-embedding-3-small"
+	}
+
+	resp, err := o.client.CreateEmbeddings(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("openai embeddings error: %w", err)
+	}
+
+	var embeddings [][]float32
+	for _, e := range resp.Data {
+		embeddings = append(embeddings, e.Embedding)
+	}
+
+	return embeddings, nil
+}

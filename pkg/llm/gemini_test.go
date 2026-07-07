@@ -590,3 +590,14 @@ func TestGeminiClient_Generate_WithResponseSchema_Error(t *testing.T) {
 		t.Fatal("expected error for unsupported schema type, got nil")
 	}
 }
+
+func TestGeminiClient_Embed(t *testing.T) {
+	client := &GeminiClient{}
+	res, err := client.Embed(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res != nil {
+		t.Fatalf("expected nil result")
+	}
+}

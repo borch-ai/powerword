@@ -87,6 +87,7 @@ type LLMClient interface {
 	Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error)
 	Stream(ctx context.Context, messages []Message, tools []ToolDefinition) (<-chan StreamChunk, error)
 	ListModels(ctx context.Context) ([]string, error)
+	Embed(ctx context.Context, texts []string) ([][]float32, error)
 }
 
 // NewClient returns an LLMClient instance based on the configuration.

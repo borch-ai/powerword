@@ -419,3 +419,62 @@ func TestOpenAIClient_Generate_WithResponseSchema_Error(t *testing.T) {
 		t.Fatal("expected schema generation error, got nil")
 	}
 }
+
+func TestOpenAIClient_Embed(t *testing.T) {
+	t.Run("empty texts", func(t *testing.T) {
+		client := &OpenAIClient{}
+		res, err := client.Embed(context.Background(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res != nil {
+			t.Fatalf("expected nil result")
+		}
+	})
+	t.Run("success", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			resp := map[string]any{
+				"data": []map[string]any{
+					{"embedding": []float32{0.1, 0.2}},
+					{"embedding": []float32{0.3, 0.4}},
+				},
+			}
+			json.NewEncoder(w).Encode(resp)
+		}))
+		defer server.Close()
+
+		clientConfig := openai.DefaultConfig("test-token")
+		clientConfig.BaseURL = server.URL
+		client := &OpenAIClient{
+			client:    openai.NewClientWithConfig(clientConfig),
+			modelName: "test-model",
+		}
+		res, err := client.Embed(context.Background(), []string{"test1", "test2"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(res) != 2 {
+			t.Fatalf("expected 2 embeddings, got %d", len(res))
+		}
+		if res[0][0] != 0.1 || res[1][0] != 0.3 {
+			t.Errorf("unexpected embeddings: %v", res)
+		}
+	})
+	t.Run("error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		clientConfig := openai.DefaultConfig("test-token")
+		clientConfig.BaseURL = server.URL
+		client := &OpenAIClient{
+			client:    openai.NewClientWithConfig(clientConfig),
+			modelName: "test-model",
+		}
+		_, err := client.Embed(context.Background(), []string{"test1"})
+		if err == nil {
+			t.Fatalf("expected error, got nil")
+		}
+	})
+}

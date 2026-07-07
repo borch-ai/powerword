@@ -435,3 +435,28 @@ func (g *GeminiClient) ListModels(ctx context.Context) ([]string, error) {
 	}
 	return models, nil
 }
+
+// Embed computes vector embeddings for the provided texts.
+func (g *GeminiClient) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+
+	em := g.client.EmbeddingModel("text-embedding-004")
+	batch := em.NewBatch()
+	for _, text := range texts {
+		batch.AddContent(genai.Text(text))
+	}
+
+	resp, err := em.BatchEmbedContents(ctx, batch)
+	if err != nil {
+		return nil, fmt.Errorf("gemini batch embed error: %w", err)
+	}
+
+	var embeddings [][]float32
+	for _, e := range resp.Embeddings {
+		embeddings = append(embeddings, e.Values)
+	}
+
+	return embeddings, nil
+}

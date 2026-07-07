@@ -357,3 +357,11 @@ func TestAnthropicClient_ListModels_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+func TestAnthropicClient_Embed(t *testing.T) {
+	client := &AnthropicClient{}
+	_, err := client.Embed(context.Background(), []string{"test"})
+	if err == nil {
+		t.Fatal("expected error for Embed, got nil")
+	}
+}

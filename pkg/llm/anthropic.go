@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -179,6 +180,7 @@ func handleAnthropicStreamEvent(event anthropic.MessageStreamEventUnion, out cha
 		}
 	}
 }
+
 func (a *AnthropicClient) ListModels(ctx context.Context) ([]string, error) {
 	page, err := a.client.Models.List(ctx, anthropic.ModelListParams{})
 	if err != nil {
@@ -190,6 +192,11 @@ func (a *AnthropicClient) ListModels(ctx context.Context) ([]string, error) {
 		models = append(models, m.ID)
 	}
 	return models, nil
+}
+
+// Embed computes vector embeddings for the provided texts. Not supported by Anthropic.
+func (a *AnthropicClient) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, errors.New("embeddings are not supported by the anthropic provider")
 }
 
 func convertAnthropicSchema(input any) (anthropic.ToolInputSchemaParam, error) {
