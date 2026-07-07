@@ -131,6 +131,9 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.23: Digital Music Distribution Helper (`pw-mcp-music`)**
     *   Implement a native Go MCP server exposing tools to package lossless audio and artwork and submit releases to distributor webhook endpoints.
     *   [Implementation Plan](plans/phase_3/task_3_23_music_mcp.md)
+*   [ ] **Task 3.24: Local Semantic Memory Plugin (`pw-mcp-memory`)**
+    *   Implement a native Go MCP server exposing tools to store, search, and retrieve chunks of text semantically using a lightweight in-process vector space model or local vector database.
+    *   [Implementation Plan](plans/phase_3/task_3_24_memory_mcp.md)
 
 ---
 
@@ -183,11 +186,12 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.15: Imagegen Capabilities Output Type Field**
     *   Extend the image generation capabilities schema to include a new `output_type` field indicating whether a backend generates still images or videos. Update the Google Imagen, DALL-E, Midjourney, and Google Veo backends to report their respective output types.
     *   [Implementation Plan](plans/phase_4/task_4_15_imagegen_capabilities_output_type.md)
-*   [ ] **Task 4.16: Lighthouse Telemetry HTTP Adapter (`pkg/telemetry`)**
+*   [x] **Task 4.16: Lighthouse Telemetry HTTP Adapter (`pkg/telemetry`)**
     *   Extend `pkg/telemetry` with an optional HTTP adapter that submits session metrics (project, command, stage, duration\_ms, cost\_usd, tokens\_in, tokens\_out, tokens\_cached) to a Lighthouse `POST /api/telemetry` endpoint on command exit. Enabled via `LIGHTHOUSE_URL` environment variable — no-ops silently if unset so no existing callers break. The adapter runs in a goroutine with a short deadline to avoid blocking the CLI exit. All sibling tools (Pithos, Aeolian, Kiln) that import `pkg/telemetry` get this capability for free once the adapter is merged. Blocked on Lighthouse Task 1.4.
     *   [Implementation Plan](plans/phase_4/task_4_16_lighthouse_telemetry_adapter.md)
-
-
+*   [ ] **Task 4.17: Client-Side Offline Telemetry Cache (`pkg/telemetry`)**
+    *   Extend `pkg/telemetry` to locally spool telemetry events when the Lighthouse server is unreachable, and synchronize them as a batch on the next successful run.
+    *   [Implementation Plan](plans/phase_4/task_4_17_telemetry_cache.md)
 
 ---
 
@@ -317,6 +321,15 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.28: Advanced Integration & Subprocess Testing Suite Expansion**
     *   Expand the integration test suite to include subprocess stdio tests for the remaining MCP servers (`pw-mcp-critic`, `pw-mcp-linter`, `pw-mcp-kdp-math`, `pw-mcp-seo`). Add compiled CLI tests for `powerword review` and `powerword link-issue` subcommands using mock stub dependencies.
     *   [Implementation Plan](plans/phase_6/task_6_28_integration_tests_expansion.md)
+*   [ ] **Task 6.29: Host-Level Containerized & Profile-Based Sandboxing (`pw-mcp-shell`)**
+    *   Introduce host-level security profiles (e.g. macOS sandbox-exec or namespace-based containment) to restrict execution capabilities of the native shell plugin.
+    *   [Implementation Plan](plans/phase_6/task_6_29_shell_sandboxing.md)
+*   [ ] **Task 6.30: Interactive TUI Chat Shell Mode (`powerword chat`)**
+    *   Build a rich terminal user interface (TUI) chat repl mode utilizing Bubbletea and Lipgloss, featuring syntax highlighting, conversational history, and collapsible tool outputs.
+    *   [Implementation Plan](plans/phase_6/task_6_30_interactive_tui.md)
+*   [ ] **Task 6.31: Dynamic Plugin Auto-Discovery & Hot Reloading**
+    *   Implement an auto-discovery scanning directory for local MCP plugin manifests and enable hot reloading of plugin services without restarting the prompt execution loop.
+    *   [Implementation Plan](plans/phase_6/task_6_31_plugin_autodiscovery.md)
 
 
 

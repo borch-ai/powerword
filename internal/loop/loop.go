@@ -147,6 +147,16 @@ func handleSaveSession(session *Session, targetModel string, updatedMessages []l
 }
 
 func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error) {
+	startTime := time.Now()
+	tracker := telemetry.NewUsageTracker()
+	var sessionID string
+
+	defer func() {
+		if !cfg.ListSessions {
+			submitTelemetry(startTime, tracker, cfg.Pricing, cfg.Model, sessionID, err)
+		}
+	}()
+
 	if cfg.ListSessions {
 		return handleListSessions()
 	}
@@ -180,6 +190,9 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		loopFailed = true
 		return initErr
 	}
+	if session != nil {
+		sessionID = session.ID
+	}
 
 	outWriter := getOutputWriter(cfg)
 	formatter := NewTerminalFormatter(outWriter, getTerminalWidth())
@@ -189,8 +202,6 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 			err = fmt.Errorf("failed to flush output: %w", flushErr)
 		}
 	}()
-
-	tracker := telemetry.NewUsageTracker()
 
 	initialLen := len(messages)
 	updatedMessages, loopErr := runReActLoop(loopCtx, cfg, activeClient, registry, formatter, messages, tracker, targetModel)
@@ -208,9 +219,55 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 			Messages:  make([]llm.Message, 0),
 		}
 	}
+	if session != nil {
+		sessionID = session.ID
+	}
 
+	return handleSessionSaveAndOutput(cfg, session, targetModel, updatedMessages, isPaused, &loopFailed, loopErr, initialLen, tracker)
+}
+
+func submitTelemetry(startTime time.Time, tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing, model, sessionID string, err error) {
+	cost := tracker.EstimatedCost(pricing)
+	durationMs := time.Since(startTime).Milliseconds()
+
+	var errMsg string
+	if err != nil && !errors.Is(err, ErrSessionPaused) {
+		errMsg = err.Error()
+	}
+
+	resolvedModel := model
+	if len(tracker.ModelUsages) == 1 {
+		for k := range tracker.ModelUsages {
+			resolvedModel = k
+		}
+	}
+
+	meta := map[string]string{
+		"model": resolvedModel,
+	}
+	if sessionID != "" {
+		meta["session_id"] = sessionID
+	}
+
+	event := telemetry.TelemetryEvent{
+		Project:      "powerword",
+		Command:      "run",
+		Stage:        "react_loop",
+		DurationMs:   durationMs,
+		CostUSD:      cost,
+		TokensIn:     int64(tracker.TotalInputTokens()),
+		TokensOut:    int64(tracker.TotalOutputTokens()),
+		TokensCached: int64(tracker.TotalCachedTokens()),
+		ErrorMsg:     errMsg,
+		Meta:         meta,
+	}
+
+	telemetry.SubmitToLighthouse(event)
+}
+
+func handleSessionSaveAndOutput(cfg *config.Config, session *Session, targetModel string, updatedMessages []llm.Message, isPaused bool, loopFailed *bool, loopErr error, initialLen int, tracker *telemetry.UsageTracker) error {
 	if session != nil && (loopErr == nil || isPaused) {
-		if saveErr := handleSaveSession(session, targetModel, updatedMessages, isPaused, &loopFailed); saveErr != nil {
+		if saveErr := handleSaveSession(session, targetModel, updatedMessages, isPaused, loopFailed); saveErr != nil {
 			loopErr = saveErr
 		} else if isPaused {
 			loopErr = nil
