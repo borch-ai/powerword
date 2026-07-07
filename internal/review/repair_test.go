@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"sync/atomic"
@@ -70,7 +69,9 @@ func TestProcessTurnCompletion_NoSession(t *testing.T) {
 
 func TestProcessTurnCompletion_Complete(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	tmpDir := t.TempDir()
@@ -101,11 +102,8 @@ func TestProcessTurnCompletion_Complete(t *testing.T) {
 
 func TestRunAutonomousLoop_SuccessOnFirstTurn(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -148,8 +146,8 @@ func TestRunAutonomousLoop_SuccessOnFirstTurn(t *testing.T) {
 
 func TestRunAutonomousLoop_LoadIssuePlanError(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		return mockExecCommandContext(ctx, "fail", args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec("fail", args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -162,11 +160,8 @@ func TestRunAutonomousLoop_LoadIssuePlanError(t *testing.T) {
 
 func TestRunAutonomousLoop_MaxIterations(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -196,11 +191,8 @@ func TestRunAutonomousLoop_MaxIterations(t *testing.T) {
 
 func TestRunAutonomousLoop_ExtractDiffError(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -225,35 +217,13 @@ func TestRunAutonomousLoop_ExtractDiffError(t *testing.T) {
 //nolint:gocognit,nestif
 func TestRunAutonomousLoop_GitRollbackSuccess(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...)
-		}
-		if command == "git" {
-			return mockExecCommandContext(ctx, "echo", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
 	origGitutilExec := gitutil.ExecCommand
-	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "git" {
-			if len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
-				return mockExecCommandContext(ctx, "echo")
-			}
-			if len(args) > 1 && args[0] == "rev-parse" {
-				if args[1] == "--show-toplevel" {
-					return mockExecCommandContext(ctx, "echo", ".")
-				}
-				if args[1] == "--is-inside-work-tree" {
-					return mockExecCommandContext(ctx, "echo", "true")
-				}
-			}
-			return mockExecCommandContext(ctx, "echo", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
-	}
+	gitutil.ExecCommand = mockOSCmd
 	defer func() { gitutil.ExecCommand = origGitutilExec }()
 
 	origExtract := ExtractGitDiff
@@ -295,35 +265,13 @@ func TestRunAutonomousLoop_GitRollbackSuccess(t *testing.T) {
 //nolint:gocognit,nestif
 func TestRunAutonomousLoop_GitRollbackFailure(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...)
-		}
-		if command == "git" {
-			return mockExecCommandContext(ctx, "echo", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
 	origGitutilExec := gitutil.ExecCommand
-	gitutil.ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "git" {
-			if len(args) > 1 && args[0] == "status" && args[1] == "--porcelain" {
-				return mockExecCommandContext(ctx, "echo")
-			}
-			if len(args) > 1 && args[0] == "rev-parse" {
-				if args[1] == "--show-toplevel" {
-					return mockExecCommandContext(ctx, "echo", ".")
-				}
-				if args[1] == "--is-inside-work-tree" {
-					return mockExecCommandContext(ctx, "echo", "true")
-				}
-			}
-			return mockExecCommandContext(ctx, "echo", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
-	}
+	gitutil.ExecCommand = mockOSCmd
 	defer func() { gitutil.ExecCommand = origGitutilExec }()
 
 	origExtract := ExtractGitDiff
@@ -380,16 +328,16 @@ func TestHandleInterrupt_WithoutRollback(t *testing.T) {
 
 	var gitStashCalled int32
 	var gitResetCalled int32
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
 		if command == "git" && len(args) > 0 && args[0] == "stash" {
 			atomic.StoreInt32(&gitStashCalled, 1)
-			return exec.CommandContext(ctx, "true")
+			return mockReviewExec("git", args)
 		}
 		if command == "git" && len(args) > 1 && args[0] == "reset" && args[1] == "--hard" {
 			atomic.StoreInt32(&gitResetCalled, 1)
-			return exec.CommandContext(ctx, "true")
+			return mockReviewExec("git", args)
 		}
-		return exec.CommandContext(ctx, "true")
+		return mockReviewExec(command, args)
 	}
 
 	var cancelCalled int32

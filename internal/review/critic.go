@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -24,7 +25,27 @@ type Plan struct {
 	Verification string
 }
 
-var execCommand = exec.CommandContext
+type Cmd interface {
+	Run() error
+	Output() ([]byte, error)
+	CombinedOutput() ([]byte, error)
+	SetStdout(w io.Writer)
+	SetStderr(w io.Writer)
+	SetDir(dir string)
+}
+
+type realCmd struct {
+	*exec.Cmd
+}
+
+func (c realCmd) SetStdout(w io.Writer) { c.Stdout = w }
+func (c realCmd) SetStderr(w io.Writer) { c.Stderr = w }
+func (c realCmd) SetDir(dir string)     { c.Dir = dir }
+
+var execCommand = func(ctx context.Context, name string, args ...string) Cmd {
+	//nolint:gosec // G204: command execution name and arguments are passed dynamically by callers in review package
+	return realCmd{exec.CommandContext(ctx, name, args...)}
+}
 
 var checkMakefileExists = func() bool {
 	_, err := os.Stat("Makefile")
@@ -156,7 +177,7 @@ func runLocalValidation(ctx context.Context, validationCmd string) error {
 	defer valCancel()
 	//nolint:gosec // G204: execution is explicitly requested by the CLI configuration; command is statically "make all"
 	cmd := execCommand(valCtx, fields[0], fields[1:]...)
-	cmd.Dir = "."
+	cmd.SetDir(".")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("local validation command failed: %w\nOutput:\n%s", err, string(out))

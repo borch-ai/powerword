@@ -71,13 +71,13 @@ func LinkTaskIssue(ctx context.Context, prNumber, baseRef string) error {
 
 func gitFetch(ctx context.Context, baseRef string) {
 	cmd := execCommand(ctx, "git", "fetch", "origin", baseRef, "--depth=1")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.SetStdout(os.Stdout)
+	cmd.SetStderr(os.Stderr)
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("[WARNING] Failed to fetch origin/%s with depth=1: %v. Attempting full fetch...\n", baseRef, err)
 		cmdFull := execCommand(ctx, "git", "fetch", "origin", baseRef)
-		cmdFull.Stdout = os.Stdout
-		cmdFull.Stderr = os.Stderr
+		cmdFull.SetStdout(os.Stdout)
+		cmdFull.SetStderr(os.Stderr)
 		if err := cmdFull.Run(); err != nil {
 			fmt.Printf("[WARNING] Failed to fetch origin/%s: %v. Proceeding anyway...\n", baseRef, err)
 		}
@@ -181,8 +181,8 @@ func updatePRBody(ctx context.Context, prNumber, prBody string, missingRefs []st
 	}
 
 	prEditCmd := execCommand(ctx, "gh", "pr", "edit", prNumber, "--body-file", tempFile.Name())
-	prEditCmd.Stdout = os.Stdout
-	prEditCmd.Stderr = os.Stderr
+	prEditCmd.SetStdout(os.Stdout)
+	prEditCmd.SetStderr(os.Stderr)
 	if editErr := prEditCmd.Run(); editErr != nil {
 		return fmt.Errorf("failed to update PR body: %w", editErr)
 	}

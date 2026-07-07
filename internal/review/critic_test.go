@@ -77,6 +77,63 @@ func newTestConfig(endpoint string, gitDiffVal string, openAIKey string) *config
 }
 
 // TestHelperProcess is used to mock exec.Command
+func handleMcpCritic() {
+	cfg := &config.Config{
+		CriticProvider: "openai",
+		CriticModel:    "gpt-4",
+		CriticEndpoint: os.Getenv("CRITIC_ENDPOINT"),
+		APIKeys: config.APIKeys{
+			OpenAI: os.Getenv("MOCK_OPENAI_API_KEY"),
+		},
+	}
+	critic.SetExecCommand(func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestHelperProcess", "--", name}
+		cs = append(cs, args...)
+		//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+		return cmd
+	})
+	critic.ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
+		val := os.Getenv("MOCK_GIT_DIFF")
+		if val == "error" {
+			return "", fmt.Errorf("git command failed")
+		}
+		return val, nil
+	}
+
+	srv, err := critic.SetupServer(os.TempDir(), cfg)
+	if err != nil {
+		os.Exit(1)
+	}
+	transport := &mcp.StdioTransport{}
+	if err := srv.Run(context.Background(), transport); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
+
+func handleGit(args []string) {
+	if len(args) > 2 && args[1] == "status" && args[2] == "--porcelain" {
+		os.Exit(0)
+	}
+	if len(args) > 2 && args[1] == "rev-parse" {
+		if args[2] == "--show-toplevel" {
+			_, _ = fmt.Fprintln(os.Stdout, ".")
+			os.Exit(0)
+		}
+		if args[2] == "--is-inside-work-tree" {
+			_, _ = fmt.Fprintln(os.Stdout, "true")
+			os.Exit(0)
+		}
+	}
+	if len(args) > 1 {
+		_, _ = fmt.Fprintln(os.Stdout, strings.Join(args[1:], " "))
+	}
+	os.Exit(0)
+}
+
+// TestHelperProcess is used to mock exec.Command
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -93,92 +150,37 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(2)
 	}
 	cmd := args[0]
-	if cmd == "pw-mcp-critic" {
-		cfg := &config.Config{
-			CriticProvider: "openai",
-			CriticModel:    "gpt-4",
-			CriticEndpoint: os.Getenv("CRITIC_ENDPOINT"),
-			APIKeys: config.APIKeys{
-				OpenAI: os.Getenv("MOCK_OPENAI_API_KEY"),
-			},
-		}
-		critic.SetExecCommand(func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", name}
-			cs = append(cs, args...)
-			//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-			return cmd
-		})
-		critic.ExtractGitDiff = func(ctx context.Context, cfg *config.Config) (string, error) {
-			val := os.Getenv("MOCK_GIT_DIFF")
-			if val == "error" {
-				return "", fmt.Errorf("git command failed")
-			}
-			return val, nil
-		}
-
-		srv, err := critic.SetupServer(os.TempDir(), cfg)
-		if err != nil {
-			os.Exit(1)
-		}
-		transport := &mcp.StdioTransport{}
-		if err := srv.Run(context.Background(), transport); err != nil {
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-	if cmd == "make" {
+	switch cmd {
+	case "pw-mcp-critic":
+		handleMcpCritic()
+	case "git":
+		handleGit(args)
+	case "make":
 		_, _ = fmt.Fprint(os.Stdout, "mock make all success")
 		os.Exit(0)
-	}
-	if cmd == "gh" {
+	case "gh":
 		_, _ = fmt.Fprint(os.Stdout, `{"body": "### Goal\ntest\n### Proposed Changes\nchanges\n### Verification Plan\nverif"}`)
 		os.Exit(0)
-	}
-	if cmd == "gh_invalid" {
+	case "gh_invalid":
 		_, _ = fmt.Fprint(os.Stdout, `invalid json`)
 		os.Exit(0)
-	}
-	if cmd == "echo" {
+	case "echo":
 		if len(args) > 1 {
 			_, _ = fmt.Fprintln(os.Stdout, strings.Join(args[1:], " "))
 		}
 		os.Exit(0)
-	}
-	if cmd == "fail" {
+	case "true":
+		os.Exit(0)
+	case "fail":
 		os.Exit(1)
 	}
 	os.Exit(1)
 }
 
-func mockExecCommandContext(ctx context.Context, command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestHelperProcess", "--", command}
-	cs = append(cs, args...)
-	//nolint:gosec // this is a test helper, subprocess with dynamic arguments is safe
-	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-
-	// Clean GOCOVERDIR to prevent helper subprocess from corrupting/writing to coverage profile
-	env := os.Environ()
-	var cleanEnv []string
-	for _, e := range env {
-		if strings.HasPrefix(e, "GOCOVERDIR=") {
-			continue
-		}
-		cleanEnv = append(cleanEnv, e)
-	}
-	cleanEnv = append(cleanEnv, "GO_WANT_HELPER_PROCESS=1")
-	cmd.Env = cleanEnv
-	return cmd
-}
-
 func TestVerifyWorkspace_InvalidConfig(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...)
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -194,7 +196,9 @@ func TestVerifyWorkspace_InvalidConfig(t *testing.T) {
 
 func TestLoadIssuePlan(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	plan, err := LoadIssuePlan(context.Background(), "123")
@@ -209,9 +213,8 @@ func TestLoadIssuePlan(t *testing.T) {
 func TestLoadIssuePlan_Error(t *testing.T) {
 	// Create a mock that returns error
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		cmd := mockExecCommandContext(ctx, "fail")
-		return cmd
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec("fail", args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -223,7 +226,9 @@ func TestLoadIssuePlan_Error(t *testing.T) {
 
 func TestVerifyWorkspace_NoChanges(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	plan := &Plan{Goal: "test"}
@@ -237,7 +242,9 @@ func TestVerifyWorkspace_NoChanges(t *testing.T) {
 
 func TestVerifyWorkspace_NoMakefile(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	origCheck := checkMakefileExists
@@ -260,12 +267,11 @@ func TestVerifyWorkspace_NoMakefile(t *testing.T) {
 
 func TestVerifyWorkspace_MakeFails(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
 		if command == "make" {
-			cmd := mockExecCommandContext(ctx, "fail")
-			return cmd
+			return mockReviewExec("make", []string{"fail"})
 		}
-		return mockExecCommandContext(ctx, command, args...)
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -286,7 +292,9 @@ func TestVerifyWorkspace_MakeFails(t *testing.T) {
 
 func TestVerifyWorkspace_GitFails(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	plan := &Plan{Goal: "test"}
@@ -314,8 +322,8 @@ func TestExtractGitDiff_Fallback(t *testing.T) {
 
 func TestLoadIssuePlan_InvalidJSON(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		return mockExecCommandContext(ctx, "gh_invalid")
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec("gh", []string{"gh_invalid"})
 	}
 	defer func() { execCommand = origExec }()
 
@@ -327,11 +335,8 @@ func TestLoadIssuePlan_InvalidJSON(t *testing.T) {
 
 func TestVerifyWorkspace_Success(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...) // mock make success
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -352,11 +357,8 @@ func TestVerifyWorkspace_Success(t *testing.T) {
 
 func TestVerifyWorkspace_Reject(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...) // mock make success
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -388,7 +390,9 @@ func TestVerifyWorkspace_NilInputs(t *testing.T) {
 
 func TestVerifyWorkspace_ToolError(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -407,7 +411,9 @@ func TestVerifyWorkspace_ToolError(t *testing.T) {
 
 func TestVerifyWorkspace_CriticServerConfigFallback(t *testing.T) {
 	origExec := execCommand
-	execCommand = mockExecCommandContext
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
+	}
 	defer func() { execCommand = origExec }()
 
 	// Create a dummy bin/pw-mcp-critic to satisfy os.Stat
@@ -434,11 +440,8 @@ func TestVerifyWorkspace_CriticServerConfigFallback(t *testing.T) {
 
 func TestVerifyWorkspace_EnableCriticFalse(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
-		if command == "make" {
-			return mockExecCommandContext(ctx, "make", args...) // mock make success
-		}
-		return mockExecCommandContext(ctx, command, args...)
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 
@@ -455,12 +458,11 @@ func TestVerifyWorkspace_EnableCriticFalse(t *testing.T) {
 
 func TestVerifyWorkspace_EnableCriticFalse_ValidationFails(t *testing.T) {
 	origExec := execCommand
-	execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, command string, args ...string) Cmd {
 		if command == "make" {
-			cmd := mockExecCommandContext(ctx, "fail") // mock make failure
-			return cmd
+			return mockReviewExec("make", []string{"fail"})
 		}
-		return mockExecCommandContext(ctx, command, args...)
+		return mockReviewExec(command, args)
 	}
 	defer func() { execCommand = origExec }()
 

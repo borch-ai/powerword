@@ -27,8 +27,8 @@ func VerifyCoverage(ctx context.Context, threshold float64, profilePath string) 
 	cmd := execCommand(ctx, "go", "tool", "cover", "-func="+profilePath)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd.SetStdout(&stdout)
+	cmd.SetStderr(&stderr)
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error running go tool cover: %w\nStderr: %s", err, stderr.String())
