@@ -197,17 +197,14 @@ func checkSandbox(requestedPath string) error {
 		workspaceRoot = cwd
 	}
 
-	cleanRoot := filepath.Clean(workspaceRoot)
-
-	evalReq, err := filepath.EvalSymlinks(requestedPath)
+	cleanRoot, err := resolvePath(workspaceRoot)
 	if err != nil {
-		if os.IsNotExist(err) {
-			evalReq = filepath.Clean(requestedPath)
-		} else {
-			return fmt.Errorf("access denied: could not evaluate symlinks for %s: %v", requestedPath, err)
-		}
-	} else {
-		evalReq = filepath.Clean(evalReq)
+		return fmt.Errorf("access denied: could not resolve workspace root: %v", err)
+	}
+
+	evalReq, err := resolvePath(requestedPath)
+	if err != nil {
+		return fmt.Errorf("access denied: could not resolve path for %s: %v", requestedPath, err)
 	}
 
 	// Add trailing separator to root to prevent prefix matching issues (e.g. /my/workspace matching /my/workspace2)
@@ -220,4 +217,35 @@ func checkSandbox(requestedPath string) error {
 		return fmt.Errorf("access denied: path %s is outside of workspace root %s", requestedPath, workspaceRoot)
 	}
 	return nil
+}
+
+func resolvePath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	current := abs
+	var parts []string
+	for {
+		eval, err := filepath.EvalSymlinks(current)
+		if err == nil {
+			for i := len(parts) - 1; i >= 0; i-- {
+				eval = filepath.Join(eval, parts[i])
+			}
+			return filepath.Clean(eval), nil
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		parts = append(parts, filepath.Base(current))
+		current = parent
+	}
+
+	return filepath.Clean(abs), nil
 }
