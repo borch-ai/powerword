@@ -196,6 +196,9 @@ func (a *AnthropicClient) ListModels(ctx context.Context) ([]string, error) {
 
 // Embed computes vector embeddings for the provided texts. Not supported by Anthropic.
 func (a *AnthropicClient) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
 	return nil, errors.New("embeddings are not supported by the anthropic provider")
 }
 

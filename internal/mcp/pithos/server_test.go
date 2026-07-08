@@ -184,22 +184,26 @@ func TestHandleStage(t *testing.T) {
 	session, cleanup := setupTestClientServer(t)
 	defer cleanup()
 
+	dir1 := t.TempDir()
+	dir2 := t.TempDir()
+	dir3 := t.TempDir()
+
 	tests := []stageTest{
 		{
 			stage: "brew",
 			args: map[string]interface{}{
-				"project_path": "/tmp/brew",
+				"project_path": dir1,
 			},
 			wantIsError: false,
-			wantSubstr:  "pithos brew --dir /tmp/brew",
+			wantSubstr:  "pithos brew --dir " + dir1,
 		},
 		{
 			stage: "assemble",
 			args: map[string]interface{}{
-				"project_path": "/tmp/assemble",
+				"project_path": dir2,
 			},
 			wantIsError: false,
-			wantSubstr:  "pithos assemble --dir /tmp/assemble",
+			wantSubstr:  "pithos assemble --dir " + dir2,
 		},
 		{
 			stage:       "missing_path",
@@ -210,7 +214,7 @@ func TestHandleStage(t *testing.T) {
 		{
 			stage: "deploy",
 			args: map[string]interface{}{
-				"project_path": "/tmp/deploy",
+				"project_path": dir3,
 			},
 			mockFail:    true,
 			wantIsError: true,

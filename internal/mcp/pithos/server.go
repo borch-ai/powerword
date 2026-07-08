@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -95,6 +97,13 @@ func handleInitiate() func(context.Context, *mcp.CallToolRequest) (*mcp.CallTool
 			}, nil
 		}
 
+		if !filepath.IsAbs(args.ProjectPath) {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "project_path must be an absolute path"}},
+			}, nil
+		}
+
 		cmdArgs := []string{"initiate", "--dir", args.ProjectPath}
 		if args.Theme != "" {
 			cmdArgs = append(cmdArgs, "--theme", args.Theme)
@@ -117,6 +126,27 @@ func handleStage(stage string) func(context.Context, *mcp.CallToolRequest) (*mcp
 			return &mcp.CallToolResult{
 				IsError: true,
 				Content: []mcp.Content{&mcp.TextContent{Text: "project_path is required"}},
+			}, nil
+		}
+
+		if !filepath.IsAbs(args.ProjectPath) {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "project_path must be an absolute path"}},
+			}, nil
+		}
+
+		info, err := os.Stat(args.ProjectPath)
+		if err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("project_path does not exist or is inaccessible: %v", err)}},
+			}, nil
+		}
+		if !info.IsDir() {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "project_path must be a directory"}},
 			}, nil
 		}
 
