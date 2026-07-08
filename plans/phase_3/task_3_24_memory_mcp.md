@@ -33,6 +33,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-memory` exposing s
 #### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
 * Implement `Embed` (returns error as Anthropic does not support generic embeddings here).
 
+
 ### Sibling: Powerword (`cmd/pw-mcp-memory`)
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-memory/main.go)
@@ -47,6 +48,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-memory` exposing s
 
 #### [NEW] [main_integration_test.go](file://../../cmd/pw-mcp-memory/main_integration_test.go)
 * Runs an integration test using the MCP StdioTransport to ensure tools are properly exposed.
+
 
 ---
 
