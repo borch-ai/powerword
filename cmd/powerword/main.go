@@ -6,7 +6,6 @@ import (
 
 	"github.com/borch-ai/powerword/internal/loop"
 	"github.com/borch-ai/powerword/pkg/config"
-	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
 func main() {
@@ -21,7 +20,6 @@ func main() {
 	rootCmd.AddCommand(newLinkIssueCmd())
 
 	err := rootCmd.Execute()
-	telemetry.Wait()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

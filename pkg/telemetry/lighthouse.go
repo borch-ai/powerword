@@ -59,7 +59,7 @@ func (a *LighthouseAdapter) Submit(ctx context.Context, e TelemetryEvent) error 
 
 	client := a.Client
 	if client == nil {
-		client = &http.Client{}
+		client = &http.Client{Timeout: 5 * time.Second}
 	}
 
 	resp, err := client.Do(req)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/borch-ai/powerword/pkg/config"
@@ -29,6 +30,7 @@ type MemoryStore struct {
 type Server struct {
 	client llm.LLMClient
 	dbPath string
+	mu     sync.Mutex
 }
 
 func main() {
@@ -133,6 +135,8 @@ func (s *Server) handleMemoryAdd() func(context.Context, *mcp.CallToolRequest) (
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "No embedding generated"}}}, nil
 		}
 
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		store, err := s.loadStore()
 		if err != nil {
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to load memory store: %v", err)}}}, nil
@@ -201,7 +205,10 @@ func (s *Server) handleMemorySearch() func(context.Context, *mcp.CallToolRequest
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "No embedding generated"}}}, nil
 		}
 
+		s.mu.Lock()
 		store, err := s.loadStore()
+		s.mu.Unlock()
+
 		if err != nil {
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to load memory store: %v", err)}}}, nil
 		}
