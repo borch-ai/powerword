@@ -1,11 +1,17 @@
 # plan: Task 6.18: Speculative — Pithos Pipeline MCP Server
 
 **Status:** Completed
-**Unit Test Coverage:** 93.3%
+**Unit Test Coverage:** 91.2%
 **Go Version:** 1.26.5
 **Date Completed:** 2026-07-08
 
 Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pithos`). This enables Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration).
+
+### PR Feedback & Hardening Updates
+- **Hard-Pinned Go Version**: Hard-pinned the Go version in `go.mod` to `1.26.5` to ensure environment consistency across developers.
+- **Telemetry Flush Timeout**: Made the telemetry flush timeout configurable via `POWERWORD_TELEMETRY_TIMEOUT` environment variable (defaulting to 500ms) to prevent slow flush processes from hanging or delaying CLI execution.
+- **Memory Store Concurrency Control**: Added cross-process advisory file locking (`flock` on Unix, `LockFileEx` on Windows) to the JSON-backed memory store (`pw-mcp-memory`) to prevent record interleaving and data loss during concurrent write operations.
+
 
 ## User Review Required
 

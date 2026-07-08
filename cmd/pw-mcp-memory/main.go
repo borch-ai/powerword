@@ -141,6 +141,13 @@ func (s *Server) handleMemoryAdd() func(context.Context, *mcp.CallToolRequest) (
 
 		s.mu.Lock()
 		defer s.mu.Unlock()
+
+		fl := NewFileLock(s.dbPath)
+		if lockErr := fl.Lock(); lockErr != nil {
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to acquire store lock: %v", lockErr)}}}, nil
+		}
+		defer fl.Unlock()
+
 		store, err := s.loadStore()
 		if err != nil {
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to load memory store: %v", err)}}}, nil

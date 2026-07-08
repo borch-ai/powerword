@@ -130,3 +130,38 @@ func TestCosineSimilarity(t *testing.T) {
 		t.Errorf("expected 1.0, got %f", cosineSimilarity(d, e))
 	}
 }
+
+func TestFileLock(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.json")
+
+	fl1 := NewFileLock(dbPath)
+	fl2 := NewFileLock(dbPath)
+
+	if err := fl1.Lock(); err != nil {
+		t.Fatalf("expected lock 1 success, got %v", err)
+	}
+
+	locked := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		close(locked)
+		if err := fl2.Lock(); err != nil {
+			t.Errorf("expected lock 2 success after release, got %v", err)
+		}
+		fl2.Unlock()
+		close(done)
+	}()
+
+	<-locked
+	// wait a bit to ensure fl2 blocks on Lock
+	select {
+	case <-done:
+		t.Fatal("lock 2 should have blocked while lock 1 is held")
+	default:
+	}
+
+	fl1.Unlock()
+
+	<-done
+}

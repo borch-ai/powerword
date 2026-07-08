@@ -23,7 +23,14 @@ func main() {
 
 	err := rootCmd.Execute()
 
-	// Wait up to 500ms for background telemetry to flush
+	// Wait up to configurable timeout (default 500ms) for background telemetry to flush
+	timeout := 500 * time.Millisecond
+	if tStr := os.Getenv("POWERWORD_TELEMETRY_TIMEOUT"); tStr != "" {
+		if d, pErr := time.ParseDuration(tStr); pErr == nil {
+			timeout = d
+		}
+	}
+
 	done := make(chan struct{})
 	go func() {
 		telemetry.Wait()
@@ -31,7 +38,7 @@ func main() {
 	}()
 	select {
 	case <-done:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(timeout):
 	}
 
 	if err != nil {
