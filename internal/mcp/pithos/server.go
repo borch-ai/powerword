@@ -215,7 +215,7 @@ func checkSandbox(requestedPath string) error {
 	if !strings.HasSuffix(rootWithSep, string(filepath.Separator)) {
 		rootWithSep += string(filepath.Separator)
 	}
-	
+
 	if !strings.HasPrefix(evalReq, rootWithSep) && evalReq != cleanRoot {
 		return fmt.Errorf("access denied: path %s is outside of workspace root %s", requestedPath, workspaceRoot)
 	}

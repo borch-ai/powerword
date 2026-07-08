@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -284,4 +285,33 @@ func TestSetExecCommand(t *testing.T) {
 	orig := execCommand
 	defer func() { execCommand = orig }()
 	SetExecCommand(exec.CommandContext)
+}
+
+func TestCheckSandbox(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("POWERWORD_WORKSPACE_ROOT", tmpDir)
+
+	if err := checkSandbox(filepath.Join(tmpDir, "ok")); err != nil {
+		t.Errorf("expected no error for sub-path, got %v", err)
+	}
+
+	if err := checkSandbox("/some/path/outside"); err == nil {
+		t.Errorf("expected error for outside path, got none")
+	}
+
+	t.Setenv("POWERWORD_WORKSPACE_ROOT", "")
+	cwd, _ := os.Getwd()
+	if err := checkSandbox(filepath.Join(cwd, "ok")); err != nil {
+		t.Errorf("expected no error for cwd fallback, got %v", err)
+	}
+
+	// Create a real symlink that points outside
+	outsideDir := t.TempDir()
+	insideSymlink := filepath.Join(tmpDir, "symlink")
+	os.Symlink(outsideDir, insideSymlink)
+	t.Setenv("POWERWORD_WORKSPACE_ROOT", tmpDir)
+
+	if err := checkSandbox(insideSymlink); err == nil {
+		t.Errorf("expected error for symlink pointing outside, got none")
+	}
 }
