@@ -439,7 +439,7 @@ func TestOpenAIClient_Embed(t *testing.T) {
 					{"embedding": []float32{0.3, 0.4}},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 		}))
 		defer server.Close()
 

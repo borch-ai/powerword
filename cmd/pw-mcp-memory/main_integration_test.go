@@ -58,7 +58,7 @@ func TestMCP_MemoryPlugin_StdoutStdin(t *testing.T) {
 	if err := os.MkdirAll(cfgPath, 0755); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	cfgContent := "[api_keys]\ngemini = \"dummy\"\n"
 	if err := os.WriteFile(filepath.Join(cfgPath, "config.toml"), []byte(cfgContent), 0600); err != nil {
 		t.Fatal(err)

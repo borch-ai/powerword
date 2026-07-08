@@ -27,8 +27,8 @@ type MemoryStore struct {
 }
 
 type Server struct {
-	client  llm.LLMClient
-	dbPath  string
+	client llm.LLMClient
+	dbPath string
 }
 
 func main() {
@@ -200,54 +200,61 @@ func (s *Server) handleMemorySearch() func(context.Context, *mcp.CallToolRequest
 		if len(embeddings) == 0 {
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "No embedding generated"}}}, nil
 		}
-		queryEmb := embeddings[0]
 
 		store, err := s.loadStore()
 		if err != nil {
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to load memory store: %v", err)}}}, nil
 		}
 
-		var results []SearchResult
-		for _, record := range store.Records {
-			score := cosineSimilarity(queryEmb, record.Embedding)
-			if score >= args.MinSimilarity {
-				results = append(results, SearchResult{
-					Record: record,
-					Score:  score,
-				})
-			}
-		}
+		results := filterAndSortResults(store.Records, embeddings[0], args.MinSimilarity, args.Limit)
+		return formatSearchResults(results)
+	}
+}
 
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].Score > results[j].Score
-		})
+type responseRecord struct {
+	Text      string    `json:"text"`
+	Tags      []string  `json:"tags,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	Score     float64   `json:"score"`
+}
 
-		if len(results) > args.Limit {
-			results = results[:args.Limit]
-		}
-
-		type responseRecord struct {
-			Text      string    `json:"text"`
-			Tags      []string  `json:"tags,omitempty"`
-			Timestamp time.Time `json:"timestamp"`
-			Score     float64   `json:"score"`
-		}
-		
-		var out []responseRecord
-		for _, res := range results {
-			out = append(out, responseRecord{
-				Text:      res.Record.Text,
-				Tags:      res.Record.Tags,
-				Timestamp: res.Record.Timestamp,
-				Score:     res.Score,
+func filterAndSortResults(records []MemoryRecord, queryEmb []float32, minSim float64, limit int) []SearchResult {
+	var results []SearchResult
+	for _, record := range records {
+		score := cosineSimilarity(queryEmb, record.Embedding)
+		if score >= minSim {
+			results = append(results, SearchResult{
+				Record: record,
+				Score:  score,
 			})
 		}
-
-		outBytes, err := json.MarshalIndent(out, "", "  ")
-		if err != nil {
-			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to format results: %v", err)}}}, nil
-		}
-
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(outBytes)}}}, nil
 	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
+
+	if len(results) > limit {
+		results = results[:limit]
+	}
+	return results
+}
+
+func formatSearchResults(results []SearchResult) (*mcp.CallToolResult, error) {
+	var out []responseRecord
+	for _, res := range results {
+		out = append(out, responseRecord{
+			Text:      res.Record.Text,
+			Tags:      res.Record.Tags,
+			Timestamp: res.Record.Timestamp,
+			Score:     res.Score,
+		})
+	}
+
+	outBytes, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("Failed to format results: %v", err)}}}, nil
+	}
+
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(outBytes)}}}, nil
 }

@@ -79,14 +79,14 @@ func TestMemoryAddAndSearch(t *testing.T) {
 
 	// Test searching memory
 	searchFunc := appServer.handleMemorySearch()
-	
+
 	searchReq := &mcp.CallToolRequest{
 		Params: &mcp.CallToolParamsRaw{
 			Arguments: json.RawMessage(`{"query":"fox jumps","limit":1,"min_similarity":0.5}`),
 		},
 	}
 	// query embedding closer to second item
-	client.embeddings = [][]float32{{0.0, 0.9, 0.1}} 
+	client.embeddings = [][]float32{{0.0, 0.9, 0.1}}
 	res, err = searchFunc(context.Background(), searchReq)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
