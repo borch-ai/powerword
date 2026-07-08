@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -104,6 +105,13 @@ func handleInitiate() func(context.Context, *mcp.CallToolRequest) (*mcp.CallTool
 			}, nil
 		}
 
+		if err := checkSandbox(args.ProjectPath); err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}},
+			}, nil
+		}
+
 		cmdArgs := []string{"initiate", "--dir", args.ProjectPath}
 		if args.Theme != "" {
 			cmdArgs = append(cmdArgs, "--theme", args.Theme)
@@ -133,6 +141,13 @@ func handleStage(stage string) func(context.Context, *mcp.CallToolRequest) (*mcp
 			return &mcp.CallToolResult{
 				IsError: true,
 				Content: []mcp.Content{&mcp.TextContent{Text: "project_path must be an absolute path"}},
+			}, nil
+		}
+
+		if err := checkSandbox(args.ProjectPath); err != nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}},
 			}, nil
 		}
 
@@ -170,4 +185,21 @@ func runPithosCommand(ctx context.Context, args []string) (*mcp.CallToolResult, 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("pithos command succeeded.\nOutput:\n%s", string(out))}},
 	}, nil
+}
+
+func checkSandbox(requestedPath string) error {
+	workspaceRoot := os.Getenv("POWERWORD_WORKSPACE_ROOT")
+	if workspaceRoot == "" {
+		return nil
+	}
+
+	cleanRoot := filepath.Clean(workspaceRoot)
+	cleanReq := filepath.Clean(requestedPath)
+
+	// Add trailing separator to root to prevent prefix matching issues (e.g. /my/workspace matching /my/workspace2)
+	rootWithSep := cleanRoot + string(filepath.Separator)
+	if !strings.HasPrefix(cleanReq, rootWithSep) && cleanReq != cleanRoot {
+		return fmt.Errorf("access denied: path %s is outside of workspace root %s", requestedPath, workspaceRoot)
+	}
+	return nil
 }

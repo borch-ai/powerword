@@ -83,7 +83,10 @@ func (a *LighthouseAdapter) Submit(ctx context.Context, e TelemetryEvent) error 
 	return nil
 }
 
-var wg sync.WaitGroup
+var (
+	wg   sync.WaitGroup
+	wgMu sync.Mutex
+)
 
 // SubmitToLighthouse reads configuration from the environment and submits
 // a telemetry event to Lighthouse asynchronously in a background goroutine.
@@ -95,7 +98,9 @@ func SubmitToLighthouse(e TelemetryEvent) {
 	}
 	apiKey := os.Getenv("LIGHTHOUSE_API_KEY")
 
+	wgMu.Lock()
 	wg.Add(1)
+	wgMu.Unlock()
 	go func() {
 		defer wg.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -115,5 +120,7 @@ func SubmitToLighthouse(e TelemetryEvent) {
 
 // Wait blocks until all pending background telemetry submissions complete.
 func Wait() {
+	wgMu.Lock()
 	wg.Wait()
+	wgMu.Unlock()
 }

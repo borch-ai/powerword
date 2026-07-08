@@ -6,7 +6,6 @@ import (
 
 	"github.com/borch-ai/powerword/internal/loop"
 	"github.com/borch-ai/powerword/pkg/config"
-	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
 func main() {
