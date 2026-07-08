@@ -110,7 +110,11 @@ func (s *Server) saveStore(store *MemoryStore) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(s.dbPath, data, 0600)
+	tmpFile := s.dbPath + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+		return err
+	}
+	return os.Rename(tmpFile, s.dbPath)
 }
 
 func (s *Server) handleMemoryAdd() func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -195,6 +199,11 @@ func (s *Server) handleMemorySearch() func(context.Context, *mcp.CallToolRequest
 		}
 		if args.Limit <= 0 {
 			args.Limit = 5
+		}
+		if args.MinSimilarity < 0.0 {
+			args.MinSimilarity = 0.0
+		} else if args.MinSimilarity > 1.0 {
+			args.MinSimilarity = 1.0
 		}
 
 		embeddings, err := s.client.Embed(ctx, []string{args.Query})

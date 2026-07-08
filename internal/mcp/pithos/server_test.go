@@ -94,6 +94,8 @@ func TestHandleInitiate(t *testing.T) {
 	SetExecCommand(mockExecCommand)
 	defer SetExecCommand(exec.CommandContext)
 
+	t.Setenv("POWERWORD_WORKSPACE_ROOT", "/")
+
 	session, cleanup := setupTestClientServer(t)
 	defer cleanup()
 
@@ -180,6 +182,8 @@ type stageTest struct {
 func TestHandleStage(t *testing.T) {
 	SetExecCommand(mockExecCommand)
 	defer SetExecCommand(exec.CommandContext)
+
+	t.Setenv("POWERWORD_WORKSPACE_ROOT", "/")
 
 	session, cleanup := setupTestClientServer(t)
 	defer cleanup()

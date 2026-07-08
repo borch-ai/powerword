@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/borch-ai/powerword/internal/loop"
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
 func main() {
@@ -20,6 +22,17 @@ func main() {
 	rootCmd.AddCommand(newLinkIssueCmd())
 
 	err := rootCmd.Execute()
+
+	// Wait up to 500ms for background telemetry to flush
+	done := make(chan struct{})
+	go func() {
+		telemetry.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+	}
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

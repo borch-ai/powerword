@@ -190,15 +190,33 @@ func runPithosCommand(ctx context.Context, args []string) (*mcp.CallToolResult, 
 func checkSandbox(requestedPath string) error {
 	workspaceRoot := os.Getenv("POWERWORD_WORKSPACE_ROOT")
 	if workspaceRoot == "" {
-		return nil
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("could not determine fallback workspace root: %v", err)
+		}
+		workspaceRoot = cwd
 	}
 
 	cleanRoot := filepath.Clean(workspaceRoot)
-	cleanReq := filepath.Clean(requestedPath)
+
+	evalReq, err := filepath.EvalSymlinks(requestedPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			evalReq = filepath.Clean(requestedPath)
+		} else {
+			return fmt.Errorf("access denied: could not evaluate symlinks for %s: %v", requestedPath, err)
+		}
+	} else {
+		evalReq = filepath.Clean(evalReq)
+	}
 
 	// Add trailing separator to root to prevent prefix matching issues (e.g. /my/workspace matching /my/workspace2)
-	rootWithSep := cleanRoot + string(filepath.Separator)
-	if !strings.HasPrefix(cleanReq, rootWithSep) && cleanReq != cleanRoot {
+	rootWithSep := cleanRoot
+	if !strings.HasSuffix(rootWithSep, string(filepath.Separator)) {
+		rootWithSep += string(filepath.Separator)
+	}
+	
+	if !strings.HasPrefix(evalReq, rootWithSep) && evalReq != cleanRoot {
 		return fmt.Errorf("access denied: path %s is outside of workspace root %s", requestedPath, workspaceRoot)
 	}
 	return nil

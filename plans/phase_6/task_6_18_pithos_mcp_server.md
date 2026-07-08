@@ -5,7 +5,7 @@
 **Go Version:** 1.26.4
 **Date Completed:** 2026-07-08
 
-Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pithos`). This enables Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration). Not to be built until Pithos `deploy` is fully implemented.
+Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pithos`). This enables Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration).
 
 ## User Review Required
 
