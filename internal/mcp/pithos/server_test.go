@@ -1,6 +1,7 @@
 package pithos
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -314,5 +315,43 @@ func TestCheckSandbox(t *testing.T) {
 
 	if err := checkSandbox(insideSymlink); err == nil {
 		t.Errorf("expected error for symlink pointing outside, got none")
+	}
+}
+
+func TestLimitWriter(t *testing.T) {
+	var buf bytes.Buffer
+	lw := &limitWriter{
+		w:     &buf,
+		limit: 10,
+	}
+
+	n, err := lw.Write([]byte("hello"))
+	if err != nil || n != 5 {
+		t.Fatalf("unexpected write: %d, %v", n, err)
+	}
+	if buf.String() != "hello" {
+		t.Errorf("expected 'hello', got '%s'", buf.String())
+	}
+	if lw.truncated {
+		t.Error("expected truncated to be false")
+	}
+
+	n, err = lw.Write([]byte(" world"))
+	if err != nil || n != 6 {
+		t.Fatalf("unexpected write: %d, %v", n, err)
+	}
+	if buf.String() != "hello worl" {
+		t.Errorf("expected 'hello worl', got '%s'", buf.String())
+	}
+	if !lw.truncated {
+		t.Error("expected truncated to be true")
+	}
+
+	n, err = lw.Write([]byte("!"))
+	if err != nil || n != 1 {
+		t.Fatalf("unexpected write: %d, %v", n, err)
+	}
+	if buf.String() != "hello worl" {
+		t.Errorf("expected 'hello worl', got '%s'", buf.String())
 	}
 }

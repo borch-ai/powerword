@@ -1,13 +1,16 @@
 package pithos
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -173,7 +176,20 @@ func handleStage(stage string) func(context.Context, *mcp.CallToolRequest) (*mcp
 func runPithosCommand(ctx context.Context, args []string) (*mcp.CallToolResult, error) {
 	//nolint:gosec // G204: Pithos is expected to be a trusted executable in the environment PATH
 	cmd := execCommand(ctx, "pithos", args...)
-	out, err := cmd.CombinedOutput()
+
+	var buf bytes.Buffer
+	lw := &limitWriter{
+		w:     &buf,
+		limit: 1024 * 1024,
+	}
+	cmd.Stdout = lw
+	cmd.Stderr = lw
+
+	err := cmd.Run()
+	out := buf.Bytes()
+	if lw.truncated {
+		out = append(out, []byte("\n[output truncated: exceeded 1MB limit]")...)
+	}
 
 	if err != nil {
 		return &mcp.CallToolResult{
@@ -185,6 +201,39 @@ func runPithosCommand(ctx context.Context, args []string) (*mcp.CallToolResult, 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("pithos command succeeded.\nOutput:\n%s", string(out))}},
 	}, nil
+}
+
+type limitWriter struct {
+	mu        sync.Mutex
+	w         io.Writer
+	limit     int
+	written   int
+	truncated bool
+}
+
+func (lw *limitWriter) Write(p []byte) (int, error) {
+	lw.mu.Lock()
+	defer lw.mu.Unlock()
+
+	if lw.written >= lw.limit {
+		lw.truncated = true
+		return len(p), nil
+	}
+
+	available := lw.limit - lw.written
+	if len(p) > available {
+		lw.truncated = true
+		n, err := lw.w.Write(p[:available])
+		lw.written += n
+		if err != nil {
+			return n, err
+		}
+		return len(p), nil
+	}
+
+	n, err := lw.w.Write(p)
+	lw.written += n
+	return n, err
 }
 
 func checkSandbox(requestedPath string) error {
