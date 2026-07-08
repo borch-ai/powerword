@@ -300,9 +300,8 @@ func TestCheckSandbox(t *testing.T) {
 	}
 
 	t.Setenv("POWERWORD_WORKSPACE_ROOT", "")
-	cwd, _ := os.Getwd()
-	if err := checkSandbox(filepath.Join(cwd, "ok")); err != nil {
-		t.Errorf("expected no error for cwd fallback, got %v", err)
+	if err := checkSandbox("/some/path"); err == nil {
+		t.Errorf("expected error when POWERWORD_WORKSPACE_ROOT is unset, got none")
 	}
 
 	// Create a real symlink that points outside

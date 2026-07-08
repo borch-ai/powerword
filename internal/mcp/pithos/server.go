@@ -190,11 +190,7 @@ func runPithosCommand(ctx context.Context, args []string) (*mcp.CallToolResult, 
 func checkSandbox(requestedPath string) error {
 	workspaceRoot := os.Getenv("POWERWORD_WORKSPACE_ROOT")
 	if workspaceRoot == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("could not determine fallback workspace root: %v", err)
-		}
-		workspaceRoot = cwd
+		return fmt.Errorf("access denied: POWERWORD_WORKSPACE_ROOT environment variable is not set")
 	}
 
 	cleanRoot, err := resolvePath(workspaceRoot)

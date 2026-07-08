@@ -1,7 +1,7 @@
 # plan: Task 3.24: Local Semantic Memory Plugin (`pw-mcp-memory`)
 
 **Status:** Completed
-**Go Version:** 1.26.4
+**Go Version:** 1.26.5
 **Date Completed:** 2026-07-07
 **Unit Test Coverage:** 91.10%
 
