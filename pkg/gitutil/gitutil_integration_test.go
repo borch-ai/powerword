@@ -35,6 +35,12 @@ func setupMockRemote(t *testing.T) string {
 		t.Fatalf("failed to configure user.email: %v", err)
 	}
 
+	cmd = exec.Command("git", "config", "commit.gpgSign", "false")
+	cmd.Dir = remoteDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to configure commit.gpgSign: %v", err)
+	}
+
 	// Create a dummy file and commit
 	dummyFile := filepath.Join(remoteDir, "README.md")
 	if err := os.WriteFile(dummyFile, []byte("# Test Repo\n"), 0644); err != nil {

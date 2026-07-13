@@ -222,13 +222,8 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 }
 
 func TestGitUtil_GitBinaryNotFound(t *testing.T) {
-	origPath := os.Getenv("PATH")
-	defer func() {
-		_ = os.Setenv("PATH", origPath)
-	}()
-
 	// Temporarily break PATH so git cannot be found
-	_ = os.Setenv("PATH", "")
+	t.Setenv("PATH", "")
 
 	ctx := context.Background()
 	_, err := RunGitCommand(ctx, t.TempDir(), "status")
@@ -317,7 +312,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Fetch(ctx, dir, "main"); err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
-	if expected := []string{"fetch", "origin", "main"}; !reflect.DeepEqual(lastArgs, expected) {
+	if expected := []string{"fetch", "--", "origin", "main"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected fetch args: %v", lastArgs)
 	}
 
@@ -338,7 +333,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Branch(ctx, dir, "feature", "origin/feature"); err != nil {
 		t.Fatalf("branch failed: %v", err)
 	}
-	if expected := []string{"branch", "--track", "feature", "origin/feature"}; !reflect.DeepEqual(lastArgs, expected) {
+	if expected := []string{"branch", "--track", "--", "feature", "origin/feature"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected branch args: %v", lastArgs)
 	}
 
@@ -361,7 +356,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Pull(ctx, dir, "main"); err != nil {
 		t.Fatalf("pull main failed: %v", err)
 	}
-	if expected := []string{"branch", "--set-upstream-to=origin/main", "main"}; !reflect.DeepEqual(lastArgs, expected) { // the last command executed in Pull
+	if expected := []string{"branch", "--set-upstream-to=origin/main", "--", "main"}; !reflect.DeepEqual(lastArgs, expected) { // the last command executed in Pull
 		t.Errorf("unexpected pull args: %v", lastArgs)
 	}
 }

@@ -100,7 +100,7 @@ func Clone(ctx context.Context, url, dir, branch string, depth int) error {
 func Fetch(ctx context.Context, dir, branch string) error {
 	args := []string{"fetch"}
 	if branch != "" {
-		args = append(args, "origin", branch)
+		args = append(args, "--", "origin", branch)
 	}
 	_, err := RunGitCommand(ctx, dir, args...)
 	return err
@@ -111,6 +111,9 @@ func Checkout(ctx context.Context, dir, branch string) error {
 	if branch == "" {
 		return fmt.Errorf("branch name cannot be empty")
 	}
+	if strings.HasPrefix(branch, "-") {
+		return fmt.Errorf("invalid branch name: cannot start with '-'")
+	}
 	_, err := RunGitCommand(ctx, dir, "checkout", branch)
 	return err
 }
@@ -119,6 +122,9 @@ func Checkout(ctx context.Context, dir, branch string) error {
 func CheckoutBranch(ctx context.Context, dir, branch, startPoint string) error {
 	if branch == "" {
 		return fmt.Errorf("branch name cannot be empty")
+	}
+	if strings.HasPrefix(branch, "-") {
+		return fmt.Errorf("invalid branch name: cannot start with '-'")
 	}
 	args := []string{"checkout", "-B", branch}
 	if startPoint != "" {
@@ -133,6 +139,9 @@ func Branch(ctx context.Context, dir, branch, startPoint string) error {
 	if branch == "" {
 		return fmt.Errorf("branch name cannot be empty")
 	}
+	if strings.HasPrefix(branch, "-") {
+		return fmt.Errorf("invalid branch name: cannot start with '-'")
+	}
 	args := []string{"branch"}
 	if startPoint != "" {
 		// Set upstream automatically if we are starting from a remote branch
@@ -140,7 +149,7 @@ func Branch(ctx context.Context, dir, branch, startPoint string) error {
 			args = append(args, "--track")
 		}
 	}
-	args = append(args, branch)
+	args = append(args, "--", branch)
 	if startPoint != "" {
 		args = append(args, startPoint)
 	}
@@ -158,7 +167,7 @@ func Pull(ctx context.Context, dir, branch string) error {
 			return err
 		}
 		// Set upstream
-		_, err := RunGitCommand(ctx, dir, "branch", "--set-upstream-to=origin/"+branch, branch)
+		_, err := RunGitCommand(ctx, dir, "branch", "--set-upstream-to=origin/"+branch, "--", branch)
 		return err
 	}
 
