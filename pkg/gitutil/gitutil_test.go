@@ -260,6 +260,113 @@ func TestGitUtil_MockedLookPath(t *testing.T) {
 	}
 }
 
+func TestSanitizeGitOutput(t *testing.T) {
+	origToken := os.Getenv("DAEDALUS_GITHUB_TOKEN")
+	_ = os.Setenv("DAEDALUS_GITHUB_TOKEN", "super-secret-token")
+	defer func() { _ = os.Setenv("DAEDALUS_GITHUB_TOKEN", origToken) }()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "basic auth token",
+			input:    "fatal: could not read Password for 'https://x-access-token:ghs_1234@github.com': terminal prompts disabled",
+			expected: "fatal: could not read Password for 'https://[REDACTED]@github.com': terminal prompts disabled",
+		},
+		{
+			name:     "environment variable token",
+			input:    "failed with token super-secret-token",
+			expected: "failed with token [REDACTED]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SanitizeGitOutput([]byte(tt.input))
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestGitUtil_LifecycleCommands(t *testing.T) {
+	origExec := ExecCommand
+	defer func() { ExecCommand = origExec }()
+
+	var lastArgs []string
+	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		lastArgs = args
+		//nolint:gosec
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "HELPER_EXIT_CODE=0", "HELPER_STDOUT=master\nfeature\n")
+		return cmd
+	}
+
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	if err := Clone(ctx, "http://repo", dir, "main", 1); err != nil {
+		t.Fatalf("clone failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "clone --branch main --depth 1 --single-branch -- http://repo " + dir {
+		t.Errorf("unexpected clone args: %v", lastArgs)
+	}
+
+	if err := Fetch(ctx, dir, "main"); err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "fetch origin main" {
+		t.Errorf("unexpected fetch args: %v", lastArgs)
+	}
+
+	if err := Checkout(ctx, dir, "feature"); err != nil {
+		t.Fatalf("checkout failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "checkout feature" {
+		t.Errorf("unexpected checkout args: %v", lastArgs)
+	}
+
+	if err := CheckoutBranch(ctx, dir, "feature", "origin/feature"); err != nil {
+		t.Fatalf("checkout branch failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "checkout -B feature origin/feature" {
+		t.Errorf("unexpected checkout branch args: %v", lastArgs)
+	}
+
+	if err := Branch(ctx, dir, "feature", "origin/feature"); err != nil {
+		t.Fatalf("branch failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "branch --set-upstream-to=origin/feature feature origin/feature" {
+		t.Errorf("unexpected branch args: %v", lastArgs)
+	}
+
+	if err := Pull(ctx, dir, ""); err != nil {
+		t.Fatalf("pull failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "pull --ff-only" {
+		t.Errorf("unexpected pull args: %v", lastArgs)
+	}
+
+	branches, err := BranchList(ctx, dir)
+	if err != nil {
+		t.Fatalf("branchlist failed: %v", err)
+	}
+	if len(branches) == 0 {
+		t.Errorf("unexpected branch list: %v", branches)
+	}
+    
+	// Test specific branch pull
+	if err := Pull(ctx, dir, "main"); err != nil {
+		t.Fatalf("pull main failed: %v", err)
+	}
+	if strings.Join(lastArgs, " ") != "branch --set-upstream-to=origin/main main" { // the last command executed in Pull
+		t.Errorf("unexpected pull args: %v", lastArgs)
+	}
+}
+
 // TestHelperProcess is used to mock command executions cross-platform.
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {

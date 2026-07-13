@@ -3,7 +3,9 @@ package gitutil
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -15,8 +17,34 @@ var ExecCommand = exec.CommandContext
 // It can be overridden in unit tests to mock PATH lookup.
 var LookPath = exec.LookPath
 
+func setupCmdEnv(cmd *exec.Cmd) {
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
+	}
+	filtered := make([]string, 0, len(cmd.Env))
+	for _, env := range cmd.Env {
+		if !strings.HasPrefix(env, "GIT_TERMINAL_PROMPT=") {
+			filtered = append(filtered, env)
+		}
+	}
+	cmd.Env = append(filtered, "GIT_TERMINAL_PROMPT=0")
+}
+
+var credentialRegex = regexp.MustCompile(`(https?://)([^@\s]+)(@)`)
+
+// SanitizeGitOutput removes sensitive credentials (like basic auth tokens in URLs
+// or DAEDALUS_GITHUB_TOKEN) from git output.
+func SanitizeGitOutput(out []byte) string {
+	s := strings.TrimSpace(string(out))
+	s = credentialRegex.ReplaceAllString(s, "${1}[REDACTED]${3}")
+	if token := os.Getenv("DAEDALUS_GITHUB_TOKEN"); token != "" {
+		s = strings.ReplaceAll(s, token, "[REDACTED]")
+	}
+	return s
+}
+
 // RunGitCommand executes a git command and captures combined stdout/stderr for detailed error reporting.
-// It filters out coverage warning lines to avoid contaminating output.
+// It filters out coverage warning lines to avoid contaminating output, and scrubs credentials.
 func RunGitCommand(ctx context.Context, dir string, args ...string) (string, error) {
 	// Robustness check: Ensure git executable is in the PATH
 	if _, err := LookPath("git"); err != nil {
@@ -24,10 +52,13 @@ func RunGitCommand(ctx context.Context, dir string, args ...string) (string, err
 	}
 
 	cmd := ExecCommand(ctx, "git", args...)
-	cmd.Dir = dir
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	setupCmdEnv(cmd)
 	out, err := cmd.CombinedOutput()
 
-	outStr := string(out)
+	outStr := SanitizeGitOutput(out)
 	if strings.Contains(outStr, "warning: GOCOVERDIR not set") {
 		var cleanLines []string
 		for _, line := range strings.Split(outStr, "\n") {
@@ -43,6 +74,102 @@ func RunGitCommand(ctx context.Context, dir string, args ...string) (string, err
 		return "", fmt.Errorf("git command %v failed: %w (output: %q)", args, err, strings.TrimSpace(outStr))
 	}
 	return outStr, nil
+}
+
+// Clone clones a repository into the specified directory.
+func Clone(ctx context.Context, url, dir, branch string, depth int) error {
+	args := []string{"clone"}
+	if branch != "" {
+		args = append(args, "--branch", branch)
+	}
+	if depth > 0 {
+		args = append(args, "--depth", fmt.Sprintf("%d", depth), "--single-branch")
+	}
+	args = append(args, "--", url, dir)
+
+	_, err := RunGitCommand(ctx, "", args...)
+	return err
+}
+
+// Fetch fetches the latest changes from the remote repository.
+func Fetch(ctx context.Context, dir, branch string) error {
+	args := []string{"fetch"}
+	if branch != "" {
+		args = append(args, "origin", branch)
+	}
+	_, err := RunGitCommand(ctx, dir, args...)
+	return err
+}
+
+// Checkout checks out a specific branch. It does not create it.
+func Checkout(ctx context.Context, dir, branch string) error {
+	_, err := RunGitCommand(ctx, dir, "checkout", branch)
+	return err
+}
+
+// CheckoutBranch creates and checks out a new branch, optionally resetting it to a start point (e.g., origin/branch).
+func CheckoutBranch(ctx context.Context, dir, branch, startPoint string) error {
+	args := []string{"checkout", "-B", branch}
+	if startPoint != "" {
+		args = append(args, startPoint)
+	}
+	_, err := RunGitCommand(ctx, dir, args...)
+	return err
+}
+
+// Branch creates a new branch without checking it out.
+func Branch(ctx context.Context, dir, branch, startPoint string) error {
+	args := []string{"branch"}
+	if startPoint != "" {
+		// Set upstream automatically if we are starting from a remote branch
+		if strings.HasPrefix(startPoint, "origin/") {
+			args = append(args, "--set-upstream-to="+startPoint)
+		}
+	}
+	args = append(args, branch)
+	if startPoint != "" {
+		args = append(args, startPoint)
+	}
+	_, err := RunGitCommand(ctx, dir, args...)
+	return err
+}
+
+// Pull fetches and integrates changes. If branch is not empty, it acts like Daedalus's Pull with specific branch handling.
+func Pull(ctx context.Context, dir, branch string) error {
+	if branch != "" {
+		if err := Fetch(ctx, dir, branch); err != nil {
+			return err
+		}
+		if err := CheckoutBranch(ctx, dir, branch, "origin/"+branch); err != nil {
+			return err
+		}
+		// Set upstream
+		_, err := RunGitCommand(ctx, dir, "branch", "--set-upstream-to=origin/"+branch, branch)
+		return err
+	}
+
+	// Default fetch and pull
+	if err := Fetch(ctx, dir, ""); err != nil {
+		return err
+	}
+	_, err := RunGitCommand(ctx, dir, "pull", "--ff-only")
+	return err
+}
+
+// BranchList lists all local branches.
+func BranchList(ctx context.Context, dir string) ([]string, error) {
+	out, err := RunGitCommand(ctx, dir, "branch", "--format=%(refname:short)")
+	if err != nil {
+		return nil, err
+	}
+	var branches []string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			branches = append(branches, line)
+		}
+	}
+	return branches, nil
 }
 
 // IsInsideWorkTree checks if the directory is inside a Git working tree.
