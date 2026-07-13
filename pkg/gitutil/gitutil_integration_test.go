@@ -126,7 +126,9 @@ func TestIntegration_FetchAndPull(t *testing.T) {
 	}
 	cmd := exec.Command("git", "add", "update.txt")
 	cmd.Dir = remoteURL
-	_ = cmd.Run()
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to add update.txt: %v", err)
+	}
 	cmd = exec.Command("git", "commit", "-m", "Update commit")
 	cmd.Dir = remoteURL
 	if err := cmd.Run(); err != nil {

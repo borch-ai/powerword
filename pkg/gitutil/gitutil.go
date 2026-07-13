@@ -72,7 +72,11 @@ func RunGitCommand(ctx context.Context, dir string, args ...string) (string, err
 	}
 
 	if err != nil {
-		return "", fmt.Errorf("git command %v failed: %w (output: %q)", args, err, strings.TrimSpace(outStr))
+		sanitizedArgs := make([]string, len(args))
+		for i, arg := range args {
+			sanitizedArgs[i] = SanitizeGitOutput([]byte(arg))
+		}
+		return "", fmt.Errorf("git command %v failed: %w (output: %q)", sanitizedArgs, err, strings.TrimSpace(outStr))
 	}
 	return outStr, nil
 }
@@ -104,12 +108,18 @@ func Fetch(ctx context.Context, dir, branch string) error {
 
 // Checkout checks out a specific branch. It does not create it.
 func Checkout(ctx context.Context, dir, branch string) error {
+	if branch == "" {
+		return fmt.Errorf("branch name cannot be empty")
+	}
 	_, err := RunGitCommand(ctx, dir, "checkout", branch)
 	return err
 }
 
 // CheckoutBranch creates and checks out a new branch, optionally resetting it to a start point (e.g., origin/branch).
 func CheckoutBranch(ctx context.Context, dir, branch, startPoint string) error {
+	if branch == "" {
+		return fmt.Errorf("branch name cannot be empty")
+	}
 	args := []string{"checkout", "-B", branch}
 	if startPoint != "" {
 		args = append(args, startPoint)
@@ -120,6 +130,9 @@ func CheckoutBranch(ctx context.Context, dir, branch, startPoint string) error {
 
 // Branch creates a new branch without checking it out.
 func Branch(ctx context.Context, dir, branch, startPoint string) error {
+	if branch == "" {
+		return fmt.Errorf("branch name cannot be empty")
+	}
 	args := []string{"branch"}
 	if startPoint != "" {
 		// Set upstream automatically if we are starting from a remote branch
