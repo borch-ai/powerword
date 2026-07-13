@@ -30,7 +30,12 @@ func (l *FileLock) Lock() error {
 	}
 	l.f = f
 
-	return syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		_ = f.Close()
+		l.f = nil
+		return err
+	}
+	return nil
 }
 
 func (l *FileLock) Unlock() {

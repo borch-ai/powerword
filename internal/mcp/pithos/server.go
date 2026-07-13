@@ -239,7 +239,11 @@ func (lw *limitWriter) Write(p []byte) (int, error) {
 func checkSandbox(requestedPath string) error {
 	workspaceRoot := os.Getenv("POWERWORD_WORKSPACE_ROOT")
 	if workspaceRoot == "" {
-		return fmt.Errorf("access denied: POWERWORD_WORKSPACE_ROOT environment variable is not set")
+		wd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("access denied: POWERWORD_WORKSPACE_ROOT is not set and cannot determine working directory: %v", err)
+		}
+		workspaceRoot = wd
 	}
 
 	cleanRoot, err := resolvePath(workspaceRoot)

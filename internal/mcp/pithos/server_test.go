@@ -309,7 +309,7 @@ func TestCheckSandbox(t *testing.T) {
 	outsideDir := t.TempDir()
 	insideSymlink := filepath.Join(tmpDir, "symlink")
 	if err := os.Symlink(outsideDir, insideSymlink); err != nil {
-		t.Fatalf("failed to create symlink: %v", err)
+		t.Skipf("skipping symlink test: failed to create symlink: %v", err)
 	}
 	t.Setenv("POWERWORD_WORKSPACE_ROOT", tmpDir)
 
