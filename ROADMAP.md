@@ -71,7 +71,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.3: Kubernetes Diagnostician Plugin (K8s)**
     *   Implement a native Go MCP server to communicate with local/remote Kubernetes clusters to inspect namespaces, check service states, dump failing pod logs, and run diagnostics.
     *   [Implementation Plan](plans/phase_3/task_3_3_k8s_mcp.md)
-*   [ ] **Task 3.4: SQL Database Inspector Plugin**
+*   [x] **Task 3.4: SQL Database Inspector Plugin**
     *   Build a database bridge Go MCP server supporting Postgres, MySQL, and SQLite. Support listing schemas, describing table structures, executing read-only check queries, and alerting on locks or long-running queries.
     *   [Implementation Plan](plans/phase_3/task_3_4_db_mcp.md)
 *   [x] **Task 3.5: Creative Asset Generation Plugin (ImageGen)**
@@ -86,7 +86,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [x] **Task 3.8: Amazon KDP SEO & Metadata Agent Plugin (SEO)**
     *   Implement a native Go MCP server querying keyword volumes and product search suggestions to formulate listing titles, descriptions, and tag payloads.
     *   [Implementation Plan](plans/phase_3/task_3_8_seo_mcp.md)
-*   [ ] **Task 3.9: Google Doc MCP Plugin (GDoc)**
+*   [x] **Task 3.9: Google Doc MCP Plugin (GDoc)**
     *   Implement a native Go MCP server to create, read, and update Google Docs to export manuscripts for editing and import them back.
     *   [Implementation Plan](plans/phase_3/task_3_9_gdoc_mcp.md)
 *   [x] **Task 3.10: Market Intelligence Plugin (`pw-mcp-trends`)**
@@ -131,7 +131,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
 *   [ ] **Task 3.23: Digital Music Distribution Helper (`pw-mcp-music`)**
     *   Implement a native Go MCP server exposing tools to package lossless audio and artwork and submit releases to distributor webhook endpoints.
     *   [Implementation Plan](plans/phase_3/task_3_23_music_mcp.md)
-*   [ ] **Task 3.24: Local Semantic Memory Plugin (`pw-mcp-memory`)**
+*   [x] **Task 3.24: Local Semantic Memory Plugin (`pw-mcp-memory`)**
     *   Implement a native Go MCP server exposing tools to store, search, and retrieve chunks of text semantically using a lightweight in-process vector space model or local vector database.
     *   [Implementation Plan](plans/phase_3/task_3_24_memory_mcp.md)
 

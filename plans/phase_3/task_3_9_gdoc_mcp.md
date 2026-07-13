@@ -1,6 +1,9 @@
 # plan: Task 3.9: Google Doc MCP Plugin (GDoc)
 
-**Status:** Open
+**Status:** Completed
+**Go Version:** 1.26.5
+**Date Completed:** 2026-07-13
+**Unit Test Coverage:** 91.0%
 
 Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the Powerword repository to interact with Google Docs and Google Drive. This enables agents and pipelines (such as Pithos) to export manuscripts to Google Docs for human review and import finalized text back.
 
