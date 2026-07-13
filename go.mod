@@ -26,7 +26,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	golang.org/x/net v0.56.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.47.0
 	google.golang.org/api v0.287.1
 	modernc.org/sqlite v1.53.0
 	rsc.io/pdf v0.1.1
