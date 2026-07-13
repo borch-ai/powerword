@@ -36,7 +36,7 @@ var credentialRegex = regexp.MustCompile(`(https?://)([^@\s]+)(@)`)
 // SanitizeGitOutput removes sensitive credentials (like basic auth tokens in URLs
 // or DAEDALUS_GITHUB_TOKEN) from git output.
 func SanitizeGitOutput(out []byte) string {
-	s := strings.TrimSpace(string(out))
+	s := string(out)
 	s = credentialRegex.ReplaceAllString(s, "${1}[REDACTED]${3}")
 	if token := os.Getenv("DAEDALUS_GITHUB_TOKEN"); token != "" {
 		s = strings.ReplaceAll(s, token, "[REDACTED]")
@@ -124,7 +124,7 @@ func Branch(ctx context.Context, dir, branch, startPoint string) error {
 	if startPoint != "" {
 		// Set upstream automatically if we are starting from a remote branch
 		if strings.HasPrefix(startPoint, "origin/") {
-			args = append(args, "--set-upstream-to="+startPoint)
+			args = append(args, "--track")
 		}
 	}
 	args = append(args, branch)

@@ -261,9 +261,7 @@ func TestGitUtil_MockedLookPath(t *testing.T) {
 }
 
 func TestSanitizeGitOutput(t *testing.T) {
-	origToken := os.Getenv("DAEDALUS_GITHUB_TOKEN")
-	_ = os.Setenv("DAEDALUS_GITHUB_TOKEN", "super-secret-token")
-	defer func() { _ = os.Setenv("DAEDALUS_GITHUB_TOKEN", origToken) }()
+	t.Setenv("DAEDALUS_GITHUB_TOKEN", "super-secret-token")
 
 	tests := []struct {
 		name     string
@@ -339,7 +337,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Branch(ctx, dir, "feature", "origin/feature"); err != nil {
 		t.Fatalf("branch failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "branch --set-upstream-to=origin/feature feature origin/feature" {
+	if strings.Join(lastArgs, " ") != "branch --track feature origin/feature" {
 		t.Errorf("unexpected branch args: %v", lastArgs)
 	}
 

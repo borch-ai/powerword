@@ -26,10 +26,14 @@ func setupMockRemote(t *testing.T) string {
 	// Configure git for committing
 	cmd = exec.Command("git", "config", "user.name", "Test User")
 	cmd.Dir = remoteDir
-	_ = cmd.Run()
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to configure user.name: %v", err)
+	}
 	cmd = exec.Command("git", "config", "user.email", "test@example.com")
 	cmd.Dir = remoteDir
-	_ = cmd.Run()
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to configure user.email: %v", err)
+	}
 
 	// Create a dummy file and commit
 	dummyFile := filepath.Join(remoteDir, "README.md")
