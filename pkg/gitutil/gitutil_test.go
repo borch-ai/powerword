@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -309,42 +310,42 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Clone(ctx, "http://repo", dir, "main", 1); err != nil {
 		t.Fatalf("clone failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "clone --branch main --depth 1 --single-branch -- http://repo "+dir {
+	if expected := []string{"clone", "--branch", "main", "--depth", "1", "--single-branch", "--", "http://repo", dir}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected clone args: %v", lastArgs)
 	}
 
 	if err := Fetch(ctx, dir, "main"); err != nil {
 		t.Fatalf("fetch failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "fetch origin main" {
+	if expected := []string{"fetch", "origin", "main"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected fetch args: %v", lastArgs)
 	}
 
 	if err := Checkout(ctx, dir, "feature"); err != nil {
 		t.Fatalf("checkout failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "checkout feature" {
+	if expected := []string{"checkout", "feature"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected checkout args: %v", lastArgs)
 	}
 
 	if err := CheckoutBranch(ctx, dir, "feature", "origin/feature"); err != nil {
 		t.Fatalf("checkout branch failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "checkout -B feature origin/feature" {
+	if expected := []string{"checkout", "-B", "feature", "origin/feature"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected checkout branch args: %v", lastArgs)
 	}
 
 	if err := Branch(ctx, dir, "feature", "origin/feature"); err != nil {
 		t.Fatalf("branch failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "branch --track feature origin/feature" {
+	if expected := []string{"branch", "--track", "feature", "origin/feature"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected branch args: %v", lastArgs)
 	}
 
 	if err := Pull(ctx, dir, ""); err != nil {
 		t.Fatalf("pull failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "pull --ff-only" {
+	if expected := []string{"pull", "--ff-only"}; !reflect.DeepEqual(lastArgs, expected) {
 		t.Errorf("unexpected pull args: %v", lastArgs)
 	}
 
@@ -360,7 +361,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Pull(ctx, dir, "main"); err != nil {
 		t.Fatalf("pull main failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "branch --set-upstream-to=origin/main main" { // the last command executed in Pull
+	if expected := []string{"branch", "--set-upstream-to=origin/main", "main"}; !reflect.DeepEqual(lastArgs, expected) { // the last command executed in Pull
 		t.Errorf("unexpected pull args: %v", lastArgs)
 	}
 }
