@@ -109,7 +109,6 @@ func SubmitToLighthouse(e TelemetryEvent) {
 		adapter := &LighthouseAdapter{
 			URL:    url,
 			APIKey: apiKey,
-			Client: &http.Client{Timeout: 5 * time.Second},
 		}
 
 		if err := adapter.Submit(ctx, e); err != nil {

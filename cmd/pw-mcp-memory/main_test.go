@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/borch-ai/powerword/pkg/llm"
@@ -109,6 +111,30 @@ func TestMemoryAddAndSearch(t *testing.T) {
 	}
 	if results[0].Text != "Jumps over the lazy dog" {
 		t.Errorf("expected 'Jumps over the lazy dog', got %q", results[0].Text)
+	}
+}
+
+func TestMemorySearch_InvalidSimilarity(t *testing.T) {
+	appServer := &Server{}
+	searchFunc := appServer.handleMemorySearch()
+
+	for _, invalidSim := range []float64{-0.1, 1.1} {
+		req := &mcp.CallToolRequest{
+			Params: &mcp.CallToolParamsRaw{
+				Arguments: json.RawMessage(fmt.Sprintf(`{"query":"test","min_similarity":%f}`, invalidSim)),
+			},
+		}
+		res, err := searchFunc(context.Background(), req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !res.IsError {
+			t.Errorf("expected error for min_similarity %f, got none", invalidSim)
+		}
+		text := res.Content[0].(*mcp.TextContent).Text
+		if !strings.Contains(text, "min_similarity must be between 0.0 and 1.0") {
+			t.Errorf("expected error message to mention range, got %q", text)
+		}
 	}
 }
 

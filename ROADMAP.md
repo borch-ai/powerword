@@ -289,7 +289,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
     *   Enhance `pkg/llm` in Powerword to support first-class structured/schema constraints (e.g., OpenAI Structured Outputs and Gemini response schema). Provide standard option builders and type-safe translations in all client adapters.
     *   [Implementation Plan](plans/phase_6/task_6_17_llm_structured_outputs.md)
 *   [x] **Task 6.18: Speculative — Pithos Pipeline MCP Server (`pw-mcp-pithos`)**
-    *   Wrap the Pithos book production pipeline behind a formal MCP server, enabling Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration). Not to be built until Pithos `deploy` is fully implemented.
+    *   Wrap the Pithos book production pipeline behind a formal MCP server, enabling Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration).
     *   [Implementation Plan](plans/phase_6/task_6_18_pithos_mcp_server.md)
 *   [x] **Task 6.19: Market Intelligence Plugin (`pw-mcp-trends`)**
     *   Implement a native Go MCP server wrapping Amazon Autocomplete (free, unauthenticated) and SerpAPI Google Trends to return ranked niche keyword candidates with demand velocity scores. Primary consumer: the Kiln `scout` engine. Defines the `TrendSource` interface so additional backends (Reddit, TikTok) can be injected without changing the MCP surface.

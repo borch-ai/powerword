@@ -207,10 +207,11 @@ func (s *Server) handleMemorySearch() func(context.Context, *mcp.CallToolRequest
 		if args.Limit <= 0 {
 			args.Limit = 5
 		}
-		if args.MinSimilarity < 0.0 {
-			args.MinSimilarity = 0.0
-		} else if args.MinSimilarity > 1.0 {
-			args.MinSimilarity = 1.0
+		if args.MinSimilarity < 0.0 || args.MinSimilarity > 1.0 {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "min_similarity must be between 0.0 and 1.0"}},
+			}, nil
 		}
 
 		embeddings, err := s.client.Embed(ctx, []string{args.Query})
