@@ -311,7 +311,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if err := Clone(ctx, "http://repo", dir, "main", 1); err != nil {
 		t.Fatalf("clone failed: %v", err)
 	}
-	if strings.Join(lastArgs, " ") != "clone --branch main --depth 1 --single-branch -- http://repo " + dir {
+	if strings.Join(lastArgs, " ") != "clone --branch main --depth 1 --single-branch -- http://repo "+dir {
 		t.Errorf("unexpected clone args: %v", lastArgs)
 	}
 
@@ -357,7 +357,7 @@ func TestGitUtil_LifecycleCommands(t *testing.T) {
 	if len(branches) == 0 {
 		t.Errorf("unexpected branch list: %v", branches)
 	}
-    
+
 	// Test specific branch pull
 	if err := Pull(ctx, dir, "main"); err != nil {
 		t.Fatalf("pull main failed: %v", err)

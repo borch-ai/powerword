@@ -27,7 +27,8 @@ func setupCmdEnv(cmd *exec.Cmd) {
 			filtered = append(filtered, env)
 		}
 	}
-	cmd.Env = append(filtered, "GIT_TERMINAL_PROMPT=0")
+	filtered = append(filtered, "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = filtered
 }
 
 var credentialRegex = regexp.MustCompile(`(https?://)([^@\s]+)(@)`)
