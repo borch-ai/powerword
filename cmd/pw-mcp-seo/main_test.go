@@ -40,6 +40,10 @@ func (m *mockLLM) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"mock"}, nil
 }
 
+func (m *mockLLM) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, nil
+}
+
 func assertResponse(t *testing.T, res *mcp.CallToolResult, wantError bool, wantSubstr string) {
 	t.Helper()
 	if res.IsError != wantError {

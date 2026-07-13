@@ -38,6 +38,10 @@ func (m *mockLLM) ListModels(ctx context.Context) ([]string, error) {
 	return []string{"mock"}, nil
 }
 
+func (m *mockLLM) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, nil
+}
+
 func TestFetchSuggestions(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	called := 0

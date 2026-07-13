@@ -1,9 +1,9 @@
 # plan: Task 3.24: Local Semantic Memory Plugin (`pw-mcp-memory`)
 
-**Status:** Open
-**Go Version:** 1.26.4
-**Date Completed:** —
-**Unit Test Coverage:** —
+**Status:** Completed
+**Go Version:** 1.26.5
+**Date Completed:** 2026-07-07
+**Unit Test Coverage:** 91.10%
 
 ## Goal Description
 
@@ -22,6 +22,18 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-memory` exposing s
 
 ## Proposed Changes
 
+### Sibling: Powerword (`pkg/llm`)
+
+#### [MODIFY] [client.go](file://../../pkg/llm/client.go)
+* Add `Embed(ctx context.Context, texts []string) ([][]float32, error)` to `LLMClient` interface.
+#### [MODIFY] [gemini.go](file://../../pkg/llm/gemini.go)
+* Implement `Embed` using `text-embedding-004`.
+#### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
+* Implement `Embed` using `text-embedding-3-small`.
+#### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
+* Implement `Embed` (returns error as Anthropic does not support generic embeddings here).
+
+
 ### Sibling: Powerword (`cmd/pw-mcp-memory`)
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-memory/main.go)
@@ -29,10 +41,14 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-memory` exposing s
 * Implements tools:
   * `memory_add`:
     * Arguments: `text`, `tags` (optional slice of strings).
-    * Implementation: Calls LLM embedding endpoint, computes vector, and persists the payload (text, tags, vector, timestamp) to a local JSON/SQLite file in `~/.local/share/powerword/memory.db`.
+    * Implementation: Calls LLM embedding endpoint, computes vector, and persists the payload (text, tags, vector, timestamp) to a local JSON file in `~/.local/share/powerword/memory.json`.
   * `memory_search`:
     * Arguments: `query`, `limit` (int), `min_similarity` (float).
     * Implementation: Generates embedding for query, computes cosine similarity against all stored vector embeddings, and returns the top matches sorted by similarity score.
+
+#### [NEW] [main_integration_test.go](file://../../cmd/pw-mcp-memory/main_integration_test.go)
+* Runs an integration test using the MCP StdioTransport to ensure tools are properly exposed.
+
 
 ---
 

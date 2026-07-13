@@ -280,6 +280,10 @@ func (m *mockLLMClientMulti) ListModels(ctx context.Context) ([]string, error) {
 	return nil, nil
 }
 
+func (m *mockLLMClientMulti) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, nil
+}
+
 func TestRunReActLoop_GenerateErrorPreservesHistory_MultipleTurns(t *testing.T) {
 	mockClient := &mockLLMClientMulti{
 		genErr: errors.New("second turn generation failed"),

@@ -44,6 +44,10 @@ func (m *mockLLMClient) ListModels(ctx context.Context) ([]string, error) {
 	return nil, nil
 }
 
+func (m *mockLLMClient) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, nil
+}
+
 func TestRunLoop_Success(t *testing.T) {
 	oldNewClient := newClient
 	defer func() { newClient = oldNewClient }()

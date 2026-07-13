@@ -590,3 +590,79 @@ func TestGeminiClient_Generate_WithResponseSchema_Error(t *testing.T) {
 		t.Fatal("expected error for unsupported schema type, got nil")
 	}
 }
+
+func TestGeminiClient_Embed(t *testing.T) {
+	client := &GeminiClient{}
+	res, err := client.Embed(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res != nil {
+		t.Fatalf("expected nil result")
+	}
+}
+
+func TestGeminiClient_Embed_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"embeddings": []map[string]any{
+				{
+					"values": []float32{0.1, 0.2, 0.3},
+				},
+				{
+					"values": []float32{0.4, 0.5, 0.6},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("text-embedding-004", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := client.Embed(context.Background(), []string{"test1", "test2"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res) != 2 {
+		t.Fatalf("expected 2 embeddings, got %d", len(res))
+	}
+	if len(res[0]) != 3 || res[0][0] != 0.1 || res[0][1] != 0.2 || res[0][2] != 0.3 {
+		t.Errorf("unexpected embedding 0: %v", res[0])
+	}
+	if len(res[1]) != 3 || res[1][0] != 0.4 || res[1][1] != 0.5 || res[1][2] != 0.6 {
+		t.Errorf("unexpected embedding 1: %v", res[1])
+	}
+}
+
+func TestGeminiClient_Embed_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"Invalid request"}}`))
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("text-embedding-004", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.Embed(context.Background(), []string{"test"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}

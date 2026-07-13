@@ -26,6 +26,10 @@ func (m *mockClassifierClient) ListModels(ctx context.Context) ([]string, error)
 	return nil, nil
 }
 
+func (m *mockClassifierClient) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, nil
+}
+
 var routerTestCases = []struct {
 	name           string
 	cfg            *config.Config

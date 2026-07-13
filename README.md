@@ -1,5 +1,9 @@
 # Powerword
 
+<p align="center">
+  <img src="assets/logo.png" width="400" alt="Powerword Logo">
+</p>
+
 **Powerword** is a vendor-agnostic Agentic CLI written in Go. It acts as an intelligent shim that orchestrates communication between multiple Large Language Models (LLMs) and a decentralized ecosystem of tools utilizing the open Model Context Protocol (MCP).
 
 ## Overview

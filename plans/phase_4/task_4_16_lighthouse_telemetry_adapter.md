@@ -2,7 +2,7 @@
 
 **Status:** Completed
 **Date Completed:** 2026-07-07
-**Go Version:** 1.26.4
+**Go Version:** 1.26.5
 **Unit Test Coverage:** 91.3%
 
 Extend `pkg/telemetry` with an optional HTTP adapter that submits session execution metrics to a Lighthouse `POST /api/telemetry` endpoint on command exit. All sibling tools (Pithos, Aeolian, Kiln) that import `pkg/telemetry` get this capability for free once merged.
