@@ -17,10 +17,17 @@ func setupMockRemote(t *testing.T) string {
 	remoteDir := t.TempDir()
 
 	// Initialize git repo
-	cmd := exec.Command("git", "init", "--initial-branch=main")
+	cmd := exec.Command("git", "init")
 	cmd.Dir = remoteDir
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("failed to init remote repo: %v", err)
+	}
+
+	cmd = exec.Command("git", "checkout", "-b", "main")
+	cmd.Dir = remoteDir
+	if err := cmd.Run(); err != nil {
+		// Ignore checkout error here as older git versions might fail on an empty repo.
+		// If it fails, the default branch (e.g. master) will be used, which we can rename after the first commit.
 	}
 
 	// Configure git for committing
@@ -58,6 +65,11 @@ func setupMockRemote(t *testing.T) string {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("failed to commit: %v", err)
 	}
+
+	// Rename branch to main (in case older git versions defaulted to master)
+	cmd = exec.Command("git", "branch", "-m", "main")
+	cmd.Dir = remoteDir
+	_ = cmd.Run()
 
 	return remoteDir
 }

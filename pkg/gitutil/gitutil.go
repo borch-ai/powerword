@@ -83,6 +83,12 @@ func RunGitCommand(ctx context.Context, dir string, args ...string) (string, err
 
 // Clone clones a repository into the specified directory.
 func Clone(ctx context.Context, url, dir, branch string, depth int) error {
+	if url == "" {
+		return fmt.Errorf("clone url cannot be empty")
+	}
+	if dir == "" {
+		return fmt.Errorf("clone directory cannot be empty")
+	}
 	args := []string{"clone"}
 	if branch != "" {
 		args = append(args, "--branch", branch)
@@ -126,6 +132,9 @@ func CheckoutBranch(ctx context.Context, dir, branch, startPoint string) error {
 	if strings.HasPrefix(branch, "-") {
 		return fmt.Errorf("invalid branch name: cannot start with '-'")
 	}
+	if startPoint != "" && strings.HasPrefix(startPoint, "-") {
+		return fmt.Errorf("invalid start point: cannot start with '-'")
+	}
 	args := []string{"checkout", "-B", branch}
 	if startPoint != "" {
 		args = append(args, startPoint)
@@ -141,6 +150,9 @@ func Branch(ctx context.Context, dir, branch, startPoint string) error {
 	}
 	if strings.HasPrefix(branch, "-") {
 		return fmt.Errorf("invalid branch name: cannot start with '-'")
+	}
+	if startPoint != "" && strings.HasPrefix(startPoint, "-") {
+		return fmt.Errorf("invalid start point: cannot start with '-'")
 	}
 	args := []string{"branch"}
 	if startPoint != "" {
