@@ -157,7 +157,10 @@ func Branch(ctx context.Context, dir, branch, startPoint string) error {
 	return err
 }
 
-// Pull fetches and integrates changes. If branch is not empty, it acts like Daedalus's Pull with specific branch handling.
+// Pull fetches and integrates changes. If branch is not empty, it acts like Daedalus's Pull:
+// it force-resets the local branch to the remote state (origin/<branch>) using checkout -B,
+// which is destructive to local unpushed commits, and then sets the upstream tracking.
+// If branch is empty, it performs a non-destructive fast-forward pull.
 func Pull(ctx context.Context, dir, branch string) error {
 	if branch != "" {
 		if err := Fetch(ctx, dir, branch); err != nil {
