@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -221,13 +222,8 @@ func TestGitUtil_MockedErrors(t *testing.T) {
 }
 
 func TestGitUtil_GitBinaryNotFound(t *testing.T) {
-	origPath := os.Getenv("PATH")
-	defer func() {
-		_ = os.Setenv("PATH", origPath)
-	}()
-
 	// Temporarily break PATH so git cannot be found
-	_ = os.Setenv("PATH", "")
+	t.Setenv("PATH", "")
 
 	ctx := context.Background()
 	_, err := RunGitCommand(ctx, t.TempDir(), "status")
@@ -257,6 +253,111 @@ func TestGitUtil_MockedLookPath(t *testing.T) {
 	_, err := RunGitCommand(ctx, t.TempDir(), "status")
 	if err != nil {
 		t.Errorf("expected success with mocked LookPath, got: %v", err)
+	}
+}
+
+func TestSanitizeGitOutput(t *testing.T) {
+	t.Setenv("DAEDALUS_GITHUB_TOKEN", "super-secret-token")
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "basic auth token",
+			input:    "fatal: could not read Password for 'https://x-access-token:ghs_1234@github.com': terminal prompts disabled",
+			expected: "fatal: could not read Password for 'https://[REDACTED]@github.com': terminal prompts disabled",
+		},
+		{
+			name:     "environment variable token",
+			input:    "failed with token super-secret-token",
+			expected: "failed with token [REDACTED]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SanitizeGitOutput([]byte(tt.input))
+			if got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestGitUtil_LifecycleCommands(t *testing.T) {
+	origExec := ExecCommand
+	defer func() { ExecCommand = origExec }()
+
+	var lastArgs []string
+	ExecCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		lastArgs = args
+		//nolint:gosec
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess")
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "HELPER_EXIT_CODE=0", "HELPER_STDOUT=master\nfeature\n")
+		return cmd
+	}
+
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	if err := Clone(ctx, "http://repo", dir, "main", 1); err != nil {
+		t.Fatalf("clone failed: %v", err)
+	}
+	if expected := []string{"clone", "--branch", "main", "--depth", "1", "--single-branch", "--", "http://repo", dir}; !reflect.DeepEqual(lastArgs, expected) {
+		t.Errorf("unexpected clone args: %v", lastArgs)
+	}
+
+	if err := Fetch(ctx, dir, "main"); err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if expected := []string{"fetch", "--", "origin", "main"}; !reflect.DeepEqual(lastArgs, expected) {
+		t.Errorf("unexpected fetch args: %v", lastArgs)
+	}
+
+	if err := Checkout(ctx, dir, "feature"); err != nil {
+		t.Fatalf("checkout failed: %v", err)
+	}
+	if expected := []string{"checkout", "feature"}; !reflect.DeepEqual(lastArgs, expected) {
+		t.Errorf("unexpected checkout args: %v", lastArgs)
+	}
+
+	if err := CheckoutBranch(ctx, dir, "feature", "origin/feature"); err != nil {
+		t.Fatalf("checkout branch failed: %v", err)
+	}
+	if expected := []string{"checkout", "-B", "feature", "origin/feature"}; !reflect.DeepEqual(lastArgs, expected) {
+		t.Errorf("unexpected checkout branch args: %v", lastArgs)
+	}
+
+	if err := Branch(ctx, dir, "feature", "origin/feature"); err != nil {
+		t.Fatalf("branch failed: %v", err)
+	}
+	if expected := []string{"branch", "--track", "--", "feature", "origin/feature"}; !reflect.DeepEqual(lastArgs, expected) {
+		t.Errorf("unexpected branch args: %v", lastArgs)
+	}
+
+	if err := Pull(ctx, dir, ""); err != nil {
+		t.Fatalf("pull failed: %v", err)
+	}
+	if expected := []string{"pull", "--ff-only"}; !reflect.DeepEqual(lastArgs, expected) {
+		t.Errorf("unexpected pull args: %v", lastArgs)
+	}
+
+	branches, err := BranchList(ctx, dir)
+	if err != nil {
+		t.Fatalf("branchlist failed: %v", err)
+	}
+	if len(branches) == 0 {
+		t.Errorf("unexpected branch list: %v", branches)
+	}
+
+	// Test specific branch pull
+	if err := Pull(ctx, dir, "main"); err != nil {
+		t.Fatalf("pull main failed: %v", err)
+	}
+	if expected := []string{"branch", "--set-upstream-to=origin/main", "--", "main"}; !reflect.DeepEqual(lastArgs, expected) { // the last command executed in Pull
+		t.Errorf("unexpected pull args: %v", lastArgs)
 	}
 }
 
