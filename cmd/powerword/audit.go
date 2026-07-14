@@ -118,6 +118,7 @@ func findMissingPricingModels(tracker *telemetry.UsageTracker, pricing map[strin
 			missing = append(missing, modelName)
 		}
 	}
+	sort.Strings(missing)
 	return missing
 }
 

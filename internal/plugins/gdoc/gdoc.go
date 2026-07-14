@@ -15,11 +15,10 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/docs/v1"
-	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 )
 
-// GDocService provides operations on Google Docs and Google Drive.
+// GDocService provides operations on Google Docs.
 type GDocService struct {
 	cfg        *config.Config
 	httpClient *http.Client
@@ -36,15 +35,15 @@ func NewGDocService(cfg *config.Config, httpClient *http.Client) *GDocService {
 	}
 }
 
-// getClient instantiates and returns Docs and Drive API clients.
-func (s *GDocService) getClient(ctx context.Context) (*docs.Service, *drive.Service, error) {
+// getClient instantiates and returns Docs API client.
+func (s *GDocService) getClient(ctx context.Context) (*docs.Service, error) {
 	var client *http.Client
 	if s.httpClient != nil {
 		client = s.httpClient
 	} else {
 		c, err := s.authorize(ctx)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		client = c
 	}
@@ -56,15 +55,10 @@ func (s *GDocService) getClient(ctx context.Context) (*docs.Service, *drive.Serv
 
 	docsSvc, err := docs.NewService(ctx, opts...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Docs service: %w", err)
+		return nil, fmt.Errorf("failed to create Docs service: %w", err)
 	}
 
-	driveSvc, err := drive.NewService(ctx, opts...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create Drive service: %w", err)
-	}
-
-	return docsSvc, driveSvc, nil
+	return docsSvc, nil
 }
 
 // authorize resolves and configures the HTTP client based on the available credentials.
@@ -95,7 +89,7 @@ func (s *GDocService) authorize(ctx context.Context) (*http.Client, error) {
 	}
 
 	// 3. Fallback to Application Default Credentials (ADC)
-	creds, err := google.FindDefaultCredentials(ctx, docs.DocumentsScope, drive.DriveScope)
+	creds, err := google.FindDefaultCredentials(ctx, docs.DocumentsScope)
 	if err == nil {
 		return oauth2.NewClient(ctx, creds.TokenSource), nil
 	}
@@ -108,7 +102,7 @@ func (s *GDocService) authorizeServiceAccount(ctx context.Context, saPath string
 	if err != nil {
 		return nil, err
 	}
-	creds, err := google.CredentialsFromJSONWithType(ctx, data, google.ServiceAccount, docs.DocumentsScope, drive.DriveScope)
+	creds, err := google.CredentialsFromJSONWithType(ctx, data, google.ServiceAccount, docs.DocumentsScope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse service account JSON: %w", err)
 	}
@@ -120,7 +114,7 @@ func (s *GDocService) authorizeUserOAuth(ctx context.Context, credPath, tokenPat
 	if err != nil {
 		return nil, err
 	}
-	conf, err := google.ConfigFromJSON(data, docs.DocumentsScope, drive.DriveScope)
+	conf, err := google.ConfigFromJSON(data, docs.DocumentsScope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse client configuration: %w", err)
 	}
@@ -175,7 +169,7 @@ func (s *GDocService) CreateDocument(ctx context.Context, title string, content 
 		return "", "", errors.New("document title is required")
 	}
 
-	docsSvc, _, err := s.getClient(ctx)
+	docsSvc, err := s.getClient(ctx)
 	if err != nil {
 		return "", "", err
 	}
@@ -212,7 +206,7 @@ func (s *GDocService) ReadDocumentText(ctx context.Context, docID string) (strin
 		return "", errors.New("document_id is required")
 	}
 
-	docsSvc, _, err := s.getClient(ctx)
+	docsSvc, err := s.getClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -246,7 +240,7 @@ func (s *GDocService) UpdateDocumentText(ctx context.Context, docID string, cont
 		return errors.New("document_id is required")
 	}
 
-	docsSvc, _, err := s.getClient(ctx)
+	docsSvc, err := s.getClient(ctx)
 	if err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func TestGDocService_GetClient_MissingCredentials(t *testing.T) {
 	cfg := &config.Config{} // no credentials
 	svc := NewGDocService(cfg, nil)
 
-	_, _, err := svc.getClient(context.Background())
+	_, err := svc.getClient(context.Background())
 	if err == nil {
 		t.Fatal("expected error due to missing credentials, got nil")
 	}
@@ -251,12 +251,12 @@ func TestGDocService_Authorize_ServiceAccount(t *testing.T) {
 	}
 
 	svc := NewGDocService(cfg, nil)
-	docsSvc, driveSvc, err := svc.getClient(context.Background())
+	docsSvc, err := svc.getClient(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if docsSvc == nil || driveSvc == nil {
-		t.Error("expected service clients to be non-nil")
+	if docsSvc == nil {
+		t.Error("expected service client to be non-nil")
 	}
 }
 
@@ -318,12 +318,12 @@ func TestGDocService_Authorize_OAuthUserFlow(t *testing.T) {
 
 	svc := NewGDocService(cfg, nil)
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, mockClient)
-	docsSvc, driveSvc, err := svc.getClient(ctx)
+	docsSvc, err := svc.getClient(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if docsSvc == nil || driveSvc == nil {
-		t.Error("expected service clients to be non-nil")
+	if docsSvc == nil {
+		t.Error("expected service client to be non-nil")
 	}
 
 	updatedTok, err := readTokenFile(tokenFile)
@@ -665,12 +665,12 @@ func TestGDocService_Authorize_OAuthUserFlow_TokenNotChanged(t *testing.T) {
 
 	svc := NewGDocService(cfg, nil)
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, mockClient)
-	docsSvc, driveSvc, err := svc.getClient(ctx)
+	docsSvc, err := svc.getClient(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if docsSvc == nil || driveSvc == nil {
-		t.Error("expected service clients to be non-nil")
+	if docsSvc == nil {
+		t.Error("expected service client to be non-nil")
 	}
 
 	// Check that the token file was NOT overwritten (token unchanged)

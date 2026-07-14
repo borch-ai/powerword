@@ -22,7 +22,6 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/docs/v1"
-	"google.golang.org/api/drive/v3"
 
 	"github.com/borch-ai/powerword/internal/plugins/gdoc"
 	"github.com/borch-ai/powerword/pkg/config"
@@ -286,7 +285,7 @@ func runAuthFlow(cfg *config.Config) error {
 		return fmt.Errorf("failed to read credentials file: %w", err)
 	}
 
-	conf, err := google.ConfigFromJSON(data, docs.DocumentsScope, drive.DriveScope)
+	conf, err := google.ConfigFromJSON(data, docs.DocumentsScope)
 	if err != nil {
 		return fmt.Errorf("failed to parse client configuration: %w", err)
 	}
