@@ -61,7 +61,7 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 
 	var totalCost float64
 	for model, usage := range u.ModelUsages {
-		p := getPricingForModel(model, pricing)
+		p := GetPricingForModel(model, pricing)
 		if p == nil {
 			continue
 		}
@@ -79,7 +79,7 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 	return totalCost
 }
 
-func getPricingForModel(model string, pricing map[string]ModelPricing) *ModelPricing {
+func GetPricingForModel(model string, pricing map[string]ModelPricing) *ModelPricing {
 	if p, ok := pricing[model]; ok {
 		return &p
 	}
@@ -117,19 +117,19 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 
 	var hasMissingPricing bool
 	for model := range u.ModelUsages {
-		if getPricingForModel(model, pricing) == nil {
+		if GetPricingForModel(model, pricing) == nil {
 			hasMissingPricing = true
 			break
 		}
 	}
 
-	sb.WriteString(formatCostSummary(cost, hasMissingPricing, len(pricing), total))
+	sb.WriteString(formatCostSummary(cost, hasMissingPricing, total))
 	fmt.Fprintf(&sb, "- Turns: %d\n", u.Turns)
 
 	return sb.String()
 }
 
-func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, total int) string {
+func formatCostSummary(cost float64, hasMissingPricing bool, total int) string {
 	if total == 0 {
 		return ""
 	}

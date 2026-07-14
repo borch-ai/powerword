@@ -118,7 +118,7 @@ func getActivePricing() map[string]telemetry.ModelPricing {
 func findMissingPricingModels(tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing) []string {
 	var missing []string
 	for modelName := range tracker.ModelUsages {
-		if getModelPricing(modelName, pricing) == nil {
+		if telemetry.GetPricingForModel(modelName, pricing) == nil {
 			missing = append(missing, modelName)
 		}
 	}
@@ -134,26 +134,6 @@ func getBudgetStatus(cost float64, limit float64, missingPricingModels []string)
 		return "⚠️ Missing Pricing (Budget Incomplete)"
 	}
 	return "✅ Within Budget"
-}
-
-func getModelPricing(modelName string, pricing map[string]telemetry.ModelPricing) *telemetry.ModelPricing {
-	if p, ok := pricing[modelName]; ok {
-		return &p
-	}
-	// Simple prefix matching
-	var bestPrefix string
-	for prefix := range pricing {
-		if len(prefix) > 0 && len(modelName) >= len(prefix) && modelName[:len(prefix)] == prefix {
-			if len(prefix) > len(bestPrefix) {
-				bestPrefix = prefix
-			}
-		}
-	}
-	if bestPrefix != "" {
-		p := pricing[bestPrefix]
-		return &p
-	}
-	return nil
 }
 
 func calculateModelCost(usage *telemetry.ModelUsage, mPricing *telemetry.ModelPricing) float64 {
@@ -186,7 +166,7 @@ func renderMarkdownAudit(cmd *cobra.Command, tracker *telemetry.UsageTracker, pr
 	var totalInput, totalOutput, totalCached int
 	for _, modelName := range modelNames {
 		usage := tracker.ModelUsages[modelName]
-		mPricing := getModelPricing(modelName, pricing)
+		mPricing := telemetry.GetPricingForModel(modelName, pricing)
 		if mPricing == nil {
 			cmd.Printf("| `%s` | %d | %d | %d | N/A |\n", modelName, usage.InputTokens, usage.OutputTokens, usage.CachedTokens)
 		} else {
