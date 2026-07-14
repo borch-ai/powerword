@@ -26,17 +26,14 @@ func TestAmazonService_MockMode(t *testing.T) {
 	}
 }
 
-func TestAmazonService_EmptyKeyMockMode(t *testing.T) {
+func TestAmazonService_EmptyKeyError(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Plugins.Amazon.APIKey = ""
 
 	svc := amazon.NewAmazonService(cfg, nil)
-	count, err := svc.GetListingCount(context.Background(), "test")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if count != 4200 {
-		t.Errorf("expected 4200, got %d", count)
+	_, err := svc.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error due to empty api key, got nil")
 	}
 }
 
@@ -56,6 +53,18 @@ func TestAmazonService_InvalidBaseURL(t *testing.T) {
 	_, err := svc.GetListingCount(context.Background(), "test")
 	if err == nil {
 		t.Error("expected error due to invalid base URL, got nil")
+	}
+}
+
+func TestAmazonService_BaseURLMissingScheme(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Plugins.Amazon.APIKey = "real-key"
+	cfg.Plugins.Amazon.BaseURL = "api.scaleserp.com" // missing http/https scheme
+
+	svc := amazon.NewAmazonService(cfg, nil)
+	_, err := svc.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error due to missing base URL scheme, got nil")
 	}
 }
 

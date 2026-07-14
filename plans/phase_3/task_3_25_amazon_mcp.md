@@ -38,7 +38,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a
   api_key = ""
   ```
 
-#### [MODIFY] [powerword.toml](file://../../powerword.toml)
+#### [MODIFY] [powerword.toml](file://../../powerword.toml) (workspace-local, uncommitted)
 - Register the compiled binary server path:
   ```toml
   [servers.amazon]

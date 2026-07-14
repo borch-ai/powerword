@@ -29,6 +29,7 @@ token_path = "~/.config/powerword/gdoc_token.json"
    args = ["run", "./cmd/pw-mcp-amazon"]
 
 [plugins.amazon]
+# rainforest or scaleserp api key. Set to "mock" for local offline testing (returns 4200).
 api_key = ""
 base_url = "" # Optional. Defaults to https://api.scaleserp.com
 

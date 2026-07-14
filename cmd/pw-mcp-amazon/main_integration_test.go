@@ -51,6 +51,16 @@ func TestMCP_AmazonPlugin_StdoutStdin(t *testing.T) {
 	}
 	defer os.RemoveAll(workspaceDir)
 
+	// Write mock config file
+	cfgContent := `
+[plugins.amazon]
+api_key = "mock"
+`
+	err = os.WriteFile(filepath.Join(workspaceDir, "powerword.toml"), []byte(cfgContent), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Setup server config
 	srvCfg := config.ServerConfig{
 		Command: amazonPluginPath,

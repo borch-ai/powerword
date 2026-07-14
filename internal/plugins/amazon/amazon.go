@@ -3,6 +3,7 @@ package amazon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,9 +37,12 @@ func NewAmazonService(cfg *config.Config, client *http.Client) *AmazonService {
 // GetListingCount queries the commercial API for the search result count.
 func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (int, error) {
 	apiKey := as.cfg.Plugins.Amazon.APIKey
-	if apiKey == "mock" || apiKey == "" {
-		// Mock fallback count for local dry-runs and tests when no key is set.
+	if apiKey == "mock" {
+		// Mock fallback count for local dry-runs and tests when explicit mock is set.
 		return 4200, nil
+	}
+	if apiKey == "" {
+		return 0, errors.New("amazon api key is required (set to 'mock' for local offline testing)")
 	}
 
 	baseURL := as.cfg.Plugins.Amazon.BaseURL
@@ -46,9 +50,17 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 		baseURL = "https://api.scaleserp.com"
 	}
 
-	u, err := url.Parse(baseURL + "/search")
+	parsedBase, err := url.Parse(baseURL)
 	if err != nil {
 		return 0, fmt.Errorf("invalid base url: %w", err)
+	}
+	if parsedBase.Scheme != "http" && parsedBase.Scheme != "https" {
+		return 0, fmt.Errorf("invalid base url scheme %q: must be http or https", parsedBase.Scheme)
+	}
+
+	u, err := url.Parse(baseURL + "/search")
+	if err != nil {
+		return 0, fmt.Errorf("invalid base url search path: %w", err)
 	}
 
 	q := u.Query()
