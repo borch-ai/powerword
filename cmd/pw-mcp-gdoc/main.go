@@ -291,8 +291,6 @@ func runAuthFlow(cfg *config.Config) error {
 		return fmt.Errorf("failed to parse client configuration: %w", err)
 	}
 
-	conf.RedirectURL = "http://localhost:8080/callback"
-
 	stateBytes := make([]byte, 16)
 	if _, randErr := rand.Read(stateBytes); randErr != nil {
 		stateBytes = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
@@ -300,17 +298,19 @@ func runAuthFlow(cfg *config.Config) error {
 	stateToken := hex.EncodeToString(stateBytes)
 
 	codeChan := make(chan string, 1)
-	server, err := startCallbackServer(stateToken, codeChan)
+	server, redirectURL, err := startCallbackServer(stateToken, codeChan)
 	if err != nil {
 		return err
 	}
+
+	conf.RedirectURL = redirectURL
 
 	authURL := conf.AuthCodeURL(stateToken, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 	fmt.Printf("Go to the following link in your browser to authorize:\n\n%s\n\n", authURL)
 
 	openBrowser(authURL)
 
-	fmt.Println("Waiting for authorization code from browser callback on http://localhost:8080/callback...")
+	fmt.Printf("Waiting for authorization code from browser callback on %s...\n", redirectURL)
 	var code string
 	select {
 	case code = <-codeChan:
@@ -334,7 +334,7 @@ func runAuthFlow(cfg *config.Config) error {
 	return nil
 }
 
-func startCallbackServer(stateToken string, codeChan chan<- string) (*http.Server, error) {
+func startCallbackServer(stateToken string, codeChan chan<- string) (*http.Server, string, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		state := r.URL.Query().Get("state")
@@ -356,16 +356,19 @@ func startCallbackServer(stateToken string, codeChan chan<- string) (*http.Serve
 	})
 
 	server := &http.Server{
-		Addr:              "127.0.0.1:8080",
 		Handler:           mux,
 		ReadHeaderTimeout: 3 * time.Second,
 	}
 
 	var lc net.ListenConfig
-	ln, err := lc.Listen(context.Background(), "tcp", server.Addr)
+	// Bind to port 0 to dynamically allocate an ephemeral port, preventing port collision
+	ln, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, fmt.Errorf("failed to start local callback server: %w", err)
+		return nil, "", fmt.Errorf("failed to start local callback server: %w", err)
 	}
+
+	port := ln.Addr().(*net.TCPAddr).Port
+	redirectURL := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
 	go func() {
 		if srvErr := server.Serve(ln); srvErr != nil && srvErr != http.ErrServerClosed {
@@ -373,7 +376,7 @@ func startCallbackServer(stateToken string, codeChan chan<- string) (*http.Serve
 		}
 	}()
 
-	return server, nil
+	return server, redirectURL, nil
 }
 
 //nolint:gosec // G204: command name is constant ("open" or "xdg-open") and URL parameter is pre-validated in openBrowser

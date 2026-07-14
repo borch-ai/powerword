@@ -369,17 +369,16 @@ func TestGDoc_Main_StartCallbackServer(t *testing.T) {
 	stateToken := "test-state-token"
 	codeChan := make(chan string, 1)
 
-	server, err := startCallbackServer(stateToken, codeChan)
+	server, redirectURL, err := startCallbackServer(stateToken, codeChan)
 	if err != nil {
-		t.Skip("skipping callback server test because port 8080 is already in use:", err)
-		return
+		t.Fatalf("failed to start callback server: %v", err)
 	}
 	defer func() {
 		_ = server.Shutdown(context.Background())
 	}()
 
 	// 1. Success case: hit the callback endpoint with matching state and code
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:8080/callback?state=test-state-token&code=auth-code-123", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, redirectURL+"?state=test-state-token&code=auth-code-123", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
@@ -405,7 +404,7 @@ func TestGDoc_Main_StartCallbackServer(t *testing.T) {
 	}
 
 	// 2. State mismatch case
-	req2, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:8080/callback?state=bad-state&code=auth-code-123", nil)
+	req2, err := http.NewRequestWithContext(context.Background(), http.MethodGet, redirectURL+"?state=bad-state&code=auth-code-123", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
