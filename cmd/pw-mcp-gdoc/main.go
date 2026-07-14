@@ -351,6 +351,7 @@ func startCallbackServer(stateToken string, codeChan chan<- string) (*http.Serve
 			default:
 			}
 		} else {
+			w.WriteHeader(http.StatusBadRequest)
 			_, _ = fmt.Fprintln(w, "Authentication failed: code parameter not found.")
 		}
 	})

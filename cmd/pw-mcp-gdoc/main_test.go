@@ -419,4 +419,21 @@ func TestGDoc_Main_StartCallbackServer(t *testing.T) {
 	if resp2.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status BadRequest for state mismatch, got %v", resp2.Status)
 	}
+
+	// 3. Missing code case
+	req3, err := http.NewRequestWithContext(context.Background(), http.MethodGet, redirectURL+"?state=test-state-token", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	resp3, err := http.DefaultClient.Do(req3)
+	if err != nil {
+		t.Fatalf("failed to make HTTP request to callback server: %v", err)
+	}
+	defer func() {
+		_ = resp3.Body.Close()
+	}()
+
+	if resp3.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status BadRequest for missing code, got %v", resp3.Status)
+	}
 }
