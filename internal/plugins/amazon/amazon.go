@@ -90,8 +90,12 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return 0, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		bodyStr := string(bodyBytes)
+		if apiKey != "" {
+			bodyStr = strings.ReplaceAll(bodyStr, apiKey, "REDACTED")
+		}
+		return 0, fmt.Errorf("api returned status %d: %s", resp.StatusCode, bodyStr)
 	}
 
 	var payload struct {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/borch-ai/powerword/internal/plugins/amazon"
@@ -107,7 +108,7 @@ func TestAmazonService_ClientDoError(t *testing.T) {
 func TestAmazonService_Non200Status(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte("Unauthorized access"))
+		_, _ = w.Write([]byte("Unauthorized access using key real-key"))
 	}))
 	defer srv.Close()
 
@@ -118,7 +119,13 @@ func TestAmazonService_Non200Status(t *testing.T) {
 	svc := amazon.NewAmazonService(cfg, nil)
 	_, err := svc.GetListingCount(context.Background(), "test")
 	if err == nil {
-		t.Error("expected error for non-200 status, got nil")
+		t.Fatal("expected error for non-200 status, got nil")
+	}
+	if strings.Contains(err.Error(), "real-key") {
+		t.Errorf("expected API key to be redacted from error message, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "REDACTED") {
+		t.Errorf("expected error message to contain 'REDACTED', got: %v", err)
 	}
 }
 

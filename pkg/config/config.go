@@ -182,6 +182,7 @@ var aliases = []envAlias{
 	{alias: "OPENAI_API_KEY", target: "POWERWORD_OPENAI_API_KEY"},
 	{alias: "ANTHROPIC_API_KEY", target: "POWERWORD_ANTHROPIC_API_KEY"},
 	{alias: "SERP_API_KEY", target: "POWERWORD_SERP_API_KEY"},
+	{alias: "AMAZON_API_KEY", target: "POWERWORD_AMAZON_API_KEY"},
 }
 
 // loadDotEnv reads the local .env file if it exists and pushes the keys into the process environment

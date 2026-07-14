@@ -39,7 +39,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a
   ```
 
 #### [MODIFY] [powerword.toml](file://../../powerword.toml) (workspace-local, uncommitted)
-- Register the compiled binary server path:
+- Register the compiled binary server path (this local configuration change is workspace-local and not committed/included in the Pull Request):
   ```toml
   [servers.amazon]
      command = "./bin/pw-mcp-amazon"
