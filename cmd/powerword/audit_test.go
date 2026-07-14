@@ -372,8 +372,27 @@ func TestAuditCmd_ExceededAndMissingPricing(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	output := buf.String()
-	expectedStatus := "Status: ⚠️ Budget Exceeded (and Incomplete, missing pricing for some models)"
+	expectedStatus := "- **Status:** ⚠️ Budget Exceeded (and Incomplete, missing pricing for some models)"
 	if !strings.Contains(output, expectedStatus) {
 		t.Errorf("expected combined status, got: %s", output)
+	}
+}
+
+func TestAuditCmd_DirectoryPath(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "powerword-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	cmd := newAuditCmd()
+	cmd.SetArgs([]string{"--file", tmpDir})
+
+	err = cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when path is a directory, got nil")
+	}
+	if !strings.Contains(err.Error(), "telemetry path is a directory") {
+		t.Errorf("expected directory error, got: %v", err)
 	}
 }

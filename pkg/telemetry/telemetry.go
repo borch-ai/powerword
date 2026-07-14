@@ -79,6 +79,10 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 	return totalCost
 }
 
+// GetPricingForModel resolves the pricing configuration for a given model name.
+// It first attempts an exact match in the pricing map. If not found, it performs
+// a longest-matching-prefix fallback (e.g., matching "gemini-1.5-pro-latest" to
+// "gemini-1.5-pro"). Returns nil if no matching model or prefix is found.
 func GetPricingForModel(model string, pricing map[string]ModelPricing) *ModelPricing {
 	if p, ok := pricing[model]; ok {
 		return &p
