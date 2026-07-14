@@ -167,14 +167,14 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		t.Errorf("Summary missing incomplete cost format: %s", summaryMixed)
 	}
 
-	// Test formatting with no cost and no pricing configured
+	// Test formatting with no cost and no pricing configured (pricing map nil)
 	tracker3 := NewUsageTracker()
 	tracker3.RecordUsage("test-model", TokenUsage{
 		InputTokens: 10,
 	})
 	summary3 := tracker3.FormatSummary(nil)
-	if strings.Contains(summary3, "Estimated Cost") {
-		t.Errorf("Summary should not contain estimated cost: %s", summary3)
+	if !strings.Contains(summary3, "Estimated Cost: N/A (Incomplete, missing pricing for some models)") {
+		t.Errorf("Summary missing N/A cost format: %s", summary3)
 	}
 }
 

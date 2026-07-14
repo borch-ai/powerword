@@ -16,6 +16,8 @@ import (
 
 	"github.com/borch-ai/powerword/pkg/config"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/docs/v1"
 )
 
 type mockRoundTripper func(req *http.Request) (*http.Response, error)
@@ -25,6 +27,12 @@ func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestGDocService_GetClient_MissingCredentials(t *testing.T) {
+	// If ambient credentials (ADC) are actually available in the test runner environment,
+	// this test cannot run deterministically since getClient will successfully find them.
+	if _, err := google.FindDefaultCredentials(context.Background(), docs.DocumentsScope); err == nil {
+		t.Skip("Skipping because ambient Application Default Credentials (ADC) are available")
+	}
+
 	// Isolate from host's Application Default Credentials (ADC)
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 	t.Setenv("HOME", "/nonexistent-home-directory-for-testing")

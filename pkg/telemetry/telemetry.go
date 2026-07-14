@@ -130,19 +130,19 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 }
 
 func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, total int) string {
+	if total == 0 {
+		return ""
+	}
 	if cost > 0 {
 		if hasMissingPricing {
 			return fmt.Sprintf("- Estimated Cost: $%.5f (Incomplete, missing pricing for some models)\n", cost)
 		}
 		return fmt.Sprintf("- Estimated Cost: $%.5f\n", cost)
 	}
-	if lenPricing > 0 && total > 0 {
-		if hasMissingPricing {
-			return "- Estimated Cost: N/A (Incomplete, missing pricing for some models)\n"
-		}
-		return "- Estimated Cost: $0.00000 (Check pricing config)\n"
+	if hasMissingPricing {
+		return "- Estimated Cost: N/A (Incomplete, missing pricing for some models)\n"
 	}
-	return ""
+	return "- Estimated Cost: $0.00000 (Check pricing config)\n"
 }
 
 // TotalTokens returns the total input and output tokens.
