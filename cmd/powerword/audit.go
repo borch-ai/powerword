@@ -209,7 +209,7 @@ func renderMarkdownAudit(cmd *cobra.Command, tracker *telemetry.UsageTracker, pr
 	cmd.Println("| --- | --- | --- | --- | --- |")
 	totalCostStr := fmt.Sprintf("$%.5f", cost)
 	if len(missingPricingModels) > 0 {
-		totalCostStr = fmt.Sprintf("$%.5f (Incomplete)", cost)
+		totalCostStr = "N/A (Incomplete)"
 	}
 	cmd.Printf("| **Total** | **%d** | **%d** | **%d** | **%s** |\n", totalInput, totalOutput, totalCached, totalCostStr)
 	cmd.Println()

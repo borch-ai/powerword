@@ -225,9 +225,9 @@ func handleRead(svc *gdoc.GDocService) func(context.Context, *mcp.CallToolReques
 func handleUpdate(svc *gdoc.GDocService) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		var args struct {
-			DocumentID string `json:"document_id"`
-			Content    string `json:"content"`
-			Append     bool   `json:"append"`
+			DocumentID string  `json:"document_id"`
+			Content    *string `json:"content"`
+			Append     bool    `json:"append"`
 		}
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return nil, err
@@ -240,7 +240,14 @@ func handleUpdate(svc *gdoc.GDocService) func(context.Context, *mcp.CallToolRequ
 			}, nil
 		}
 
-		err := svc.UpdateDocumentText(ctx, args.DocumentID, args.Content, args.Append)
+		if args.Content == nil {
+			return &mcp.CallToolResult{
+				IsError: true,
+				Content: []mcp.Content{&mcp.TextContent{Text: "content parameter is required"}},
+			}, nil
+		}
+
+		err := svc.UpdateDocumentText(ctx, args.DocumentID, *args.Content, args.Append)
 		if err != nil {
 			return &mcp.CallToolResult{
 				IsError: true,

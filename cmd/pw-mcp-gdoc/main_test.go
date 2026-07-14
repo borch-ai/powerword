@@ -235,6 +235,16 @@ func TestGDoc_MCP_Update(t *testing.T) {
 		t.Fatalf("call tool failed: %v", err)
 	}
 	assertResponse(t, res, true, "document_id parameter is required")
+
+	// Missing content case
+	res, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "gdoc_update",
+		Arguments: json.RawMessage(`{"document_id": "doc123"}`),
+	})
+	if err != nil {
+		t.Fatalf("call tool failed: %v", err)
+	}
+	assertResponse(t, res, true, "content parameter is required")
 }
 
 func TestGDoc_Main_RunErrors(t *testing.T) {

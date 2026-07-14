@@ -257,7 +257,7 @@ func TestAuditCmd_MissingPricing(t *testing.T) {
 	if !strings.Contains(output, "| `unknown-model-foo` | 100 | 50 | 0 | N/A |") {
 		t.Errorf("expected N/A for missing model cost, got: %s", output)
 	}
-	if !strings.Contains(output, "| **Total** | **100** | **50** | **0** | **$0.00000 (Incomplete)** |") {
+	if !strings.Contains(output, "| **Total** | **100** | **50** | **0** | **N/A (Incomplete)** |") {
 		t.Errorf("expected incomplete total cost, got: %s", output)
 	}
 	if !strings.Contains(output, "- **Status:** ⚠️ Missing Pricing (Budget Incomplete)") {
