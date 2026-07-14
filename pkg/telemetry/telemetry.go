@@ -138,7 +138,7 @@ func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, tot
 	}
 	if lenPricing > 0 && total > 0 {
 		if hasMissingPricing {
-			return "- Estimated Cost: N/A (Missing pricing config)\n"
+			return "- Estimated Cost: N/A (Incomplete, missing pricing for some models)\n"
 		}
 		return "- Estimated Cost: $0.00000 (Check pricing config)\n"
 	}

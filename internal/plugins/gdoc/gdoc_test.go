@@ -2,7 +2,11 @@ package gdoc
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"os"
@@ -220,6 +224,24 @@ func TestGDocService_UpdateDocumentText(t *testing.T) {
 }
 
 func TestGDocService_Authorize_ServiceAccount(t *testing.T) {
+	// Generate a valid RSA private key for testing
+	reader := rand.Reader
+	bitSize := 1024
+	key, err := rsa.GenerateKey(reader, bitSize)
+	if err != nil {
+		t.Fatalf("failed to generate private key: %v", err)
+	}
+	privBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatalf("failed to marshal private key: %v", err)
+	}
+	keyBlock := &pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privBytes,
+	}
+	pemBytes := pem.EncodeToMemory(keyBlock)
+	privateKeyPEM := string(pemBytes)
+
 	tmpDir := t.TempDir()
 	saFile := filepath.Join(tmpDir, "sa.json")
 	//nolint:gosec // G101: dummy credentials for testing
@@ -227,7 +249,7 @@ func TestGDocService_Authorize_ServiceAccount(t *testing.T) {
 		"type":           "service_account",
 		"project_id":     "test-project",
 		"private_key_id": "key123",
-		"private_key":    "-----BEGIN " + "PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END " + "PRIVATE KEY-----\n",
+		"private_key":    privateKeyPEM,
 		"client_email":   "test@test.iam.gserviceaccount.com",
 		"client_id":      "client123",
 		"auth_uri":       "https://accounts.google.com/o/oauth2/auth",
@@ -250,8 +272,25 @@ func TestGDocService_Authorize_ServiceAccount(t *testing.T) {
 		},
 	}
 
+	mockClient := &http.Client{
+		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+			if req.Method == http.MethodPost && (strings.Contains(req.URL.Path, "/oauth2/token") || strings.Contains(req.URL.Path, "/token")) {
+				respBody := `{"access_token":"sa_access_token_123","token_type":"Bearer","expires_in":3600}`
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(respBody)),
+				}, nil
+			}
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`{"error": "bad request"}`)),
+			}, nil
+		}),
+	}
+
 	svc := NewGDocService(cfg, nil)
-	docsSvc, err := svc.getClient(context.Background())
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, mockClient)
+	docsSvc, err := svc.getClient(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

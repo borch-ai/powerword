@@ -150,7 +150,7 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		InputTokens: 10,
 	})
 	summary2 := tracker2.FormatSummary(pricing)
-	if !strings.Contains(summary2, "N/A (Missing pricing config)") {
+	if !strings.Contains(summary2, "N/A (Incomplete, missing pricing for some models)") {
 		t.Errorf("Summary missing N/A cost format: %s", summary2)
 	}
 

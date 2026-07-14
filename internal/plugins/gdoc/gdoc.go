@@ -106,6 +106,10 @@ func (s *GDocService) authorizeServiceAccount(ctx context.Context, saPath string
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse service account JSON: %w", err)
 	}
+	// Eagerly fetch a token to validate that credentials work
+	if _, err := creds.TokenSource.Token(); err != nil {
+		return nil, fmt.Errorf("service account credentials failed to retrieve token: %w", err)
+	}
 	return oauth2.NewClient(ctx, creds.TokenSource), nil
 }
 

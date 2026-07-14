@@ -8,7 +8,7 @@ import (
 	"github.com/borch-ai/powerword/pkg/config"
 )
 
-func TestGDoc_Integration_Bootstrap(t *testing.T) {
+func TestGDoc_Bootstrap(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	cfgContent := `
