@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -40,7 +43,11 @@ func run() error {
 	}
 
 	transport := &mcp.StdioTransport{}
-	return srv.Run(context.Background(), transport)
+	err = srv.Run(context.Background(), transport)
+	if err != nil && !errors.Is(err, io.EOF) && !strings.Contains(err.Error(), "EOF") {
+		return err
+	}
+	return nil
 }
 
 const (
