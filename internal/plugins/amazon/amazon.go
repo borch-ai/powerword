@@ -102,10 +102,8 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 		SearchInformation struct {
 			TotalResults int `json:"total_results"`
 		} `json:"search_information"`
-		SearchResults struct {
-			TotalResults int `json:"total_results"`
-		} `json:"search_results"`
-		TotalResults int `json:"total_results"`
+		SearchResults json.RawMessage `json:"search_results"`
+		TotalResults  int             `json:"total_results"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
@@ -115,10 +113,14 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	// Try extracting count from multiple potential fields returned by ScaleSerp / Rainforest
 	count := payload.SearchInformation.TotalResults
 	if count == 0 {
-		count = payload.SearchResults.TotalResults
-	}
-	if count == 0 {
 		count = payload.TotalResults
+	}
+	if count == 0 && len(payload.SearchResults) > 0 && payload.SearchResults[0] == '{' {
+		var searchResultsObj struct {
+			TotalResults int `json:"total_results"`
+		}
+		_ = json.Unmarshal(payload.SearchResults, &searchResultsObj)
+		count = searchResultsObj.TotalResults
 	}
 
 	return count, nil

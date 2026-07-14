@@ -169,6 +169,16 @@ func TestAmazonService_AlternativeFields(t *testing.T) {
 			},
 			want: 9999,
 		},
+		{
+			name: "SearchResults array format with total_results fallback",
+			payload: map[string]interface{}{
+				"search_results": []interface{}{
+					map[string]interface{}{"title": "Product 1"},
+				},
+				"total_results": 1234,
+			},
+			want: 1234,
+		},
 	}
 
 	for _, tt := range tests {
