@@ -329,3 +329,51 @@ func TestAuditCmd_InvalidFormat(t *testing.T) {
 		t.Errorf("expected unsupported output format error, got: %v", err)
 	}
 }
+
+func TestAuditCmd_ExceededAndMissingPricing(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "powerword-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	origActive := config.Active
+	config.Active = &config.Config{
+		Pricing: map[string]telemetry.ModelPricing{
+			"gemini-1.5-pro": {Input: 10.0, Output: 20.0},
+		},
+	}
+	defer func() { config.Active = origActive }()
+
+	telemetryData := `{
+		"turns": 2,
+		"model_usages": {
+			"gemini-1.5-pro": {
+				"input_tokens": 100000,
+				"output_tokens": 50000
+			},
+			"unknown-model": {
+				"input_tokens": 100
+			}
+		}
+	}`
+	filePath := filepath.Join(tmpDir, "telemetry.json")
+	if wErr := os.WriteFile(filePath, []byte(telemetryData), 0600); wErr != nil {
+		t.Fatalf("failed to write mock telemetry: %v", wErr)
+	}
+
+	cmd := newAuditCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	// limit is 1.0, gemini cost is 100000*(10/1M) + 50000*(20/1M) = 1.0 + 1.0 = 2.0 (exceeds limit), and unknown-model has missing pricing
+	cmd.SetArgs([]string{"--file", filePath, "--limit", "1.0", "--format", "markdown"})
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	expectedStatus := "Status: ⚠️ Budget Exceeded (and Incomplete, missing pricing for some models)"
+	if !strings.Contains(output, expectedStatus) {
+		t.Errorf("expected combined status, got: %s", output)
+	}
+}

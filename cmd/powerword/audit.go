@@ -127,11 +127,14 @@ func findMissingPricingModels(tracker *telemetry.UsageTracker, pricing map[strin
 }
 
 func getBudgetStatus(cost float64, limit float64, missingPricingModels []string) string {
+	if len(missingPricingModels) > 0 {
+		if cost > limit {
+			return "⚠️ Budget Exceeded (and Incomplete, missing pricing for some models)"
+		}
+		return "⚠️ Missing Pricing (Budget Incomplete)"
+	}
 	if cost > limit {
 		return "⚠️ Budget Exceeded"
-	}
-	if len(missingPricingModels) > 0 {
-		return "⚠️ Missing Pricing (Budget Incomplete)"
 	}
 	return "✅ Within Budget"
 }
