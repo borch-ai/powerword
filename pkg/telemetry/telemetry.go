@@ -123,15 +123,18 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 		}
 	}
 
-	sb.WriteString(formatCostSummary(cost, hasMissingPricing, total))
+	sb.WriteString(formatCostSummary(cost, hasMissingPricing, len(pricing), total))
 	fmt.Fprintf(&sb, "- Turns: %d\n", u.Turns)
 
 	return sb.String()
 }
 
-func formatCostSummary(cost float64, hasMissingPricing bool, total int) string {
+func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, total int) string {
 	if total == 0 {
 		return ""
+	}
+	if lenPricing == 0 {
+		return "- Estimated Cost: N/A\n"
 	}
 	if cost > 0 {
 		if hasMissingPricing {

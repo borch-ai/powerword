@@ -234,7 +234,7 @@ func TestGDocService_UpdateDocumentText(t *testing.T) {
 func TestGDocService_Authorize_ServiceAccount(t *testing.T) {
 	// Generate a valid RSA private key for testing
 	reader := rand.Reader
-	bitSize := 1024
+	bitSize := 2048
 	key, err := rsa.GenerateKey(reader, bitSize)
 	if err != nil {
 		t.Fatalf("failed to generate private key: %v", err)
