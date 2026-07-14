@@ -30,6 +30,15 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
   - `gdoc_update`: Overwrites or modifies a Google Doc with new content.
 - Initialize Google API clients (Docs API and Drive API) using `google.golang.org/api/docs/v1` and `google.golang.org/api/drive/v3`.
 
+### CLI Subcommand for Token Audits
+
+#### [NEW] [audit.go](file://../../cmd/powerword/audit.go)
+- Implements the `powerword audit` subcommand to audit token usage and financial cost from a telemetry JSON file.
+- Supports filtering by limit/budget, strict validation exit codes, and output formatting (text or markdown).
+
+#### [MODIFY] [main.go](file://../../cmd/powerword/main.go)
+- Registers the new `audit` subcommand under Cobra's root command.
+
 ### Configuration Layer
 
 #### [MODIFY] [powerword.example.toml](file://../../powerword.example.toml)

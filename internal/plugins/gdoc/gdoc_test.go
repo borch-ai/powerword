@@ -251,12 +251,12 @@ func TestGDocService_Authorize_ServiceAccount(t *testing.T) {
 	}
 
 	svc := NewGDocService(cfg, nil)
-	client, err := svc.authorize(context.Background())
+	docsSvc, driveSvc, err := svc.getClient(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if client == nil {
-		t.Error("expected oauth2 client, got nil")
+	if docsSvc == nil || driveSvc == nil {
+		t.Error("expected service clients to be non-nil")
 	}
 }
 
@@ -285,7 +285,7 @@ func TestGDocService_Authorize_OAuthUserFlow(t *testing.T) {
 	}
 
 	//nolint:gosec // G101: dummy credentials for testing
-	tokenContent := `{"access_token":"access123","token_type":"Bearer","refresh_token":"refresh123","expiry":"2026-07-13T15:00:00Z"}`
+	tokenContent := `{"access_token":"access123","token_type":"Bearer","refresh_token":"refresh123","expiry":"2000-01-01T00:00:00Z"}`
 	err = os.WriteFile(tokenFile, []byte(tokenContent), 0600)
 	if err != nil {
 		t.Fatalf("failed to write dummy token: %v", err)
@@ -316,14 +316,14 @@ func TestGDocService_Authorize_OAuthUserFlow(t *testing.T) {
 		}),
 	}
 
-	svc := NewGDocService(cfg, mockClient)
+	svc := NewGDocService(cfg, nil)
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, mockClient)
-	client, err := svc.authorize(ctx)
+	docsSvc, driveSvc, err := svc.getClient(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if client == nil {
-		t.Error("expected client, got nil")
+	if docsSvc == nil || driveSvc == nil {
+		t.Error("expected service clients to be non-nil")
 	}
 
 	updatedTok, err := readTokenFile(tokenFile)
@@ -566,5 +566,120 @@ func TestNewGDocService_NilConfig(t *testing.T) {
 	svc := NewGDocService(nil, nil)
 	if svc.cfg == nil {
 		t.Error("expected non-nil config in GDocService when passing nil")
+	}
+}
+
+func TestGDocService_ExtraEdgeCases(t *testing.T) {
+	// 1. validateEndpoint with unparseable URL
+	// A control character like ASCII 127 in URL will cause url.Parse to return error in older go, or we can use:
+	// "http://a b" (spaces are not allowed in URLs parsed by url.Parse)
+	got := validateEndpoint("http://a b")
+	if got != "" {
+		t.Errorf("expected validateEndpoint to fail on invalid URL, got %q", got)
+	}
+
+	// 2. readTokenFile with invalid JSON content
+	tmpDir := t.TempDir()
+	invalidJSONFile := filepath.Join(tmpDir, "invalid_token.json")
+	err := os.WriteFile(invalidJSONFile, []byte("{invalid"), 0600)
+	if err != nil {
+		t.Fatalf("failed to write invalid JSON: %v", err)
+	}
+	_, err = readTokenFile(invalidJSONFile)
+	if err == nil {
+		t.Error("expected readTokenFile to fail on invalid JSON, got nil")
+	}
+
+	// 3. writeTokenFile directory creation failure
+	// We can make directory creation fail by writing a file first, and then trying to write a token file inside it.
+	conflictFilePath := filepath.Join(tmpDir, "conflict_file")
+	err = os.WriteFile(conflictFilePath, []byte("some content"), 0600)
+	if err != nil {
+		t.Fatalf("failed to write conflict file: %v", err)
+	}
+	// Try to write token file as if conflict_file was a directory
+	badTokenPath := filepath.Join(conflictFilePath, "token.json")
+	err = writeTokenFile(badTokenPath, &oauth2.Token{})
+	if err == nil {
+		t.Error("expected writeTokenFile to fail when directory creation fails, got nil")
+	}
+
+	// Try to open a path we cannot write to (e.g. read-only folder or empty path)
+	err = writeTokenFile("", &oauth2.Token{})
+	if err == nil {
+		t.Error("expected writeTokenFile to fail on empty path, got nil")
+	}
+}
+
+func TestGDocService_Authorize_OAuthUserFlow_TokenNotChanged(t *testing.T) {
+	tmpDir := t.TempDir()
+	credFile := filepath.Join(tmpDir, "credentials.json")
+	tokenFile := filepath.Join(tmpDir, "token.json")
+
+	//nolint:gosec // G101: dummy credentials for testing
+	credMap := map[string]interface{}{
+		"installed": map[string]interface{}{
+			"client_id":     "client123",
+			"client_secret": "secret123",
+			"auth_uri":      "https://accounts.google.com/o/oauth2/auth",
+			"token_uri":     "https://oauth2.googleapis.com/token",
+			"redirect_uris": []string{"http://localhost:8080/callback"},
+		},
+	}
+	credBytes, err := json.Marshal(credMap)
+	if err != nil {
+		t.Fatalf("failed to marshal dummy client credentials: %v", err)
+	}
+	err = os.WriteFile(credFile, credBytes, 0600)
+	if err != nil {
+		t.Fatalf("failed to write dummy client credentials: %v", err)
+	}
+
+	// Token expiry in the future so that it does NOT need refresh
+	//nolint:gosec // G101: dummy credentials for testing
+	tokenContent := `{"access_token":"access123","token_type":"Bearer","refresh_token":"refresh123","expiry":"2100-01-01T00:00:00Z"}`
+	err = os.WriteFile(tokenFile, []byte(tokenContent), 0600)
+	if err != nil {
+		t.Fatalf("failed to write dummy token: %v", err)
+	}
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			GDoc: config.GDocConfig{
+				CredentialsPath: credFile,
+				TokenPath:       tokenFile,
+			},
+		},
+	}
+
+	// No HTTP requests should be made because the token is not expired
+	mockClient := &http.Client{
+		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+			t.Error("unexpected HTTP request when token is not expired")
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`{"error": "bad request"}`)),
+			}, nil
+		}),
+	}
+
+	svc := NewGDocService(cfg, nil)
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, mockClient)
+	docsSvc, driveSvc, err := svc.getClient(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if docsSvc == nil || driveSvc == nil {
+		t.Error("expected service clients to be non-nil")
+	}
+
+	// Check that the token file was NOT overwritten (token unchanged)
+	//nolint:gosec // G304: test file read is safe
+	data, err := os.ReadFile(tokenFile)
+	if err != nil {
+		t.Fatalf("failed to read token file: %v", err)
+	}
+	if string(data) != tokenContent {
+		t.Errorf("expected token file content to remain unchanged, got %s", string(data))
 	}
 }

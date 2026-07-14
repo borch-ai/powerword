@@ -376,13 +376,13 @@ func startCallbackServer(stateToken string, codeChan chan<- string) (*http.Serve
 	return server, nil
 }
 
-//nolint:gosec // G204: browser commands are safe as URL is verified to belong to Google's HTTPS endpoint
+//nolint:gosec // G204: command name is constant ("open" or "xdg-open") and URL parameter is pre-validated in openBrowser
 func defaultBrowserCmd(name, url string) error {
 	cmd := exec.CommandContext(context.Background(), name, url)
 	return cmd.Start()
 }
 
-//nolint:gosec // G204: browser commands are safe as URL is verified to belong to Google's HTTPS endpoint
+//nolint:gosec // G204: command name is constant ("rundll32") and URL parameter is pre-validated in openBrowser
 func defaultWindowsBrowserCmd(url string) error {
 	cmd := exec.CommandContext(context.Background(), "rundll32", "url.dll,FileProtocolHandler", url)
 	return cmd.Start()

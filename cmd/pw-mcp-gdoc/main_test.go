@@ -16,6 +16,7 @@ import (
 
 	"github.com/borch-ai/powerword/internal/plugins/gdoc"
 	"github.com/borch-ai/powerword/pkg/config"
+	"golang.org/x/oauth2"
 )
 
 type mockRoundTripper func(req *http.Request) (*http.Response, error)
@@ -335,5 +336,88 @@ func TestGDoc_Main_OpenBrowser(t *testing.T) {
 	openBrowser(":%")
 	if browserCmdCalled || windowsCmdCalled {
 		t.Error("expected browser hooks not to be called for unparseable URL")
+	}
+}
+
+func TestGDoc_Main_SaveTokenConfigured(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "subdir", "token.json")
+	tok := &oauth2.Token{
+		AccessToken: "test-access-token",
+	}
+	err := saveTokenConfigured(tokenPath, tok)
+	if err != nil {
+		t.Fatalf("failed to save token: %v", err)
+	}
+
+	// Verify file content
+	//nolint:gosec // G304: test file read is safe
+	data, err := os.ReadFile(tokenPath)
+	if err != nil {
+		t.Fatalf("failed to read saved token file: %v", err)
+	}
+	var loaded oauth2.Token
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("failed to unmarshal token: %v", err)
+	}
+	if loaded.AccessToken != "test-access-token" {
+		t.Errorf("expected access token 'test-access-token', got %q", loaded.AccessToken)
+	}
+}
+
+func TestGDoc_Main_StartCallbackServer(t *testing.T) {
+	stateToken := "test-state-token"
+	codeChan := make(chan string, 1)
+
+	server, err := startCallbackServer(stateToken, codeChan)
+	if err != nil {
+		t.Skip("skipping callback server test because port 8080 is already in use:", err)
+		return
+	}
+	defer func() {
+		_ = server.Shutdown(context.Background())
+	}()
+
+	// 1. Success case: hit the callback endpoint with matching state and code
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:8080/callback?state=test-state-token&code=auth-code-123", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("failed to make HTTP request to callback server: %v", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status OK, got %v", resp.Status)
+	}
+
+	select {
+	case code := <-codeChan:
+		if code != "auth-code-123" {
+			t.Errorf("expected code 'auth-code-123', got %q", code)
+		}
+	default:
+		t.Error("expected auth code to be sent on channel, but channel was empty")
+	}
+
+	// 2. State mismatch case
+	req2, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:8080/callback?state=bad-state&code=auth-code-123", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatalf("failed to make HTTP request to callback server: %v", err)
+	}
+	defer func() {
+		_ = resp2.Body.Close()
+	}()
+
+	if resp2.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status BadRequest for state mismatch, got %v", resp2.Status)
 	}
 }
