@@ -18,3 +18,10 @@ enable_critic = false
 # If unset, only Amazon completion data is returned.
 serp_api_key = ""
 
+[plugins.gdoc]
+credentials_path = "~/.config/powerword/credentials.json"
+token_path = "~/.config/powerword/gdoc_token.json"
+# Or for service account:
+# service_account_path = "~/.config/powerword/service_account.json"
+
+

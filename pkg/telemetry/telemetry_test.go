@@ -144,24 +144,37 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		t.Errorf("Summary missing estimated cost: %s", summary)
 	}
 
-	// Test formatting with no cost but pricing configured (should show $0.00000)
+	// Test formatting with missing pricing (should show N/A)
 	tracker2 := NewUsageTracker()
 	tracker2.RecordUsage("unknown-model", TokenUsage{
 		InputTokens: 10,
 	})
 	summary2 := tracker2.FormatSummary(pricing)
-	if !strings.Contains(summary2, "$0.00000") {
-		t.Errorf("Summary missing 0 cost format: %s", summary2)
+	if !strings.Contains(summary2, "N/A (Incomplete, missing pricing for some models)") {
+		t.Errorf("Summary missing N/A cost format: %s", summary2)
 	}
 
-	// Test formatting with no cost and no pricing configured
+	// Test formatting with mixed models (some missing pricing)
+	trackerMixed := NewUsageTracker()
+	trackerMixed.RecordUsage("test-model", TokenUsage{
+		InputTokens: 10,
+	})
+	trackerMixed.RecordUsage("unknown-model", TokenUsage{
+		InputTokens: 10,
+	})
+	summaryMixed := trackerMixed.FormatSummary(pricing)
+	if !strings.Contains(summaryMixed, "Incomplete, missing pricing for some models") {
+		t.Errorf("Summary missing incomplete cost format: %s", summaryMixed)
+	}
+
+	// Test formatting with no cost and no pricing configured (pricing map nil)
 	tracker3 := NewUsageTracker()
 	tracker3.RecordUsage("test-model", TokenUsage{
 		InputTokens: 10,
 	})
 	summary3 := tracker3.FormatSummary(nil)
-	if strings.Contains(summary3, "Estimated Cost") {
-		t.Errorf("Summary should not contain estimated cost: %s", summary3)
+	if !strings.Contains(summary3, "Estimated Cost: N/A") || strings.Contains(summary3, "Incomplete") {
+		t.Errorf("Summary should contain N/A but not Incomplete: %s", summary3)
 	}
 }
 
@@ -189,5 +202,40 @@ func TestUsageTracker_Totals(t *testing.T) {
 	}
 	if got := tracker.TotalCachedTokens(); got != 50 {
 		t.Errorf("TotalCachedTokens() = %d; want 50", got)
+	}
+}
+
+func TestUsageTracker_NilModelUsage(t *testing.T) {
+	tracker := NewUsageTracker()
+	// Manually insert a nil entry into the map to trigger nil-pointer checks
+	tracker.ModelUsages["nil-model"] = nil
+
+	pricing := map[string]ModelPricing{
+		"nil-model": {Input: 1.0, Output: 2.0},
+	}
+
+	// 1. EstimatedCost
+	if cost := tracker.EstimatedCost(pricing); cost != 0 {
+		t.Errorf("Expected 0 cost for nil model usage, got %f", cost)
+	}
+
+	// 2. FormatSummary
+	summary := tracker.FormatSummary(pricing)
+	if !strings.Contains(summary, "Total Tokens: 0") {
+		t.Errorf("Expected 0 total tokens in summary, got: %s", summary)
+	}
+
+	// 3. Totals
+	if got := tracker.TotalTokens(); got != 0 {
+		t.Errorf("TotalTokens() = %d; want 0", got)
+	}
+	if got := tracker.TotalInputTokens(); got != 0 {
+		t.Errorf("TotalInputTokens() = %d; want 0", got)
+	}
+	if got := tracker.TotalOutputTokens(); got != 0 {
+		t.Errorf("TotalOutputTokens() = %d; want 0", got)
+	}
+	if got := tracker.TotalCachedTokens(); got != 0 {
+		t.Errorf("TotalCachedTokens() = %d; want 0", got)
 	}
 }

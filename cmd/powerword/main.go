@@ -20,6 +20,7 @@ func main() {
 	rootCmd.AddCommand(newLintPlansCmd())
 	rootCmd.AddCommand(newLintGoCmd())
 	rootCmd.AddCommand(newLinkIssueCmd())
+	rootCmd.AddCommand(newAuditCmd())
 
 	err := rootCmd.Execute()
 

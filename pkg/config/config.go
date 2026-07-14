@@ -121,6 +121,13 @@ type DBConfig struct {
 	QueryTimeout string `mapstructure:"query_timeout"` // per-query deadline, e.g. "10s" (default: "10s")
 }
 
+// GDocConfig holds parameters for the Google Doc plugin.
+type GDocConfig struct {
+	CredentialsPath    string `mapstructure:"credentials_path"`
+	TokenPath          string `mapstructure:"token_path"`
+	ServiceAccountPath string `mapstructure:"service_account_path"`
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
@@ -131,6 +138,7 @@ type PluginsConfig struct {
 	Cloud    CloudConfig    `mapstructure:"cloud"`
 	YouTube  YouTubeConfig  `mapstructure:"youtube"`
 	DB       DBConfig       `mapstructure:"db"`
+	GDoc     GDocConfig     `mapstructure:"gdoc"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -382,6 +390,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("plugins.db.dsn", "")
 	v.SetDefault("plugins.db.max_rows", 200)
 	v.SetDefault("plugins.db.query_timeout", "10s")
+	v.SetDefault("plugins.gdoc.credentials_path", "")
+	v.SetDefault("plugins.gdoc.token_path", "")
+	v.SetDefault("plugins.gdoc.service_account_path", "")
 }
 
 // bindEnvVars binds all known environment variable overrides to their Viper config paths.
@@ -453,6 +464,9 @@ func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.db.dsn", "POWERWORD_DB_DSN")
 	bindEnv(v, "plugins.db.max_rows", "POWERWORD_DB_MAX_ROWS")
 	bindEnv(v, "plugins.db.query_timeout", "POWERWORD_DB_QUERY_TIMEOUT")
+	bindEnv(v, "plugins.gdoc.credentials_path", "POWERWORD_GDOC_CREDENTIALS_PATH")
+	bindEnv(v, "plugins.gdoc.token_path", "POWERWORD_GDOC_TOKEN_PATH")
+	bindEnv(v, "plugins.gdoc.service_account_path", "POWERWORD_GDOC_SERVICE_ACCOUNT_PATH")
 }
 
 func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {

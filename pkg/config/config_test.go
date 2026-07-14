@@ -687,3 +687,55 @@ func TestLoadFromWorkspace_NoToml_NoGlobal_ReturnsEmpty(t *testing.T) {
 		t.Fatal("expected non-nil config, got nil")
 	}
 }
+
+func TestLoadConfig_GDoc(t *testing.T) {
+	defer clearEnv()()
+	tmpDir := t.TempDir()
+
+	tomlContent := `
+[plugins.gdoc]
+credentials_path = "/path/to/creds.json"
+token_path = "/path/to/token.json"
+service_account_path = "/path/to/sa.json"
+`
+	cfgFilePath := filepath.Join(tmpDir, "config.toml")
+	if errWrite := os.WriteFile(cfgFilePath, []byte(tomlContent), 0600); errWrite != nil {
+		t.Fatalf("failed to write temp config: %v", errWrite)
+	}
+
+	// 1. Test TOML parsing
+	cfg, err := LoadConfig(cfgFilePath)
+	if err != nil {
+		t.Fatalf("LoadConfig returned unexpected error: %v", err)
+	}
+
+	if cfg.Plugins.GDoc.CredentialsPath != "/path/to/creds.json" {
+		t.Errorf("expected credentials_path to be '/path/to/creds.json', got '%s'", cfg.Plugins.GDoc.CredentialsPath)
+	}
+	if cfg.Plugins.GDoc.TokenPath != "/path/to/token.json" {
+		t.Errorf("expected token_path to be '/path/to/token.json', got '%s'", cfg.Plugins.GDoc.TokenPath)
+	}
+	if cfg.Plugins.GDoc.ServiceAccountPath != "/path/to/sa.json" {
+		t.Errorf("expected service_account_path to be '/path/to/sa.json', got '%s'", cfg.Plugins.GDoc.ServiceAccountPath)
+	}
+
+	// 2. Test Env override
+	t.Setenv("POWERWORD_GDOC_CREDENTIALS_PATH", "/env/creds.json")
+	t.Setenv("POWERWORD_GDOC_TOKEN_PATH", "/env/token.json")
+	t.Setenv("POWERWORD_GDOC_SERVICE_ACCOUNT_PATH", "/env/sa.json")
+
+	cfgEnv, errEnv := LoadConfig(cfgFilePath)
+	if errEnv != nil {
+		t.Fatalf("LoadConfig returned unexpected error with env: %v", errEnv)
+	}
+
+	if cfgEnv.Plugins.GDoc.CredentialsPath != "/env/creds.json" {
+		t.Errorf("expected env override credentials_path to be '/env/creds.json', got '%s'", cfgEnv.Plugins.GDoc.CredentialsPath)
+	}
+	if cfgEnv.Plugins.GDoc.TokenPath != "/env/token.json" {
+		t.Errorf("expected env override token_path to be '/env/token.json', got '%s'", cfgEnv.Plugins.GDoc.TokenPath)
+	}
+	if cfgEnv.Plugins.GDoc.ServiceAccountPath != "/env/sa.json" {
+		t.Errorf("expected env override service_account_path to be '/env/sa.json', got '%s'", cfgEnv.Plugins.GDoc.ServiceAccountPath)
+	}
+}

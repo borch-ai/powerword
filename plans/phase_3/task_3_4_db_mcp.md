@@ -1,6 +1,6 @@
 # plan: Task 3.4: SQL Database Inspector Plugin
 
-**Status:** Complete — PR [#127](https://github.com/borch-ai/powerword/pull/127) awaiting merge
+**Status:** Completed
 **Date Completed:** 2026-06-26
 **Go Version:** 1.26.4
 **Unit Test Coverage:** 91.1%
@@ -49,10 +49,7 @@ Added `DBConfig` struct with `Backend`, `DSN`, `MaxRows` (default 200), and `Que
 - Mock backend unit tests; `validateReadOnly` table-driven tests (allowed + rejected)
 - `TestValidateReadOnly_WithDML_Rejected` — 7 cases for WITH/EXPLAIN + DML bypass
 - `TestValidateIdentifier` — safe and unsafe table name cases
-
-#### [NEW] [db_integration_test.go](../../internal/plugins/db/db_integration_test.go)
-- SQLite-backed integration tests for all 4 tools
-- Dialect-mismatch error paths (Postgres/MySQL PRAGMA rejected on SQLite)
+- SQLite-backed integration tests for all 4 tools and dialect-mismatch error paths
 
 ---
 

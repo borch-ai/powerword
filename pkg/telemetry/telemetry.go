@@ -61,8 +61,11 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 
 	var totalCost float64
 	for model, usage := range u.ModelUsages {
-		p := getPricingForModel(model, pricing)
-		if p == nil {
+		if usage == nil {
+			continue
+		}
+		p, ok := GetPricingForModel(model, pricing)
+		if !ok {
 			continue
 		}
 
@@ -79,9 +82,13 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 	return totalCost
 }
 
-func getPricingForModel(model string, pricing map[string]ModelPricing) *ModelPricing {
+// GetPricingForModel resolves the pricing configuration for a given model name.
+// It first attempts an exact match in the pricing map. If not found, it performs
+// a longest-matching-prefix fallback (e.g., matching "gemini-1.5-pro-latest" to
+// "gemini-1.5-pro"). Returns ModelPricing and a boolean indicating if a match was found.
+func GetPricingForModel(model string, pricing map[string]ModelPricing) (ModelPricing, bool) {
 	if p, ok := pricing[model]; ok {
-		return &p
+		return p, true
 	}
 	var bestPrefix string
 	for prefix := range pricing {
@@ -90,10 +97,9 @@ func getPricingForModel(model string, pricing map[string]ModelPricing) *ModelPri
 		}
 	}
 	if bestPrefix != "" {
-		p := pricing[bestPrefix]
-		return &p
+		return pricing[bestPrefix], true
 	}
-	return nil
+	return ModelPricing{}, false
 }
 
 // FormatSummary returns a formatted string detailing token usage and estimated cost.
@@ -102,6 +108,9 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 
 	var totalInput, totalOutput, totalCached int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		totalInput += usage.InputTokens
 		totalOutput += usage.OutputTokens
 		totalCached += usage.CachedTokens
@@ -115,20 +124,49 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 		fmt.Fprintf(&sb, "- Cached Tokens: %d\n", totalCached)
 	}
 
-	if cost > 0 {
-		fmt.Fprintf(&sb, "- Estimated Cost: $%.5f\n", cost)
-	} else if len(pricing) > 0 && total > 0 {
-		sb.WriteString("- Estimated Cost: $0.00000 (Check pricing config)\n")
+	var hasMissingPricing bool
+	for model, usage := range u.ModelUsages {
+		if usage == nil || (usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0) {
+			continue
+		}
+		if _, ok := GetPricingForModel(model, pricing); !ok {
+			hasMissingPricing = true
+			break
+		}
 	}
+
+	sb.WriteString(formatCostSummary(cost, hasMissingPricing, len(pricing), total))
 	fmt.Fprintf(&sb, "- Turns: %d\n", u.Turns)
 
 	return sb.String()
+}
+
+func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, total int) string {
+	if total == 0 {
+		return ""
+	}
+	if lenPricing == 0 {
+		return "- Estimated Cost: N/A\n"
+	}
+	if cost > 0 {
+		if hasMissingPricing {
+			return fmt.Sprintf("- Estimated Cost: $%.5f (Incomplete, missing pricing for some models)\n", cost)
+		}
+		return fmt.Sprintf("- Estimated Cost: $%.5f\n", cost)
+	}
+	if hasMissingPricing {
+		return "- Estimated Cost: N/A (Incomplete, missing pricing for some models)\n"
+	}
+	return "- Estimated Cost: $0.00000 (Check pricing config)\n"
 }
 
 // TotalTokens returns the total input and output tokens.
 func (u *UsageTracker) TotalTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.InputTokens + usage.OutputTokens
 	}
 	return total
@@ -138,6 +176,9 @@ func (u *UsageTracker) TotalTokens() int {
 func (u *UsageTracker) TotalInputTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.InputTokens
 	}
 	return total
@@ -147,6 +188,9 @@ func (u *UsageTracker) TotalInputTokens() int {
 func (u *UsageTracker) TotalOutputTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.OutputTokens
 	}
 	return total
@@ -156,6 +200,9 @@ func (u *UsageTracker) TotalOutputTokens() int {
 func (u *UsageTracker) TotalCachedTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.CachedTokens
 	}
 	return total
