@@ -64,8 +64,8 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 		if usage == nil {
 			continue
 		}
-		p := GetPricingForModel(model, pricing)
-		if p == nil {
+		p, ok := GetPricingForModel(model, pricing)
+		if !ok {
 			continue
 		}
 
@@ -85,10 +85,10 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 // GetPricingForModel resolves the pricing configuration for a given model name.
 // It first attempts an exact match in the pricing map. If not found, it performs
 // a longest-matching-prefix fallback (e.g., matching "gemini-1.5-pro-latest" to
-// "gemini-1.5-pro"). Returns nil if no matching model or prefix is found.
-func GetPricingForModel(model string, pricing map[string]ModelPricing) *ModelPricing {
+// "gemini-1.5-pro"). Returns ModelPricing and a boolean indicating if a match was found.
+func GetPricingForModel(model string, pricing map[string]ModelPricing) (ModelPricing, bool) {
 	if p, ok := pricing[model]; ok {
-		return &p
+		return p, true
 	}
 	var bestPrefix string
 	for prefix := range pricing {
@@ -97,10 +97,9 @@ func GetPricingForModel(model string, pricing map[string]ModelPricing) *ModelPri
 		}
 	}
 	if bestPrefix != "" {
-		p := pricing[bestPrefix]
-		return &p
+		return pricing[bestPrefix], true
 	}
-	return nil
+	return ModelPricing{}, false
 }
 
 // FormatSummary returns a formatted string detailing token usage and estimated cost.
@@ -127,7 +126,7 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 
 	var hasMissingPricing bool
 	for model := range u.ModelUsages {
-		if GetPricingForModel(model, pricing) == nil {
+		if _, ok := GetPricingForModel(model, pricing); !ok {
 			hasMissingPricing = true
 			break
 		}

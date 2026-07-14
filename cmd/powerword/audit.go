@@ -120,18 +120,22 @@ func loadTelemetryFile(filePath string) (*telemetry.UsageTracker, error) {
 }
 
 func getActivePricing() map[string]telemetry.ModelPricing {
-	pricing := fallbackPricing
 	cfg := config.Active
 	if cfg != nil && len(cfg.Pricing) > 0 {
-		pricing = cfg.Pricing
+		return cfg.Pricing
 	}
-	return pricing
+	// Return a shallow copy of fallbackPricing to avoid shared mutable global state
+	copyMap := make(map[string]telemetry.ModelPricing, len(fallbackPricing))
+	for k, v := range fallbackPricing {
+		copyMap[k] = v
+	}
+	return copyMap
 }
 
 func findMissingPricingModels(tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing) []string {
 	var missing []string
 	for modelName := range tracker.ModelUsages {
-		if telemetry.GetPricingForModel(modelName, pricing) == nil {
+		if _, ok := telemetry.GetPricingForModel(modelName, pricing); !ok {
 			missing = append(missing, modelName)
 		}
 	}
@@ -152,8 +156,8 @@ func getBudgetStatus(cost float64, limit float64, missingPricingModels []string)
 	return "✅ Within Budget"
 }
 
-func calculateModelCost(usage *telemetry.ModelUsage, mPricing *telemetry.ModelPricing) float64 {
-	if mPricing == nil || usage == nil {
+func calculateModelCost(usage *telemetry.ModelUsage, mPricing telemetry.ModelPricing) float64 {
+	if usage == nil {
 		return 0.0
 	}
 	billedInput := usage.InputTokens - usage.CachedTokens
@@ -188,8 +192,8 @@ func renderMarkdownAudit(cmd *cobra.Command, tracker *telemetry.UsageTracker, pr
 			output = usage.OutputTokens
 			cached = usage.CachedTokens
 		}
-		mPricing := telemetry.GetPricingForModel(modelName, pricing)
-		if mPricing == nil {
+		mPricing, ok := telemetry.GetPricingForModel(modelName, pricing)
+		if !ok {
 			cmd.Printf("| `%s` | %d | %d | %d | N/A |\n", modelName, input, output, cached)
 		} else {
 			mCost := calculateModelCost(usage, mPricing)
