@@ -125,7 +125,10 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 	}
 
 	var hasMissingPricing bool
-	for model := range u.ModelUsages {
+	for model, usage := range u.ModelUsages {
+		if usage == nil || (usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0) {
+			continue
+		}
 		if _, ok := GetPricingForModel(model, pricing); !ok {
 			hasMissingPricing = true
 			break

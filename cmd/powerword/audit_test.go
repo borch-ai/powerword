@@ -457,3 +457,39 @@ func TestAuditCmd_NullModelUsage(t *testing.T) {
 		t.Errorf("expected 0 for null model usage fields, got: %s", output)
 	}
 }
+
+func TestAuditCmd_NullAndZeroModelUsageMissingPricing(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "powerword-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// Both "null-usage-model" (nil) and "zero-usage-model" (all zeroes) have missing pricing
+	telemetryData := `{
+		"turns": 2,
+		"model_usages": {
+			"null-usage-model": null,
+			"zero-usage-model": {
+				"input_tokens": 0,
+				"output_tokens": 0,
+				"cached_tokens": 0
+			}
+		}
+	}`
+	filePath := filepath.Join(tmpDir, "telemetry.json")
+	if wErr := os.WriteFile(filePath, []byte(telemetryData), 0600); wErr != nil {
+		t.Fatalf("failed to write mock telemetry: %v", wErr)
+	}
+
+	cmd := newAuditCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--file", filePath, "--limit", "2.0", "--strict"})
+
+	// Since there is no actual usage, strict should not fail with missing pricing error
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error for nil/zero usages: %v", err)
+	}
+}

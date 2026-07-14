@@ -134,7 +134,10 @@ func getActivePricing() map[string]telemetry.ModelPricing {
 
 func findMissingPricingModels(tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing) []string {
 	var missing []string
-	for modelName := range tracker.ModelUsages {
+	for modelName, usage := range tracker.ModelUsages {
+		if usage == nil || (usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.CachedTokens == 0) {
+			continue
+		}
 		if _, ok := telemetry.GetPricingForModel(modelName, pricing); !ok {
 			missing = append(missing, modelName)
 		}
