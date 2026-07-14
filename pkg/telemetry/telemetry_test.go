@@ -144,14 +144,27 @@ func TestUsageTracker_FormatSummary(t *testing.T) {
 		t.Errorf("Summary missing estimated cost: %s", summary)
 	}
 
-	// Test formatting with no cost but pricing configured (should show $0.00000)
+	// Test formatting with missing pricing (should show N/A)
 	tracker2 := NewUsageTracker()
 	tracker2.RecordUsage("unknown-model", TokenUsage{
 		InputTokens: 10,
 	})
 	summary2 := tracker2.FormatSummary(pricing)
-	if !strings.Contains(summary2, "$0.00000") {
-		t.Errorf("Summary missing 0 cost format: %s", summary2)
+	if !strings.Contains(summary2, "N/A (Missing pricing config)") {
+		t.Errorf("Summary missing N/A cost format: %s", summary2)
+	}
+
+	// Test formatting with mixed models (some missing pricing)
+	trackerMixed := NewUsageTracker()
+	trackerMixed.RecordUsage("test-model", TokenUsage{
+		InputTokens: 10,
+	})
+	trackerMixed.RecordUsage("unknown-model", TokenUsage{
+		InputTokens: 10,
+	})
+	summaryMixed := trackerMixed.FormatSummary(pricing)
+	if !strings.Contains(summaryMixed, "Incomplete, missing pricing for some models") {
+		t.Errorf("Summary missing incomplete cost format: %s", summaryMixed)
 	}
 
 	// Test formatting with no cost and no pricing configured

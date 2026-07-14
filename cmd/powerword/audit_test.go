@@ -213,3 +213,107 @@ func TestAuditCmd_FallbackPricing(t *testing.T) {
 		t.Errorf("expected correct fallback pricing row calculation, got: %s", output)
 	}
 }
+
+func TestAuditCmd_MissingPricing(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "powerword-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	origActive := config.Active
+	config.Active = &config.Config{
+		Pricing: map[string]telemetry.ModelPricing{
+			// Empty pricing to force missing pricing
+		},
+	}
+	defer func() { config.Active = origActive }()
+
+	telemetryData := `{
+		"turns": 2,
+		"model_usages": {
+			"unknown-model-foo": {
+				"input_tokens": 100,
+				"output_tokens": 50,
+				"cached_tokens": 0
+			}
+		}
+	}`
+	filePath := filepath.Join(tmpDir, "telemetry.json")
+	if wErr := os.WriteFile(filePath, []byte(telemetryData), 0600); wErr != nil {
+		t.Fatalf("failed to write mock telemetry: %v", wErr)
+	}
+
+	// 1. Markdown output: should show N/A and Incomplete status
+	cmd := newAuditCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--file", filePath, "--limit", "1.5", "--format", "markdown"})
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "| `unknown-model-foo` | 100 | 50 | 0 | N/A |") {
+		t.Errorf("expected N/A for missing model cost, got: %s", output)
+	}
+	if !strings.Contains(output, "| **Total** | **100** | **50** | **0** | **$0.00000 (Incomplete)** |") {
+		t.Errorf("expected incomplete total cost, got: %s", output)
+	}
+	if !strings.Contains(output, "- **Status:** ⚠️ Missing Pricing (Budget Incomplete)") {
+		t.Errorf("expected missing pricing status, got: %s", output)
+	}
+
+	// 2. Text output: should show N/A in Estimated Cost
+	cmdText := newAuditCmd()
+	var bufText bytes.Buffer
+	cmdText.SetOut(&bufText)
+	cmdText.SetArgs([]string{"--file", filePath, "--limit", "1.5", "--format", "text"})
+	err = cmdText.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	outputText := bufText.String()
+	if !strings.Contains(outputText, "- Estimated Cost: N/A") {
+		t.Errorf("expected N/A for estimated cost in text output, got: %s", outputText)
+	}
+}
+
+func TestAuditCmd_StrictWithMissingPricing(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "powerword-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	origActive := config.Active
+	config.Active = &config.Config{
+		Pricing: map[string]telemetry.ModelPricing{},
+	}
+	defer func() { config.Active = origActive }()
+
+	telemetryData := `{
+		"turns": 2,
+		"model_usages": {
+			"unknown-model-foo": {
+				"input_tokens": 100,
+				"output_tokens": 50,
+				"cached_tokens": 0
+			}
+		}
+	}`
+	filePath := filepath.Join(tmpDir, "telemetry.json")
+	if wErr := os.WriteFile(filePath, []byte(telemetryData), 0600); wErr != nil {
+		t.Fatalf("failed to write mock telemetry: %v", wErr)
+	}
+
+	cmdStrict := newAuditCmd()
+	cmdStrict.SetArgs([]string{"--file", filePath, "--limit", "1.5", "--strict"})
+	err = cmdStrict.Execute()
+	if err == nil {
+		t.Fatal("expected strict execution to fail with missing pricing error, got nil")
+	}
+	if !strings.Contains(err.Error(), "budget audit failed: missing pricing for models") {
+		t.Errorf("expected missing pricing error, got: %v", err)
+	}
+}

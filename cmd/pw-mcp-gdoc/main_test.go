@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -279,7 +280,7 @@ func TestGDoc_Main_RunErrors(t *testing.T) {
 	}
 }
 
-func TestGDoc_Main_OpenBrowser(t *testing.T) {
+func TestGDoc_Main_OpenBrowser_SuccessCases(t *testing.T) {
 	// Mock out hooks to avoid spawning real browser processes in tests
 	oldBrowserHook := runBrowserCmdHook
 	oldWindowsHook := runWindowsBrowserCmdHook
@@ -313,6 +314,52 @@ func TestGDoc_Main_OpenBrowser(t *testing.T) {
 			t.Error("expected windowsCmdHook to be called on windows platform")
 		}
 	}
+
+	// Test safety check with port in host
+	browserCmdCalled = false
+	windowsCmdCalled = false
+	openBrowser("https://accounts.google.com:443/o/oauth2/auth")
+	switch runtime.GOOS {
+	case "darwin", "linux":
+		if !browserCmdCalled {
+			t.Error("expected browserCmdHook to be called for accounts.google.com:443 URL")
+		}
+	case "windows":
+		if !windowsCmdCalled {
+			t.Error("expected windowsCmdHook to be called for accounts.google.com:443 URL")
+		}
+	}
+}
+
+func TestGDoc_Main_OpenBrowser_FailureCases(t *testing.T) {
+	// Mock out hooks to avoid spawning real browser processes in tests
+	oldBrowserHook := runBrowserCmdHook
+	oldWindowsHook := runWindowsBrowserCmdHook
+	defer func() {
+		runBrowserCmdHook = oldBrowserHook
+		runWindowsBrowserCmdHook = oldWindowsHook
+	}()
+
+	var browserCmdCalled bool
+	var windowsCmdCalled bool
+
+	runBrowserCmdHook = func(name, url string) error {
+		browserCmdCalled = true
+		return nil
+	}
+	runWindowsBrowserCmdHook = func(url string) error {
+		windowsCmdCalled = true
+		return nil
+	}
+
+	// 5. Test command execution error returns
+	runBrowserCmdHook = func(name, url string) error {
+		return errors.New("browser open failed")
+	}
+	runWindowsBrowserCmdHook = func(url string) error {
+		return errors.New("windows browser open failed")
+	}
+	openBrowser("https://accounts.google.com/o/oauth2/auth")
 
 	// 2. HTTP (invalid scheme)
 	browserCmdCalled = false

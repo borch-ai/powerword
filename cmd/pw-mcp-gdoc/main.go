@@ -401,18 +401,26 @@ func openBrowser(rawURL string) {
 		fmt.Fprintf(os.Stderr, "warning: failed to parse authorization URL: %v\n", err)
 		return
 	}
-	if parsed.Scheme != "https" || parsed.Host != "accounts.google.com" {
-		fmt.Fprintf(os.Stderr, "warning: safety check failed; authorization URL host %q is not accounts.google.com. Please open the URL manually.\n", parsed.Host)
+	if parsed.Scheme != "https" || parsed.Hostname() != "accounts.google.com" {
+		fmt.Fprintf(os.Stderr, "warning: safety check failed; authorization URL host %q is not accounts.google.com. Please open the URL manually.\n", parsed.Hostname())
 		return
 	}
 
+	var openErr error
 	switch runtime.GOOS {
 	case "darwin":
-		_ = runBrowserCmdHook("open", rawURL)
+		openErr = runBrowserCmdHook("open", rawURL)
 	case "windows":
-		_ = runWindowsBrowserCmdHook(rawURL)
+		openErr = runWindowsBrowserCmdHook(rawURL)
 	case "linux":
-		_ = runBrowserCmdHook("xdg-open", rawURL)
+		openErr = runBrowserCmdHook("xdg-open", rawURL)
+	default:
+		fmt.Fprintf(os.Stderr, "warning: automatic browser opening is not supported on OS %q. Please open the link manually.\n", runtime.GOOS)
+		return
+	}
+
+	if openErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to automatically open browser: %v. Please open the link manually.\n", openErr)
 	}
 }
 
