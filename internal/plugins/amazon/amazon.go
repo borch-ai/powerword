@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/borch-ai/powerword/pkg/config"
@@ -68,7 +69,11 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 
 	resp, err := as.client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("http request failed: %w", err)
+		errStr := err.Error()
+		if apiKey != "" {
+			errStr = strings.ReplaceAll(errStr, apiKey, "REDACTED")
+		}
+		return 0, fmt.Errorf("http request failed: %s", errStr)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

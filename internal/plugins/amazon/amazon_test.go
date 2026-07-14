@@ -3,6 +3,7 @@ package amazon_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -58,13 +59,24 @@ func TestAmazonService_InvalidBaseURL(t *testing.T) {
 	}
 }
 
+type mockRoundTripper func(req *http.Request) (*http.Response, error)
+
+func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return m(req)
+}
+
 func TestAmazonService_ClientDoError(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Plugins.Amazon.APIKey = "real-key"
-	cfg.Plugins.Amazon.BaseURL = "https://non-existent-api-url.example.com"
+	cfg.Plugins.Amazon.BaseURL = "https://api.scaleserp.com"
 
-	// Using default client which will timeout/fail on non-existent domain.
-	svc := amazon.NewAmazonService(cfg, nil)
+	client := &http.Client{
+		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("network connection refused")
+		}),
+	}
+
+	svc := amazon.NewAmazonService(cfg, client)
 	_, err := svc.GetListingCount(context.Background(), "test")
 	if err == nil {
 		t.Error("expected HTTP request failure error, got nil")

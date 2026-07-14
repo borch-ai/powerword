@@ -106,7 +106,7 @@ func handleGetListingCount(svc *amazon.AmazonService) func(context.Context, *mcp
 			ListingCount: count,
 		}
 
-		data, err := json.Marshal(res)
+		data, err := json.MarshalIndent(res, "", "  ")
 		if err != nil {
 			return nil, err
 		}

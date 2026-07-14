@@ -30,5 +30,6 @@ token_path = "~/.config/powerword/gdoc_token.json"
 
 [plugins.amazon]
 api_key = ""
+base_url = "" # Optional. Defaults to https://api.scaleserp.com
 
 
