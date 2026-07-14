@@ -422,3 +422,38 @@ func TestAuditCmd_NegativeLimit(t *testing.T) {
 		t.Errorf("expected negative limit error, got: %v", err)
 	}
 }
+
+func TestAuditCmd_NullModelUsage(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "powerword-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	// Telemetry data where a model usage is null
+	telemetryData := `{
+		"turns": 2,
+		"model_usages": {
+			"gemini-1.5-pro": null
+		}
+	}`
+	filePath := filepath.Join(tmpDir, "telemetry.json")
+	if wErr := os.WriteFile(filePath, []byte(telemetryData), 0600); wErr != nil {
+		t.Fatalf("failed to write mock telemetry: %v", wErr)
+	}
+
+	cmd := newAuditCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--file", filePath, "--limit", "2.0", "--format", "markdown"})
+
+	err = cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "| `gemini-1.5-pro` | 0 | 0 | 0 |") {
+		t.Errorf("expected 0 for null model usage fields, got: %s", output)
+	}
+}

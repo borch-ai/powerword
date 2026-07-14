@@ -40,19 +40,16 @@ func NewGDocService(cfg *config.Config, httpClient *http.Client) *GDocService {
 // getClient instantiates and returns Docs API client.
 func (s *GDocService) getClient(ctx context.Context) (*docs.Service, error) {
 	s.mu.Lock()
-	client := s.httpClient
-	s.mu.Unlock()
-
-	if client == nil {
+	if s.httpClient == nil {
 		c, err := s.authorize(ctx)
 		if err != nil {
+			s.mu.Unlock()
 			return nil, err
 		}
-		s.mu.Lock()
 		s.httpClient = c
-		client = c
-		s.mu.Unlock()
 	}
+	client := s.httpClient
+	s.mu.Unlock()
 
 	opts := []option.ClientOption{option.WithHTTPClient(client)}
 	if ep := validateEndpoint(os.Getenv("POWERWORD_GDOC_API_ENDPOINT")); ep != "" {

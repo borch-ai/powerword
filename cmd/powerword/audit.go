@@ -182,16 +182,22 @@ func renderMarkdownAudit(cmd *cobra.Command, tracker *telemetry.UsageTracker, pr
 	var totalInput, totalOutput, totalCached int
 	for _, modelName := range modelNames {
 		usage := tracker.ModelUsages[modelName]
+		var input, output, cached int
+		if usage != nil {
+			input = usage.InputTokens
+			output = usage.OutputTokens
+			cached = usage.CachedTokens
+		}
 		mPricing := telemetry.GetPricingForModel(modelName, pricing)
 		if mPricing == nil {
-			cmd.Printf("| `%s` | %d | %d | %d | N/A |\n", modelName, usage.InputTokens, usage.OutputTokens, usage.CachedTokens)
+			cmd.Printf("| `%s` | %d | %d | %d | N/A |\n", modelName, input, output, cached)
 		} else {
 			mCost := calculateModelCost(usage, mPricing)
-			cmd.Printf("| `%s` | %d | %d | %d | $%.5f |\n", modelName, usage.InputTokens, usage.OutputTokens, usage.CachedTokens, mCost)
+			cmd.Printf("| `%s` | %d | %d | %d | $%.5f |\n", modelName, input, output, cached, mCost)
 		}
-		totalInput += usage.InputTokens
-		totalOutput += usage.OutputTokens
-		totalCached += usage.CachedTokens
+		totalInput += input
+		totalOutput += output
+		totalCached += cached
 	}
 	cmd.Println("| --- | --- | --- | --- | --- |")
 	totalCostStr := fmt.Sprintf("$%.5f", cost)

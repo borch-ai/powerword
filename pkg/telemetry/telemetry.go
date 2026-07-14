@@ -61,6 +61,9 @@ func (u *UsageTracker) EstimatedCost(pricing map[string]ModelPricing) float64 {
 
 	var totalCost float64
 	for model, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		p := GetPricingForModel(model, pricing)
 		if p == nil {
 			continue
@@ -106,6 +109,9 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 
 	var totalInput, totalOutput, totalCached int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		totalInput += usage.InputTokens
 		totalOutput += usage.OutputTokens
 		totalCached += usage.CachedTokens
@@ -156,6 +162,9 @@ func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, tot
 func (u *UsageTracker) TotalTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.InputTokens + usage.OutputTokens
 	}
 	return total
@@ -165,6 +174,9 @@ func (u *UsageTracker) TotalTokens() int {
 func (u *UsageTracker) TotalInputTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.InputTokens
 	}
 	return total
@@ -174,6 +186,9 @@ func (u *UsageTracker) TotalInputTokens() int {
 func (u *UsageTracker) TotalOutputTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.OutputTokens
 	}
 	return total
@@ -183,6 +198,9 @@ func (u *UsageTracker) TotalOutputTokens() int {
 func (u *UsageTracker) TotalCachedTokens() int {
 	var total int
 	for _, usage := range u.ModelUsages {
+		if usage == nil {
+			continue
+		}
 		total += usage.CachedTokens
 	}
 	return total

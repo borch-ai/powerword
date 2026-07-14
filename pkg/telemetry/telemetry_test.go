@@ -204,3 +204,38 @@ func TestUsageTracker_Totals(t *testing.T) {
 		t.Errorf("TotalCachedTokens() = %d; want 50", got)
 	}
 }
+
+func TestUsageTracker_NilModelUsage(t *testing.T) {
+	tracker := NewUsageTracker()
+	// Manually insert a nil entry into the map to trigger nil-pointer checks
+	tracker.ModelUsages["nil-model"] = nil
+
+	pricing := map[string]ModelPricing{
+		"nil-model": {Input: 1.0, Output: 2.0},
+	}
+
+	// 1. EstimatedCost
+	if cost := tracker.EstimatedCost(pricing); cost != 0 {
+		t.Errorf("Expected 0 cost for nil model usage, got %f", cost)
+	}
+
+	// 2. FormatSummary
+	summary := tracker.FormatSummary(pricing)
+	if !strings.Contains(summary, "Total Tokens: 0") {
+		t.Errorf("Expected 0 total tokens in summary, got: %s", summary)
+	}
+
+	// 3. Totals
+	if got := tracker.TotalTokens(); got != 0 {
+		t.Errorf("TotalTokens() = %d; want 0", got)
+	}
+	if got := tracker.TotalInputTokens(); got != 0 {
+		t.Errorf("TotalInputTokens() = %d; want 0", got)
+	}
+	if got := tracker.TotalOutputTokens(); got != 0 {
+		t.Errorf("TotalOutputTokens() = %d; want 0", got)
+	}
+	if got := tracker.TotalCachedTokens(); got != 0 {
+		t.Errorf("TotalCachedTokens() = %d; want 0", got)
+	}
+}

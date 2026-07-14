@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/borch-ai/powerword/pkg/config"
@@ -729,4 +730,68 @@ func TestGDocService_Authorize_OAuthUserFlow_TokenNotChanged(t *testing.T) {
 	if string(data) != tokenContent {
 		t.Errorf("expected token file content to remain unchanged, got %s", string(data))
 	}
+}
+
+func TestGDocService_GetClient_Concurrent(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "gdoc-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	credFile := filepath.Join(tmpDir, "credentials.json")
+	tokenFile := filepath.Join(tmpDir, "token.json")
+
+	// Dummy client credentials
+	credBytes := []byte(`{"installed":{"client_id":"client123","client_secret":"secret123","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost:8080/callback"]}}`)
+	err = os.WriteFile(credFile, credBytes, 0600)
+	if err != nil {
+		t.Fatalf("failed to write dummy client credentials: %v", err)
+	}
+
+	tokenContent := `{"access_token":"access123","token_type":"Bearer","refresh_token":"refresh123","expiry":"2100-01-01T00:00:00Z"}`
+	err = os.WriteFile(tokenFile, []byte(tokenContent), 0600)
+	if err != nil {
+		t.Fatalf("failed to write dummy token: %v", err)
+	}
+
+	cfg := &config.Config{
+		Plugins: config.PluginsConfig{
+			GDoc: config.GDocConfig{
+				CredentialsPath: credFile,
+				TokenPath:       tokenFile,
+			},
+		},
+	}
+
+	mockClient := &http.Client{
+		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{}`)),
+			}, nil
+		}),
+	}
+
+	svc := NewGDocService(cfg, nil)
+	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, mockClient)
+
+	var wg sync.WaitGroup
+	const numGoroutines = 10
+	wg.Add(numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			docsSvc, err := svc.getClient(ctx)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if docsSvc == nil {
+				t.Error("expected docs service client to be non-nil")
+			}
+		}()
+	}
+	wg.Wait()
 }
