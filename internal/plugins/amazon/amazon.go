@@ -57,11 +57,11 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	if parsedBase.Scheme != "http" && parsedBase.Scheme != "https" {
 		return 0, fmt.Errorf("invalid base url scheme %q: must be http or https", parsedBase.Scheme)
 	}
-
-	u, err := url.Parse(baseURL + "/search")
-	if err != nil {
-		return 0, fmt.Errorf("invalid base url search path: %w", err)
+	if parsedBase.Host == "" {
+		return 0, fmt.Errorf("invalid base url: missing host")
 	}
+
+	u := parsedBase.JoinPath("search")
 
 	q := u.Query()
 	q.Set("api_key", apiKey)
@@ -90,7 +90,7 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return 0, fmt.Errorf("api returned status %d: %s", resp.StatusCode, string(body))
 	}
 

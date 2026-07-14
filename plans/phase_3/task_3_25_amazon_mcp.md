@@ -13,7 +13,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a
 
 > [!IMPORTANT]
 > **API Credentials and Mock fallback**:
-> By default, if the Rainforest/ScaleSerp API key is not configured, the plugin falls back to a mock listing count of `4200` to allow local dry-runs and integration testing without requiring a live Rainforest/ScaleSerp paid subscription.
+> By default, the plugin requires `api_key` to be configured. If `api_key` is explicitly set to `"mock"`, the plugin runs in mock mode returning `4200` to allow local dry-runs and offline integration testing without requiring a live Rainforest/ScaleSerp paid subscription. If `api_key` is empty, it returns a configuration error.
 
 ---
 

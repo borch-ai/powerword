@@ -68,6 +68,18 @@ func TestAmazonService_BaseURLMissingScheme(t *testing.T) {
 	}
 }
 
+func TestAmazonService_BaseURLMissingHost(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Plugins.Amazon.APIKey = "real-key"
+	cfg.Plugins.Amazon.BaseURL = "https://" // missing host
+
+	svc := amazon.NewAmazonService(cfg, nil)
+	_, err := svc.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error due to missing base URL host, got nil")
+	}
+}
+
 type mockRoundTripper func(req *http.Request) (*http.Response, error)
 
 func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

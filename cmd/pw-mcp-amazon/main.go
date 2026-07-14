@@ -56,7 +56,7 @@ const (
 	}`
 )
 
-func setupServer(workspaceRoot string, cfg *config.Config, svc *amazon.AmazonService) (*mcp.Server, error) {
+func setupServer(_ string, cfg *config.Config, svc *amazon.AmazonService) (*mcp.Server, error) {
 	srv := mcp.NewServer(&mcp.Implementation{
 		Name:    "pw-mcp-amazon",
 		Version: "0.1.0",
