@@ -45,6 +45,10 @@ func newAuditCmd() *cobra.Command {
 }
 
 func runAuditCommand(cmd *cobra.Command, filePath string, limit float64, strict bool, format string) error {
+	if format != "markdown" && format != "text" {
+		return fmt.Errorf("unsupported output format %q; must be either \"markdown\" or \"text\"", format)
+	}
+
 	// 1. Check file existence
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		cmd.Printf("No telemetry file found at %s. Skipping budget audit.\n", filePath)

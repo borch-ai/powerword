@@ -317,3 +317,15 @@ func TestAuditCmd_StrictWithMissingPricing(t *testing.T) {
 		t.Errorf("expected missing pricing error, got: %v", err)
 	}
 }
+
+func TestAuditCmd_InvalidFormat(t *testing.T) {
+	cmd := newAuditCmd()
+	cmd.SetArgs([]string{"--format", "invalid-format"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error due to invalid format, got nil")
+	}
+	if !strings.Contains(err.Error(), "unsupported output format") {
+		t.Errorf("expected unsupported output format error, got: %v", err)
+	}
+}
