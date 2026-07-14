@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/borch-ai/powerword/pkg/config"
 	"golang.org/x/oauth2"
@@ -21,6 +22,7 @@ import (
 // GDocService provides operations on Google Docs.
 type GDocService struct {
 	cfg        *config.Config
+	mu         sync.Mutex
 	httpClient *http.Client
 }
 
@@ -37,15 +39,19 @@ func NewGDocService(cfg *config.Config, httpClient *http.Client) *GDocService {
 
 // getClient instantiates and returns Docs API client.
 func (s *GDocService) getClient(ctx context.Context) (*docs.Service, error) {
-	var client *http.Client
-	if s.httpClient != nil {
-		client = s.httpClient
-	} else {
+	s.mu.Lock()
+	client := s.httpClient
+	s.mu.Unlock()
+
+	if client == nil {
 		c, err := s.authorize(ctx)
 		if err != nil {
 			return nil, err
 		}
+		s.mu.Lock()
+		s.httpClient = c
 		client = c
+		s.mu.Unlock()
 	}
 
 	opts := []option.ClientOption{option.WithHTTPClient(client)}

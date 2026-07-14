@@ -48,6 +48,12 @@ func runAuditCommand(cmd *cobra.Command, filePath string, limit float64, strict 
 	if format != "markdown" && format != "text" {
 		return fmt.Errorf("unsupported output format %q; must be either \"markdown\" or \"text\"", format)
 	}
+	if filePath == "" {
+		return fmt.Errorf("telemetry file path cannot be empty")
+	}
+	if limit < 0 {
+		return fmt.Errorf("limit cannot be negative: %.2f", limit)
+	}
 
 	// 1. Check file existence and type
 	info, err := os.Stat(filePath)

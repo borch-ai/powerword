@@ -396,3 +396,29 @@ func TestAuditCmd_DirectoryPath(t *testing.T) {
 		t.Errorf("expected directory error, got: %v", err)
 	}
 }
+
+func TestAuditCmd_EmptyFilePath(t *testing.T) {
+	cmd := newAuditCmd()
+	cmd.SetArgs([]string{"--file", ""})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty file path, got nil")
+	}
+	if !strings.Contains(err.Error(), "telemetry file path cannot be empty") {
+		t.Errorf("expected empty path error, got: %v", err)
+	}
+}
+
+func TestAuditCmd_NegativeLimit(t *testing.T) {
+	cmd := newAuditCmd()
+	cmd.SetArgs([]string{"--limit", "-1.5"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for negative limit, got nil")
+	}
+	if !strings.Contains(err.Error(), "limit cannot be negative") {
+		t.Errorf("expected negative limit error, got: %v", err)
+	}
+}
