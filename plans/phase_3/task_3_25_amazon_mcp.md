@@ -7,13 +7,13 @@
 
 ## Goal Description
 
-Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a tool to query the commercial Amazon Search API (via Rainforest or ScaleSerp) to retrieve product listing counts for keywords.
+Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a tool to query the commercial ScaleSerp Amazon Search API to retrieve product listing counts for keywords.
 
 ## User Review Required
 
 > [!IMPORTANT]
 > **API Credentials and Mock fallback**:
-> By default, the plugin requires `api_key` to be configured. If `api_key` is explicitly set to `"mock"`, the plugin runs in mock mode returning `4200` to allow local dry-runs and offline integration testing without requiring a live Rainforest/ScaleSerp paid subscription. If `api_key` is empty, it returns a configuration error.
+> By default, the plugin requires `api_key` to be configured. If `api_key` is explicitly set to `"mock"`, the plugin runs in mock mode returning `4200` to allow local dry-runs and offline integration testing without requiring a live ScaleSerp paid subscription. If `api_key` is empty, it returns a configuration error.
 
 ---
 
@@ -25,7 +25,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a
 - Add `AmazonConfig` struct containing `APIKey` and `BaseURL` fields.
 - Add `Amazon` field of type `AmazonConfig` to `PluginsConfig` struct.
 - In `setDefaults`, register defaults for `plugins.amazon.api_key` (empty) and `plugins.amazon.base_url` (empty).
-- In `bindPluginEnvVars`, bind the environment variables `POWERWORD_AMAZON_API_KEY`, `AMAZON_API_KEY`, and `POWERWORD_AMAZON_BASE_URL`.
+- In `bindPluginEnvVars`, bind the environment variables `POWERWORD_AMAZON_API_KEY`, `AMAZON_API_KEY`, and `POWERWORD_AMAZON_SEARCH_BASE_URL`.
 
 #### [MODIFY] [powerword.example.toml](file://../../powerword.example.toml)
 - Document the Amazon plugin settings block:
@@ -48,7 +48,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-amazon` exposing a
 ### Amazon Plugin Implementation
 
 #### [NEW] [amazon.go](file://../../internal/plugins/amazon/amazon.go)
-- Core service that manages calls to the ScaleSerp/Rainforest APIs.
+- Core service that manages calls to the ScaleSerp API.
 - Implements `GetListingCount(ctx context.Context, keyword string) (int, error)`.
 - Respects context cancellation and propagates errors.
 

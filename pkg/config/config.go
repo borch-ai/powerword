@@ -478,7 +478,7 @@ func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.gdoc.token_path", "POWERWORD_GDOC_TOKEN_PATH")
 	bindEnv(v, "plugins.gdoc.service_account_path", "POWERWORD_GDOC_SERVICE_ACCOUNT_PATH")
 	bindEnv(v, "plugins.amazon.api_key", "POWERWORD_AMAZON_API_KEY", "AMAZON_API_KEY")
-	bindEnv(v, "plugins.amazon.base_url", "POWERWORD_AMAZON_BASE_URL")
+	bindEnv(v, "plugins.amazon.base_url", "POWERWORD_AMAZON_SEARCH_BASE_URL")
 }
 
 func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {

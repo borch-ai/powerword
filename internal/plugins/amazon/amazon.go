@@ -14,7 +14,7 @@ import (
 	"github.com/borch-ai/powerword/pkg/config"
 )
 
-// AmazonService coordinates calls to the commercial Amazon Search API (ScaleSerp/Rainforest API).
+// AmazonService coordinates calls to the commercial ScaleSerp Amazon Search API.
 type AmazonService struct {
 	cfg    *config.Config
 	client *http.Client
@@ -67,9 +67,8 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	q.Set("api_key", apiKey)
 	q.Set("q", keyword)
 
-	// Support both ScaleSerp and Rainforest parameters:
+	// Set query parameters for ScaleSerp Search:
 	q.Set("search_type", "products")
-	q.Set("type", "search")
 
 	u.RawQuery = q.Encode()
 
