@@ -24,4 +24,11 @@ token_path = "~/.config/powerword/gdoc_token.json"
 # Or for service account:
 # service_account_path = "~/.config/powerword/service_account.json"
 
+[servers.amazon]
+   command = "go"
+   args = ["run", "./cmd/pw-mcp-amazon"]
+
+[plugins.amazon]
+api_key = ""
+
 

@@ -128,6 +128,12 @@ type GDocConfig struct {
 	ServiceAccountPath string `mapstructure:"service_account_path"`
 }
 
+// AmazonConfig holds parameters for the Amazon search plugin.
+type AmazonConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	BaseURL string `mapstructure:"base_url"`
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
@@ -139,6 +145,7 @@ type PluginsConfig struct {
 	YouTube  YouTubeConfig  `mapstructure:"youtube"`
 	DB       DBConfig       `mapstructure:"db"`
 	GDoc     GDocConfig     `mapstructure:"gdoc"`
+	Amazon   AmazonConfig   `mapstructure:"amazon"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -393,6 +400,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("plugins.gdoc.credentials_path", "")
 	v.SetDefault("plugins.gdoc.token_path", "")
 	v.SetDefault("plugins.gdoc.service_account_path", "")
+	v.SetDefault("plugins.amazon.api_key", "")
+	v.SetDefault("plugins.amazon.base_url", "")
 }
 
 // bindEnvVars binds all known environment variable overrides to their Viper config paths.
@@ -467,6 +476,8 @@ func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.gdoc.credentials_path", "POWERWORD_GDOC_CREDENTIALS_PATH")
 	bindEnv(v, "plugins.gdoc.token_path", "POWERWORD_GDOC_TOKEN_PATH")
 	bindEnv(v, "plugins.gdoc.service_account_path", "POWERWORD_GDOC_SERVICE_ACCOUNT_PATH")
+	bindEnv(v, "plugins.amazon.api_key", "POWERWORD_AMAZON_API_KEY", "AMAZON_API_KEY")
+	bindEnv(v, "plugins.amazon.base_url", "POWERWORD_AMAZON_BASE_URL")
 }
 
 func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {
