@@ -228,6 +228,9 @@ func hasOSEnvOverride(key string) bool {
 	case "POWERWORD_SERP_API_KEY":
 		return os.Getenv("POWERWORD_SERP_API_KEY") != "" ||
 			os.Getenv("SERP_API_KEY") != ""
+	case "POWERWORD_AMAZON_API_KEY":
+		return os.Getenv("POWERWORD_AMAZON_API_KEY") != "" ||
+			os.Getenv("AMAZON_API_KEY") != ""
 	default:
 		return os.Getenv(key) != ""
 	}

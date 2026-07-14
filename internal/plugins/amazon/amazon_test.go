@@ -240,3 +240,24 @@ func TestAmazonService_GetListingCount_Success(t *testing.T) {
 		t.Errorf("expected 1234, got %d", count)
 	}
 }
+
+func TestAmazonService_MalformedSearchResults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"search_results": {"total_results": "invalid-int-format"}}`))
+	}))
+	defer srv.Close()
+
+	cfg := &config.Config{}
+	cfg.Plugins.Amazon.APIKey = "real-key"
+	cfg.Plugins.Amazon.BaseURL = srv.URL
+
+	svc := amazon.NewAmazonService(cfg, nil)
+	_, err := svc.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error decoding malformed search_results object, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to decode search_results object") {
+		t.Errorf("expected error message to contain 'failed to decode search_results object', got: %v", err)
+	}
+}

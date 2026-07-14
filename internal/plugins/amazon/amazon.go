@@ -118,7 +118,9 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 		var searchResultsObj struct {
 			TotalResults int `json:"total_results"`
 		}
-		_ = json.Unmarshal(payload.SearchResults, &searchResultsObj)
+		if err := json.Unmarshal(payload.SearchResults, &searchResultsObj); err != nil {
+			return 0, fmt.Errorf("failed to decode search_results object: %w", err)
+		}
 		count = searchResultsObj.TotalResults
 	}
 
