@@ -115,14 +115,34 @@ func (u *UsageTracker) FormatSummary(pricing map[string]ModelPricing) string {
 		fmt.Fprintf(&sb, "- Cached Tokens: %d\n", totalCached)
 	}
 
-	if cost > 0 {
-		fmt.Fprintf(&sb, "- Estimated Cost: $%.5f\n", cost)
-	} else if len(pricing) > 0 && total > 0 {
-		sb.WriteString("- Estimated Cost: $0.00000 (Check pricing config)\n")
+	var hasMissingPricing bool
+	for model := range u.ModelUsages {
+		if getPricingForModel(model, pricing) == nil {
+			hasMissingPricing = true
+			break
+		}
 	}
+
+	sb.WriteString(formatCostSummary(cost, hasMissingPricing, len(pricing), total))
 	fmt.Fprintf(&sb, "- Turns: %d\n", u.Turns)
 
 	return sb.String()
+}
+
+func formatCostSummary(cost float64, hasMissingPricing bool, lenPricing int, total int) string {
+	if cost > 0 {
+		if hasMissingPricing {
+			return fmt.Sprintf("- Estimated Cost: $%.5f (Incomplete, missing pricing for some models)\n", cost)
+		}
+		return fmt.Sprintf("- Estimated Cost: $%.5f\n", cost)
+	}
+	if lenPricing > 0 && total > 0 {
+		if hasMissingPricing {
+			return "- Estimated Cost: N/A (Incomplete, missing pricing for some models)\n"
+		}
+		return "- Estimated Cost: $0.00000 (Check pricing config)\n"
+	}
+	return ""
 }
 
 // TotalTokens returns the total input and output tokens.
