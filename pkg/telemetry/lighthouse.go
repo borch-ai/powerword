@@ -165,15 +165,8 @@ func spoolOfflineEvent(e TelemetryEvent) {
 	}
 	defer func() { _ = f.Close() }()
 
-	startOffset, seekErr := f.Seek(0, io.SeekEnd)
-	if seekErr != nil {
-		log.Printf("Warning: failed to seek spool file: %v", seekErr)
-		return
-	}
-
 	if _, writeErr := f.Write(append(payload, '\n')); writeErr != nil {
 		log.Printf("Warning: failed to write to telemetry spool file: %v", writeErr)
-		_ = f.Truncate(startOffset)
 	}
 }
 
@@ -245,19 +238,12 @@ func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
 	}
 	defer func() { _ = spoolFile.Close() }()
 
-	// Record start offset so we can truncate back to it if any write fails (avoiding corruption)
-	startOffset, err := spoolFile.Seek(0, io.SeekEnd)
-	if err != nil {
-		return err
-	}
-
 	for _, ev := range events {
 		payload, err := json.Marshal(ev)
 		if err != nil {
 			continue
 		}
 		if _, writeErr := spoolFile.Write(append(payload, '\n')); writeErr != nil {
-			_ = spoolFile.Truncate(startOffset)
 			return writeErr
 		}
 	}
