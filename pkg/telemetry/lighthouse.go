@@ -352,6 +352,25 @@ var (
 	syncOnce sync.Once
 )
 
+// isRetryableError determines if the error represents a retryable condition
+// (such as network issues, timeouts, or 429/5xx HTTP responses).
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	if strings.Contains(errStr, "unexpected status code") {
+		var code int
+		// Scan format: "unexpected status code %d"
+		if _, scanErr := fmt.Sscanf(errStr, "unexpected status code %d", &code); scanErr == nil {
+			return code == 429 || code >= 500
+		}
+		// Fallback matches:
+		return strings.Contains(errStr, "429") || strings.Contains(errStr, "500") || strings.Contains(errStr, "502") || strings.Contains(errStr, "503") || strings.Contains(errStr, "504")
+	}
+	return true
+}
+
 // SubmitToLighthouse reads configuration from the environment and submits
 // a telemetry event to Lighthouse asynchronously in a background goroutine.
 // It is a no-op if LIGHTHOUSE_URL is unset.
@@ -397,7 +416,9 @@ func SubmitToLighthouse(e TelemetryEvent) {
 
 		if err := adapter.Submit(ctx, e); err != nil {
 			log.Printf("Warning: lighthouse telemetry submission failed: %v", err)
-			spoolOfflineEvent(e)
+			if isRetryableError(err) {
+				spoolOfflineEvent(e)
+			}
 		}
 	}()
 }

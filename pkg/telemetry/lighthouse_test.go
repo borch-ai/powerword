@@ -689,6 +689,31 @@ func TestLighthouseAdapter_SubmitBatch_EmptyAndNoURL(t *testing.T) {
 	}
 }
 
+func TestIsRetryableError(t *testing.T) {
+	tests := []struct {
+		err      error
+		expected bool
+	}{
+		{nil, false},
+		{fmt.Errorf("http request failed: connection refused"), true},
+		{fmt.Errorf("unexpected status code 400 (Bad Request)"), false},
+		{fmt.Errorf("unexpected status code 401 (Unauthorized)"), false},
+		{fmt.Errorf("unexpected status code 403 (Forbidden)"), false},
+		{fmt.Errorf("unexpected status code 404 (Not Found)"), false},
+		{fmt.Errorf("unexpected status code 429 (Too Many Requests)"), true},
+		{fmt.Errorf("unexpected status code 500 (Internal Server Error)"), true},
+		{fmt.Errorf("unexpected status code 503 (Service Unavailable)"), true},
+		{fmt.Errorf("unexpected status code 500"), true}, // fallback case
+	}
+
+	for _, tt := range tests {
+		result := isRetryableError(tt.err)
+		if result != tt.expected {
+			t.Errorf("isRetryableError(%v) = %v; expected %v", tt.err, result, tt.expected)
+		}
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || s[0:len(substr)] == substr || s[len(s)-len(substr):] == substr || stringContains(s, substr))
 }

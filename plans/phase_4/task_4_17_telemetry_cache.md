@@ -1,7 +1,7 @@
 # plan: Task 4.17: Client-Side Offline Telemetry Cache (`pkg/telemetry`)
 
 **Status:** Completed
-**Go Version:** 1.26.4
+**Go Version:** 1.26.5
 **Date Completed:** 2026-07-15
 **Unit Test Coverage:** 91.0%
 
