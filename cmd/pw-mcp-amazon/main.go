@@ -46,7 +46,7 @@ func run() error {
 	err = srv.Run(context.Background(), transport)
 	if err != nil {
 		errStr := err.Error()
-		if errors.Is(err, io.EOF) || (strings.HasSuffix(errStr, "EOF") && !strings.Contains(errStr, "unexpected EOF")) {
+		if errors.Is(err, io.EOF) || errStr == "EOF" || (strings.Contains(errStr, "server is closing") && strings.Contains(errStr, "EOF")) {
 			return nil
 		}
 		return err
