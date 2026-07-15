@@ -247,6 +247,29 @@ func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) {
 	}
 }
 
+// processSyncFile processes a single temporary sync file: syncs to Lighthouse, deletes on success, rolls back on failure.
+func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) {
+	events, readErr := readSpooledEvents(syncPath)
+	if readErr != nil {
+		log.Printf("Warning: error reading temporary telemetry sync file: %v", readErr)
+	}
+
+	if len(events) == 0 {
+		_ = os.Remove(syncPath)
+		return
+	}
+
+	if syncErr := sendBatchEvents(ctx, adapter, events); syncErr == nil {
+		if removeErr := os.Remove(syncPath); removeErr != nil {
+			log.Printf("Warning: failed to remove temporary telemetry sync file: %v", removeErr)
+		}
+	} else {
+		log.Printf("Warning: failed to sync spooled telemetry events: %v", syncErr)
+		rollbackSpooledEvents(spoolPath, events)
+		_ = os.Remove(syncPath)
+	}
+}
+
 // SyncSpooledEvents processes any spooled telemetry events and sends them to Lighthouse.
 func SyncSpooledEvents(ctx context.Context, url, apiKey string) {
 	if url == "" {
@@ -261,6 +284,23 @@ func SyncSpooledEvents(ctx context.Context, url, apiKey string) {
 	spoolDir := filepath.Join(home, ".local", "share", "powerword")
 	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
 
+	adapter := &LighthouseAdapter{
+		URL:    url,
+		APIKey: apiKey,
+	}
+
+	// 1. Process any leftover stranded temporary sync files from previous runs
+	files, readDirErr := os.ReadDir(spoolDir)
+	if readDirErr == nil {
+		for _, entry := range files {
+			if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), "telemetry_spool_sync_") && strings.HasSuffix(entry.Name(), ".jsonl") {
+				syncPath := filepath.Join(spoolDir, entry.Name())
+				processSyncFile(ctx, adapter, syncPath, spoolPath)
+			}
+		}
+	}
+
+	// 2. Process the main spool file if it exists and has content
 	fi, statErr := os.Stat(spoolPath)
 	if statErr != nil {
 		if os.IsNotExist(statErr) {
@@ -280,30 +320,7 @@ func SyncSpooledEvents(ctx context.Context, url, apiKey string) {
 		return
 	}
 
-	events, readErr := readSpooledEvents(tempSyncPath)
-	if readErr != nil {
-		log.Printf("Warning: error reading temporary telemetry sync file: %v", readErr)
-	}
-
-	if len(events) == 0 {
-		_ = os.Remove(tempSyncPath)
-		return
-	}
-
-	adapter := &LighthouseAdapter{
-		URL:    url,
-		APIKey: apiKey,
-	}
-
-	if syncErr := sendBatchEvents(ctx, adapter, events); syncErr == nil {
-		if removeErr := os.Remove(tempSyncPath); removeErr != nil {
-			log.Printf("Warning: failed to remove temporary telemetry sync file: %v", removeErr)
-		}
-	} else {
-		log.Printf("Warning: failed to sync spooled telemetry events: %v", syncErr)
-		rollbackSpooledEvents(spoolPath, events)
-		_ = os.Remove(tempSyncPath)
-	}
+	processSyncFile(ctx, adapter, tempSyncPath, spoolPath)
 }
 
 var (
@@ -322,13 +339,21 @@ func SubmitToLighthouse(e TelemetryEvent) {
 	}
 	apiKey := os.Getenv("LIGHTHOUSE_API_KEY")
 
+	// Read timeout from environment, defaulting to 500ms for CLI flush budget
+	timeout := 500 * time.Millisecond
+	if tStr := os.Getenv("POWERWORD_TELEMETRY_TIMEOUT"); tStr != "" {
+		if d, pErr := time.ParseDuration(tStr); pErr == nil {
+			timeout = d
+		}
+	}
+
 	syncOnce.Do(func() {
 		wgMu.Lock()
 		wg.Add(1)
 		wgMu.Unlock()
 		go func() {
 			defer wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			SyncSpooledEvents(ctx, url, apiKey)
 		}()
@@ -339,7 +364,7 @@ func SubmitToLighthouse(e TelemetryEvent) {
 	wgMu.Unlock()
 	go func() {
 		defer wg.Done()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
 		adapter := &LighthouseAdapter{

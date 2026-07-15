@@ -595,6 +595,52 @@ func TestTelemetrySync_ContextCancelled(t *testing.T) {
 	}
 }
 
+func TestTelemetrySync_StrandedSyncFiles(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// Write a stranded sync file
+	strandedPath := filepath.Join(spoolDir, "telemetry_spool_sync_12345.jsonl")
+	event := TelemetryEvent{Project: "stranded"}
+	payload, _ := json.Marshal(event)
+	if err := os.WriteFile(strandedPath, append(payload, '\n'), 0600); err != nil {
+		t.Fatalf("failed to write stranded file: %v", err)
+	}
+
+	// Start a mock server to receive it
+	var (
+		mu       sync.Mutex
+		received bool
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if r.URL.Path == "/api/telemetry/batch" {
+			received = true
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Check if stranded file was processed and deleted
+	if _, err := os.Stat(strandedPath); !os.IsNotExist(err) {
+		t.Errorf("expected stranded sync file to be deleted, but it still exists")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if !received {
+		t.Error("expected stranded events to be synced to the batch endpoint")
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || s[0:len(substr)] == substr || s[len(s)-len(substr):] == substr || stringContains(s, substr))
 }

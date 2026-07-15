@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -754,17 +755,16 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 	}
 
 	// 2. Start mock Lighthouse server to sync events
-	var (
-		receivedBatch bool
-		batchLength   int
-	)
+	receivedChan := make(chan int, 1)
 	lhServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/telemetry/batch" {
-			receivedBatch = true
 			var events []interface{}
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &events)
-			batchLength = len(events)
+			select {
+			case receivedChan <- len(events):
+			default:
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -791,10 +791,13 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 		t.Errorf("expected spool file at %s to be deleted after successful sync, but it still exists", spoolPath)
 	}
 
-	if !receivedBatch {
-		t.Error("expected mock Lighthouse server to receive telemetry batch endpoint call")
-	}
-	if batchLength != 1 {
-		t.Errorf("expected batch length to be 1, got %d", batchLength)
+	// Verify we received the batch
+	select {
+	case length := <-receivedChan:
+		if length != 1 {
+			t.Errorf("expected batch length to be 1, got %d", length)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("timeout waiting to receive batch telemetry on mock server")
 	}
 }
