@@ -787,6 +787,46 @@ func TestTelemetrySync_PartialBatchSync(t *testing.T) {
 	}
 }
 
+func TestTelemetrySync_CorruptFileRetention(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// Create a temporary sync file with invalid JSON content (non-empty)
+	syncPath := filepath.Join(spoolDir, "telemetry_spool_sync_99999.jsonl")
+	if err := os.WriteFile(syncPath, []byte("corrupt-invalid-json-content\n"), 0600); err != nil {
+		t.Fatalf("failed to write corrupt sync file: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify that the sync file is RETAINED for inspection because it has size > 0 but 0 parsed events
+	if _, err := os.Stat(syncPath); os.IsNotExist(err) {
+		t.Errorf("expected corrupt sync file to be retained, but it was deleted")
+	}
+
+	// Verify that if the file was completely empty (size == 0), it is deleted
+	emptySyncPath := filepath.Join(spoolDir, "telemetry_spool_sync_88888.jsonl")
+	if err := os.WriteFile(emptySyncPath, []byte(""), 0600); err != nil {
+		t.Fatalf("failed to write empty sync file: %v", err)
+	}
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	if _, err := os.Stat(emptySyncPath); !os.IsNotExist(err) {
+		t.Errorf("expected empty sync file to be deleted, but it still exists")
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || s[0:len(substr)] == substr || s[len(s)-len(substr):] == substr || stringContains(s, substr))
 }

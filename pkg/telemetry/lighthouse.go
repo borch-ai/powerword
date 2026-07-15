@@ -273,7 +273,11 @@ func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, 
 	}
 
 	if len(events) == 0 {
-		_ = os.Remove(syncPath)
+		if fi, err := os.Stat(syncPath); err == nil && fi.Size() == 0 {
+			_ = os.Remove(syncPath)
+		} else {
+			log.Printf("Warning: temporary telemetry sync file is non-empty but contains no valid events; retaining for inspection: %s", syncPath)
+		}
 		return
 	}
 

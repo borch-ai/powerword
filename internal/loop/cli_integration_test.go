@@ -733,10 +733,8 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 	}))
 	defer llmServer.Close()
 
-	// Get a deterministically unreachable URL by closing a mock server immediately
-	unreachableServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	unreachableURL := unreachableServer.URL
-	unreachableServer.Close()
+	// Use a deterministically unreachable URL with port 0 to prevent flaky port reuse
+	unreachableURL := "http://127.0.0.1:0"
 
 	// 1. Run with invalid LIGHTHOUSE_URL -> should spool event offline
 	cmd1 := exec.Command(binaryPath, "test offline telemetry", "--json", "--headless")
