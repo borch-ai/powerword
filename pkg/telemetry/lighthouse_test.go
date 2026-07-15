@@ -641,6 +641,54 @@ func TestTelemetrySync_StrandedSyncFiles(t *testing.T) {
 	}
 }
 
+func TestTelemetrySync_RollbackFailureSyncFileRetention(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// Make the main spool path a directory, so rollback fails
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	if err := os.MkdirAll(spoolPath, 0750); err != nil {
+		t.Fatalf("failed to create spool path as directory: %v", err)
+	}
+
+	// Write a temporary sync file
+	syncPath := filepath.Join(spoolDir, "telemetry_spool_sync_99999.jsonl")
+	event := TelemetryEvent{Project: "rollback-fail"}
+	payload, _ := json.Marshal(event)
+	if err := os.WriteFile(syncPath, append(payload, '\n'), 0600); err != nil {
+		t.Fatalf("failed to write sync file: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify that the sync file is NOT deleted because rollback failed
+	if _, err := os.Stat(syncPath); os.IsNotExist(err) {
+		t.Errorf("expected temporary sync file to be retained on rollback failure, but it was deleted")
+	}
+}
+
+func TestLighthouseAdapter_SubmitBatch_EmptyAndNoURL(t *testing.T) {
+	adapter := &LighthouseAdapter{URL: ""}
+	// Empty events should succeed immediately
+	if err := adapter.SubmitBatch(context.Background(), nil); err != nil {
+		t.Errorf("expected nil error for empty events, got: %v", err)
+	}
+	// Non-empty events with empty URL should fail
+	if err := adapter.SubmitBatch(context.Background(), []TelemetryEvent{{}}); err == nil {
+		t.Error("expected error for empty URL, got nil")
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || s[0:len(substr)] == substr || s[len(s)-len(substr):] == substr || stringContains(s, substr))
 }
