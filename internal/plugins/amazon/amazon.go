@@ -59,7 +59,7 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 
 	resp, err := as.client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("http request failed: %s", redactKey(err.Error(), apiKey))
+		return 0, fmt.Errorf("http request failed: %w", &redactedError{err: err, apiKey: apiKey})
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -69,6 +69,19 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	}
 
 	return parseResponsePayload(resp.Body)
+}
+
+type redactedError struct {
+	err    error
+	apiKey string
+}
+
+func (e *redactedError) Error() string {
+	return redactKey(e.err.Error(), e.apiKey)
+}
+
+func (e *redactedError) Unwrap() error {
+	return e.err
 }
 
 func redactKey(str, apiKey string) string {

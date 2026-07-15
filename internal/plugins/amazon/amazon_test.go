@@ -92,16 +92,20 @@ func TestAmazonService_ClientDoError(t *testing.T) {
 	cfg.Plugins.Amazon.APIKey = "real-key"
 	cfg.Plugins.Amazon.BaseURL = "https://api.scaleserp.com"
 
+	underlyingErr := errors.New("network connection refused")
 	client := &http.Client{
 		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {
-			return nil, errors.New("network connection refused")
+			return nil, underlyingErr
 		}),
 	}
 
 	svc := amazon.NewAmazonService(cfg, client)
 	_, err := svc.GetListingCount(context.Background(), "test")
 	if err == nil {
-		t.Error("expected HTTP request failure error, got nil")
+		t.Fatal("expected HTTP request failure error, got nil")
+	}
+	if !errors.Is(err, underlyingErr) {
+		t.Errorf("expected wrapped error to wrap underlyingErr, got: %v", err)
 	}
 }
 
