@@ -113,6 +113,13 @@ func (as *AmazonService) buildURL(apiKey, keyword string) (*url.URL, error) {
 		return nil, fmt.Errorf("invalid base url: missing host")
 	}
 
+	if parsedBase.Scheme == "http" {
+		hn := parsedBase.Hostname()
+		if hn != "localhost" && hn != "127.0.0.1" && hn != "::1" {
+			return nil, fmt.Errorf("insecure http scheme is only allowed for loopback hosts (localhost, 127.0.0.1, ::1); got %q", hn)
+		}
+	}
+
 	u := parsedBase.JoinPath("search")
 
 	q := u.Query()

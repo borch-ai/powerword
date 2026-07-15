@@ -81,6 +81,40 @@ func TestAmazonService_BaseURLMissingHost(t *testing.T) {
 	}
 }
 
+func TestAmazonService_BaseURLInsecureHTTP(t *testing.T) {
+	// Remote http should fail
+	cfg := &config.Config{}
+	cfg.Plugins.Amazon.APIKey = "real-key"
+	cfg.Plugins.Amazon.BaseURL = "http://api.scaleserp.com"
+
+	svc := amazon.NewAmazonService(cfg, nil)
+	_, err := svc.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Error("expected error due to insecure http scheme on remote host, got nil")
+	} else if !strings.Contains(err.Error(), "insecure http scheme is only allowed for loopback hosts") {
+		t.Errorf("expected insecure loopback error message, got: %v", err)
+	}
+
+	// Loopback http should pass URL building
+	cfgLocal := &config.Config{}
+	cfgLocal.Plugins.Amazon.APIKey = "real-key"
+	cfgLocal.Plugins.Amazon.BaseURL = "http://localhost:1234"
+
+	refusedErr := errors.New("connection refused")
+	client := &http.Client{
+		Transport: mockRoundTripper(func(req *http.Request) (*http.Response, error) {
+			return nil, refusedErr
+		}),
+	}
+	svcLocal := amazon.NewAmazonService(cfgLocal, client)
+	_, err = svcLocal.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Error("expected network error, got nil")
+	} else if !errors.Is(err, refusedErr) {
+		t.Errorf("expected connection refused error wrapping, got: %v", err)
+	}
+}
+
 type mockRoundTripper func(req *http.Request) (*http.Response, error)
 
 func (m mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

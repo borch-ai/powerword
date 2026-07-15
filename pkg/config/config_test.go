@@ -577,6 +577,7 @@ GEMINI_API_KEY=dotenv-gemini-key
 OPENAI_API_KEY=dotenv-openai-key
 ANTHROPIC_API_KEY=dotenv-anthropic-key
 SERP_API_KEY=dotenv-serp-key
+AMAZON_API_KEY=dotenv-amazon-key
 `
 	if errWrite := os.WriteFile(".env", []byte(envContent), 0600); errWrite != nil {
 		t.Fatalf("failed to write .env: %v", errWrite)
@@ -611,6 +612,9 @@ SERP_API_KEY=dotenv-serp-key
 	if cfg.Plugins.Trends.SerpAPIKey != "dotenv-serp-key" {
 		t.Errorf("expected SerpAPI key 'dotenv-serp-key', got '%s'", cfg.Plugins.Trends.SerpAPIKey)
 	}
+	if cfg.Plugins.Amazon.APIKey != "dotenv-amazon-key" {
+		t.Errorf("expected Amazon API key 'dotenv-amazon-key', got '%s'", cfg.Plugins.Amazon.APIKey)
+	}
 
 	// Test OS-level override wins over .env (including OS-level canonical overriding .env POWERWORD_ key)
 	_ = os.Unsetenv("POWERWORD_GEMINI_API_KEY")
@@ -619,12 +623,16 @@ SERP_API_KEY=dotenv-serp-key
 	_ = os.Unsetenv("POWERWORD_SERP_API_KEY")
 	_ = os.Unsetenv("POWERWORD_AMAZON_API_KEY")
 	t.Setenv("GEMINI_API_KEY", "os-gemini-override")
+	t.Setenv("AMAZON_API_KEY", "os-amazon-override")
 	cfg, err = LoadConfig("")
 	if err != nil {
 		t.Fatalf("LoadConfig error: %v", err)
 	}
 	if cfg.APIKeys.Gemini != "os-gemini-override" {
 		t.Errorf("expected OS environment variable to override .env, got '%s'", cfg.APIKeys.Gemini)
+	}
+	if cfg.Plugins.Amazon.APIKey != "os-amazon-override" {
+		t.Errorf("expected OS environment variable to override .env, got '%s'", cfg.Plugins.Amazon.APIKey)
 	}
 }
 
