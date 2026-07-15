@@ -777,7 +777,7 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 		"OPENAI_BASE_URL="+llmServer.URL,
 		"POWERWORD_OPENAI_API_KEY=dummy",
 		"POWERWORD_MODEL=gpt-4",
-		"LIGHTHOUSE_URL="+lhServer.URL, // Valid Lighthouse URL
+		"LIGHTHOUSE_URL="+lhServer.URL,   // Valid Lighthouse URL
 		"POWERWORD_TELEMETRY_TIMEOUT=2s", // Give enough time for background sync
 	)
 	cmd2.Stderr = os.Stderr

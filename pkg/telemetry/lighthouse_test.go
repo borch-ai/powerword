@@ -244,6 +244,14 @@ func TestLighthouseAdapter_SubmitBatch_Success(t *testing.T) {
 		t.Errorf("expected path /api/telemetry/batch, got %s", receivedReq.URL.Path)
 	}
 
+	if receivedReq.Header.Get("Content-Type") != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", receivedReq.Header.Get("Content-Type"))
+	}
+
+	if receivedReq.Header.Get("Authorization") != "Bearer batch-key" {
+		t.Errorf("expected Authorization Bearer batch-key, got %s", receivedReq.Header.Get("Authorization"))
+	}
+
 	if len(receivedVal) != 2 {
 		t.Errorf("expected 2 events, got %d", len(receivedVal))
 	}

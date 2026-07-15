@@ -170,6 +170,20 @@ func spoolOfflineEvent(e TelemetryEvent) {
 	}
 }
 
+// parseLine trims and unmarshals a single JSONL line into a TelemetryEvent.
+func parseLine(line []byte) (TelemetryEvent, bool) {
+	line = bytes.TrimSpace(line)
+	if len(line) == 0 {
+		return TelemetryEvent{}, false
+	}
+	var ev TelemetryEvent
+	if err := json.Unmarshal(line, &ev); err != nil {
+		log.Printf("Warning: failed to unmarshal telemetry event from sync file: %v", err)
+		return TelemetryEvent{}, false
+	}
+	return ev, true
+}
+
 // readSpooledEvents opens the sync file, reads and parses events line by line.
 func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, error) {
 	//nolint:gosec // G304: path is resolved from secure UserHomeDir
@@ -180,20 +194,23 @@ func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, error) {
 	defer func() { _ = f.Close() }()
 
 	var events []TelemetryEvent
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+	reader := bufio.NewReader(f)
+	for {
+		line, readErr := reader.ReadBytes('\n')
+		if readErr != nil {
+			if readErr == io.EOF {
+				if ev, ok := parseLine(line); ok {
+					events = append(events, ev)
+				}
+				break
+			}
+			return nil, readErr
 		}
-		var ev TelemetryEvent
-		if err := json.Unmarshal(line, &ev); err != nil {
-			log.Printf("Warning: failed to unmarshal telemetry event from sync file: %v", err)
-			continue
+		if ev, ok := parseLine(line); ok {
+			events = append(events, ev)
 		}
-		events = append(events, ev)
 	}
-	return events, scanner.Err()
+	return events, nil
 }
 
 // sendBatchEvents posts events in batches of 100 to the Lighthouse adapter.
