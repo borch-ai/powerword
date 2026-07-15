@@ -704,6 +704,10 @@ func TestIsRetryableError(t *testing.T) {
 		{fmt.Errorf("unexpected status code 500 (Internal Server Error)"), true},
 		{fmt.Errorf("unexpected status code 503 (Service Unavailable)"), true},
 		{fmt.Errorf("unexpected status code 500"), true}, // fallback case
+		{fmt.Errorf("context canceled"), true},
+		{fmt.Errorf("context deadline exceeded"), true},
+		{fmt.Errorf("failed to marshal telemetry payload"), false},
+		{fmt.Errorf("failed to create http request"), false},
 	}
 
 	for _, tt := range tests {

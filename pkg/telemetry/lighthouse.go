@@ -368,7 +368,12 @@ func isRetryableError(err error) bool {
 		// Fallback matches:
 		return strings.Contains(errStr, "429") || strings.Contains(errStr, "500") || strings.Contains(errStr, "502") || strings.Contains(errStr, "503") || strings.Contains(errStr, "504")
 	}
-	return true
+	// Restrict transport errors specifically to network timeouts, cancellations, or connection failures.
+	// In LighthouseAdapter.Submit/SubmitBatch, these are returned as:
+	// "http request failed: %w" or context errors ("context canceled", "context deadline exceeded").
+	return strings.Contains(errStr, "http request failed") ||
+		strings.Contains(errStr, "context canceled") ||
+		strings.Contains(errStr, "context deadline exceeded")
 }
 
 // SubmitToLighthouse reads configuration from the environment and submits
