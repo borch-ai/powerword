@@ -24,4 +24,13 @@ token_path = "~/.config/powerword/gdoc_token.json"
 # Or for service account:
 # service_account_path = "~/.config/powerword/service_account.json"
 
+[servers.amazon]
+   command = "go"
+   args = ["run", "./cmd/pw-mcp-amazon"]
+
+[plugins.amazon]
+# ScaleSerp API key. Set to "mock" for local offline testing (returns 4200).
+api_key = ""
+base_url = "" # Optional. Defaults to https://api.scaleserp.com
+
 

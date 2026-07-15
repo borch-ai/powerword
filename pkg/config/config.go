@@ -128,6 +128,12 @@ type GDocConfig struct {
 	ServiceAccountPath string `mapstructure:"service_account_path"`
 }
 
+// AmazonConfig holds parameters for the Amazon search plugin.
+type AmazonConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	BaseURL string `mapstructure:"base_url"`
+}
+
 // PluginsConfig holds configurations for individual plugins.
 type PluginsConfig struct {
 	ImageGen ImageGenConfig `mapstructure:"imagegen"`
@@ -139,6 +145,7 @@ type PluginsConfig struct {
 	YouTube  YouTubeConfig  `mapstructure:"youtube"`
 	DB       DBConfig       `mapstructure:"db"`
 	GDoc     GDocConfig     `mapstructure:"gdoc"`
+	Amazon   AmazonConfig   `mapstructure:"amazon"`
 }
 
 // APIKeys maps the model providers to their API keys.
@@ -163,7 +170,7 @@ type envAlias struct {
 	target string
 }
 
-// aliases is an ordered list of canonical provider env var aliases.
+// aliases is an ordered list of canonical provider and plugin env var aliases.
 // Precedence is determined by order: aliases appearing earlier (e.g. GEMINI_API_KEY)
 // take precedence over aliases appearing later (e.g. GOOGLE_API_KEY).
 // When an alias is found in .env, the target POWERWORD_ var is set from the alias
@@ -175,6 +182,7 @@ var aliases = []envAlias{
 	{alias: "OPENAI_API_KEY", target: "POWERWORD_OPENAI_API_KEY"},
 	{alias: "ANTHROPIC_API_KEY", target: "POWERWORD_ANTHROPIC_API_KEY"},
 	{alias: "SERP_API_KEY", target: "POWERWORD_SERP_API_KEY"},
+	{alias: "AMAZON_API_KEY", target: "POWERWORD_AMAZON_API_KEY"},
 }
 
 // loadDotEnv reads the local .env file if it exists and pushes the keys into the process environment
@@ -220,6 +228,9 @@ func hasOSEnvOverride(key string) bool {
 	case "POWERWORD_SERP_API_KEY":
 		return os.Getenv("POWERWORD_SERP_API_KEY") != "" ||
 			os.Getenv("SERP_API_KEY") != ""
+	case "POWERWORD_AMAZON_API_KEY":
+		return os.Getenv("POWERWORD_AMAZON_API_KEY") != "" ||
+			os.Getenv("AMAZON_API_KEY") != ""
 	default:
 		return os.Getenv(key) != ""
 	}
@@ -393,6 +404,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("plugins.gdoc.credentials_path", "")
 	v.SetDefault("plugins.gdoc.token_path", "")
 	v.SetDefault("plugins.gdoc.service_account_path", "")
+	v.SetDefault("plugins.amazon.api_key", "")
+	v.SetDefault("plugins.amazon.base_url", "")
 }
 
 // bindEnvVars binds all known environment variable overrides to their Viper config paths.
@@ -467,6 +480,8 @@ func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.gdoc.credentials_path", "POWERWORD_GDOC_CREDENTIALS_PATH")
 	bindEnv(v, "plugins.gdoc.token_path", "POWERWORD_GDOC_TOKEN_PATH")
 	bindEnv(v, "plugins.gdoc.service_account_path", "POWERWORD_GDOC_SERVICE_ACCOUNT_PATH")
+	bindEnv(v, "plugins.amazon.api_key", "POWERWORD_AMAZON_API_KEY", "AMAZON_API_KEY")
+	bindEnv(v, "plugins.amazon.base_url", "POWERWORD_AMAZON_SEARCH_BASE_URL")
 }
 
 func readConfigFile(v *viper.Viper, configFilesToTry []string, cfgFile string) error {
