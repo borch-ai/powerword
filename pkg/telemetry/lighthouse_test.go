@@ -3,7 +3,6 @@ package telemetry
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -933,11 +932,11 @@ func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
 }
 
 func TestGenerateEventID_Fallback(t *testing.T) {
-	oldReader := rand.Reader
-	// Mock rand.Reader to return an error
-	rand.Reader = io.LimitReader(bytes.NewBuffer(nil), 0)
+	oldReader := randReader
+	// Mock randReader to return an error
+	randReader = io.LimitReader(bytes.NewBuffer(nil), 0)
 	defer func() {
-		rand.Reader = oldReader
+		randReader = oldReader
 	}()
 
 	id1 := generateEventID()

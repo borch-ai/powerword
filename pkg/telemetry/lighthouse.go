@@ -61,11 +61,12 @@ func (e *HTTPError) Error() string {
 var (
 	fallbackMu      sync.Mutex
 	fallbackCounter int64
+	randReader      io.Reader = rand.Reader
 )
 
 func generateEventID() string {
 	b := make([]byte, 16)
-	_, err := rand.Reader.Read(b)
+	_, err := randReader.Read(b)
 	if err != nil {
 		fallbackMu.Lock()
 		fallbackCounter++
@@ -281,7 +282,11 @@ func spoolOfflineEvent(e TelemetryEvent) {
 	if err := withFileLock(spoolPath, 10*time.Second, func() error {
 		// Enforce max spool size limit of 5 MB to avoid unbounded disk growth
 		const maxSpoolBytes = 5 * 1024 * 1024
-		if fi, err := os.Stat(spoolPath); err == nil && fi.Size()+int64(len(payload)+1) > maxSpoolBytes {
+		var currentSize int64
+		if fi, err := os.Stat(spoolPath); err == nil {
+			currentSize = fi.Size()
+		}
+		if currentSize+int64(len(payload)+1) > maxSpoolBytes {
 			log.Printf("Warning: telemetry spool file size limit exceeded; dropping event")
 			return nil
 		}
@@ -399,10 +404,12 @@ func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
 	return withFileLock(spoolPath, 10*time.Second, func() error {
 		// Enforce max spool size limit of 5 MB
 		const maxSpoolBytes = 5 * 1024 * 1024
+		var currentSize int64
 		if fi, err := os.Stat(spoolPath); err == nil {
-			if fi.Size()+computeTotalPayloadSize(events) > maxSpoolBytes {
-				return fmt.Errorf("telemetry spool file size limit exceeded")
-			}
+			currentSize = fi.Size()
+		}
+		if currentSize+computeTotalPayloadSize(events) > maxSpoolBytes {
+			return fmt.Errorf("telemetry spool file size limit exceeded")
 		}
 
 		//nolint:gosec // G304: path is resolved from secure UserHomeDir
