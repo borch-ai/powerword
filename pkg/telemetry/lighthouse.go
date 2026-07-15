@@ -171,10 +171,14 @@ func withFileLock(spoolPath string, action func() error) error {
 			acquired = true
 			break
 		}
+		// If the error is NOT that the lock file already exists, abort retrying immediately
+		if !os.IsExist(err) {
+			return fmt.Errorf("failed to create lock file: %w", err)
+		}
 	}
 
 	if !acquired {
-		return fmt.Errorf("failed to acquire telemetry lock")
+		return fmt.Errorf("failed to acquire telemetry lock: timeout")
 	}
 
 	defer func() {
@@ -205,7 +209,7 @@ func spoolOfflineEvent(e TelemetryEvent) {
 		return
 	}
 
-	_ = withFileLock(spoolPath, func() error {
+	if err := withFileLock(spoolPath, func() error {
 		// Enforce max spool size limit of 5 MB to avoid unbounded disk growth
 		const maxSpoolBytes = 5 * 1024 * 1024
 		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
@@ -224,7 +228,9 @@ func spoolOfflineEvent(e TelemetryEvent) {
 			return writeErr
 		}
 		return nil
-	})
+	}); err != nil {
+		log.Printf("Warning: failed to spool telemetry event offline: %v", err)
+	}
 }
 
 // parseLine trims and unmarshals a single JSONL line into a TelemetryEvent.
@@ -315,41 +321,92 @@ func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
 	})
 }
 
-// processSyncFile processes a single temporary sync file: syncs to Lighthouse, deletes on success, rolls back on failure.
-func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) {
+// cleanEmptySyncFile deletes the sync file if it is empty, or logs a warning if it contains invalid data.
+func cleanEmptySyncFile(syncPath string) {
+	if fi, err := os.Stat(syncPath); err == nil && fi.Size() == 0 {
+		_ = os.Remove(syncPath)
+	} else if err == nil {
+		log.Printf("Warning: temporary telemetry sync file is non-empty but contains no valid events; retaining for inspection: %s", syncPath)
+	}
+}
+
+// handleSyncFailure rolls back unsent events and deletes the sync file on sync error.
+func handleSyncFailure(spoolPath, syncPath string, events []TelemetryEvent, sentCount int, syncErr error) {
+	log.Printf("Warning: failed to sync spooled telemetry events: %v", syncErr)
+	unsentEvents := events[sentCount:]
+	if len(unsentEvents) > 0 {
+		rollbackErr := rollbackSpooledEvents(spoolPath, unsentEvents)
+		if rollbackErr != nil {
+			log.Printf("Warning: failed to rollback spooled telemetry events: %v", rollbackErr)
+			return // Keep the sync file so we don't lose the telemetry events
+		}
+	}
+	_ = os.Remove(syncPath)
+}
+
+// syncFileEvents reads and synchronizes spooled events from the syncPath file.
+func syncFileEvents(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) error {
 	events, readErr := readSpooledEvents(syncPath)
 	if readErr != nil {
+		if os.IsNotExist(readErr) {
+			return nil
+		}
 		log.Printf("Warning: error reading temporary telemetry sync file: %v", readErr)
-		return // Keep the sync file so it is retried next time
+		return nil
 	}
 
 	if len(events) == 0 {
-		if fi, err := os.Stat(syncPath); err == nil && fi.Size() == 0 {
-			_ = os.Remove(syncPath)
-		} else {
-			log.Printf("Warning: temporary telemetry sync file is non-empty but contains no valid events; retaining for inspection: %s", syncPath)
-		}
-		return
+		cleanEmptySyncFile(syncPath)
+		return nil
 	}
 
 	sentCount, syncErr := sendBatchEvents(ctx, adapter, events)
 	if syncErr != nil {
-		log.Printf("Warning: failed to sync spooled telemetry events: %v", syncErr)
-		unsentEvents := events[sentCount:]
-		if len(unsentEvents) > 0 {
-			rollbackErr := rollbackSpooledEvents(spoolPath, unsentEvents)
-			if rollbackErr != nil {
-				log.Printf("Warning: failed to rollback spooled telemetry events: %v", rollbackErr)
-				return // Keep the sync file so we don't lose the telemetry events
-			}
-		}
-		_ = os.Remove(syncPath)
-		return
+		handleSyncFailure(spoolPath, syncPath, events, sentCount, syncErr)
+		return nil
 	}
 
 	if removeErr := os.Remove(syncPath); removeErr != nil {
 		log.Printf("Warning: failed to remove temporary telemetry sync file: %v", removeErr)
 	}
+	return nil
+}
+
+// processSyncFile processes a single temporary sync file: syncs to Lighthouse, deletes on success, rolls back on failure.
+func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) {
+	// Use lock coordination on the sync file to prevent concurrent processes from processing the same file.
+	// If we fail to acquire the lock immediately, it means another process is already processing it, so we skip.
+	_ = withFileLock(syncPath, func() error {
+		return syncFileEvents(ctx, adapter, syncPath, spoolPath)
+	})
+}
+
+// processStrandedSyncFiles scans the spool directory and processes any leftover temporary sync files from previous runs.
+func processStrandedSyncFiles(ctx context.Context, adapter *LighthouseAdapter, spoolDir, spoolPath string) {
+	files, readDirErr := os.ReadDir(spoolDir)
+	if readDirErr != nil {
+		return
+	}
+	for _, entry := range files {
+		if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), "telemetry_spool_sync_") && strings.HasSuffix(entry.Name(), ".jsonl") {
+			syncPath := filepath.Join(spoolDir, entry.Name())
+			processSyncFile(ctx, adapter, syncPath, spoolPath)
+		}
+	}
+}
+
+// renameSpoolUnderLock renames the main spool file to a unique temp sync path under lock coordination.
+func renameSpoolUnderLock(spoolPath, tempSyncPath string) error {
+	return withFileLock(spoolPath, func() error {
+		fiInner, statErrInner := os.Stat(spoolPath)
+		if statErrInner != nil {
+			return statErrInner
+		}
+		if fiInner.Size() == 0 {
+			return fmt.Errorf("spool file is empty")
+		}
+		return os.Rename(spoolPath, tempSyncPath)
+	})
 }
 
 // SyncSpooledEvents processes any spooled telemetry events and sends them to Lighthouse.
@@ -372,34 +429,23 @@ func SyncSpooledEvents(ctx context.Context, url, apiKey string) {
 	}
 
 	// 1. Process any leftover stranded temporary sync files from previous runs
-	files, readDirErr := os.ReadDir(spoolDir)
-	if readDirErr == nil {
-		for _, entry := range files {
-			if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), "telemetry_spool_sync_") && strings.HasSuffix(entry.Name(), ".jsonl") {
-				syncPath := filepath.Join(spoolDir, entry.Name())
-				processSyncFile(ctx, adapter, syncPath, spoolPath)
-			}
+	processStrandedSyncFiles(ctx, adapter, spoolDir, spoolPath)
+
+	// 2. Process the main spool file if it exists and has content (checked first without locking)
+	fi, statErr := os.Stat(spoolPath)
+	if statErr != nil {
+		if !os.IsNotExist(statErr) {
+			log.Printf("Warning: failed to stat telemetry spool file: %v", statErr)
 		}
+		return
+	}
+	if fi.Size() == 0 {
+		return
 	}
 
-	// 2. Process the main spool file if it exists and has content
+	// Atomic Rename strategy under lock
 	tempSyncPath := filepath.Join(spoolDir, fmt.Sprintf("telemetry_spool_sync_%d.jsonl", time.Now().UnixNano()))
-
-	renameErr := withFileLock(spoolPath, func() error {
-		fi, statErr := os.Stat(spoolPath)
-		if statErr != nil {
-			return statErr
-		}
-		if fi.Size() == 0 {
-			return fmt.Errorf("spool file is empty")
-		}
-		if err := os.Rename(spoolPath, tempSyncPath); err != nil {
-			return err
-		}
-		return nil
-	})
-
-	if renameErr != nil {
+	if renameErr := renameSpoolUnderLock(spoolPath, tempSyncPath); renameErr != nil {
 		if !os.IsNotExist(renameErr) && renameErr.Error() != "spool file is empty" {
 			log.Printf("Warning: failed to rename telemetry spool file: %v", renameErr)
 		}
