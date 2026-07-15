@@ -187,7 +187,7 @@ func (a *LighthouseAdapter) SubmitBatch(ctx context.Context, events []TelemetryE
 	return nil
 }
 
-var lockTimeout = 200 * time.Millisecond
+var lockTimeout = 2 * time.Second
 
 // isLockStale reads the lock file and checks if the lock has exceeded staleThreshold.
 func isLockStale(lockPath string, staleThreshold time.Duration) bool {
@@ -261,7 +261,7 @@ func spoolOfflineEvent(e TelemetryEvent) {
 	}
 
 	spoolDir := filepath.Join(home, ".local", "share", "powerword")
-	if dirErr := os.MkdirAll(spoolDir, 0750); dirErr != nil {
+	if dirErr := os.MkdirAll(spoolDir, 0700); dirErr != nil {
 		log.Printf("Warning: failed to create telemetry spool directory: %v", dirErr)
 		return
 	}
@@ -281,7 +281,7 @@ func spoolOfflineEvent(e TelemetryEvent) {
 	if err := withFileLock(spoolPath, 10*time.Second, func() error {
 		// Enforce max spool size limit of 5 MB to avoid unbounded disk growth
 		const maxSpoolBytes = 5 * 1024 * 1024
-		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
+		if fi, err := os.Stat(spoolPath); err == nil && fi.Size()+int64(len(payload)+1) > maxSpoolBytes {
 			log.Printf("Warning: telemetry spool file size limit exceeded; dropping event")
 			return nil
 		}
@@ -369,13 +369,40 @@ func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []T
 	return len(events), nil
 }
 
+func computeTotalPayloadSize(events []TelemetryEvent) int64 {
+	var total int64
+	for _, ev := range events {
+		payload, err := json.Marshal(ev)
+		if err != nil {
+			continue
+		}
+		total += int64(len(payload) + 1)
+	}
+	return total
+}
+
+func writeEventsToSpoolFile(f *os.File, events []TelemetryEvent) error {
+	for _, ev := range events {
+		payload, err := json.Marshal(ev)
+		if err != nil {
+			continue
+		}
+		if _, writeErr := f.Write(append(payload, '\n')); writeErr != nil {
+			return writeErr
+		}
+	}
+	return nil
+}
+
 // rollbackSpooledEvents writes events back to the spool file on sync failure.
 func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
 	return withFileLock(spoolPath, 10*time.Second, func() error {
 		// Enforce max spool size limit of 5 MB
 		const maxSpoolBytes = 5 * 1024 * 1024
-		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
-			return fmt.Errorf("telemetry spool file size limit exceeded")
+		if fi, err := os.Stat(spoolPath); err == nil {
+			if fi.Size()+computeTotalPayloadSize(events) > maxSpoolBytes {
+				return fmt.Errorf("telemetry spool file size limit exceeded")
+			}
 		}
 
 		//nolint:gosec // G304: path is resolved from secure UserHomeDir
@@ -385,16 +412,7 @@ func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
 		}
 		defer func() { _ = spoolFile.Close() }()
 
-		for _, ev := range events {
-			payload, err := json.Marshal(ev)
-			if err != nil {
-				continue
-			}
-			if _, writeErr := spoolFile.Write(append(payload, '\n')); writeErr != nil {
-				return writeErr
-			}
-		}
-		return nil
+		return writeEventsToSpoolFile(spoolFile, events)
 	})
 }
 
