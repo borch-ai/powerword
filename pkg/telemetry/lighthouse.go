@@ -209,12 +209,10 @@ func isLockStale(lockPath string, staleThreshold time.Duration) bool {
 
 // withFileLock executes the given action while holding an exclusive filesystem-level lock
 // on the spool file (via a lock file). It retries lock acquisition for up to lockTimeout.
-// If the lock file is found to be older than staleThreshold (5 minutes, e.g. from a crashed process),
-// it is automatically cleaned up.
-func withFileLock(spoolPath string, action func() error) error {
+// If the lock file is found to be older than staleThreshold, it is automatically cleaned up.
+func withFileLock(spoolPath string, staleThreshold time.Duration, action func() error) error {
 	lockPath := spoolPath + ".lock"
 	acquired := false
-	const staleThreshold = 5 * time.Minute
 
 	// Try to acquire the lock using O_EXCL (atomic creation)
 	for start := time.Now(); time.Since(start) < lockTimeout; {
@@ -236,7 +234,11 @@ func withFileLock(spoolPath string, action func() error) error {
 			continue
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		sleepDur := lockTimeout / 10
+		if sleepDur < 1*time.Millisecond {
+			sleepDur = 1 * time.Millisecond
+		}
+		time.Sleep(sleepDur)
 	}
 
 	if !acquired {
@@ -276,7 +278,7 @@ func spoolOfflineEvent(e TelemetryEvent) {
 		return
 	}
 
-	if err := withFileLock(spoolPath, func() error {
+	if err := withFileLock(spoolPath, 10*time.Second, func() error {
 		// Enforce max spool size limit of 5 MB to avoid unbounded disk growth
 		const maxSpoolBytes = 5 * 1024 * 1024
 		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
@@ -369,7 +371,7 @@ func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []T
 
 // rollbackSpooledEvents writes events back to the spool file on sync failure.
 func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
-	return withFileLock(spoolPath, func() error {
+	return withFileLock(spoolPath, 10*time.Second, func() error {
 		// Enforce max spool size limit of 5 MB
 		const maxSpoolBytes = 5 * 1024 * 1024
 		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
@@ -459,7 +461,7 @@ func syncFileEvents(ctx context.Context, adapter *LighthouseAdapter, syncPath, s
 func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) {
 	// Use lock coordination on the sync file to prevent concurrent processes from processing the same file.
 	// If we fail to acquire the lock within lockTimeout, it means another process is already processing it, so we skip.
-	_ = withFileLock(syncPath, func() error {
+	_ = withFileLock(syncPath, 1*time.Minute, func() error {
 		return syncFileEvents(ctx, adapter, syncPath, spoolPath)
 	})
 }
@@ -480,7 +482,7 @@ func processStrandedSyncFiles(ctx context.Context, adapter *LighthouseAdapter, s
 
 // renameSpoolUnderLock renames the main spool file to a unique temp sync path under lock coordination.
 func renameSpoolUnderLock(spoolPath, tempSyncPath string) error {
-	return withFileLock(spoolPath, func() error {
+	return withFileLock(spoolPath, 10*time.Second, func() error {
 		fiInner, statErrInner := os.Stat(spoolPath)
 		if statErrInner != nil {
 			return statErrInner
@@ -595,6 +597,10 @@ func SubmitToLighthouse(e TelemetryEvent) {
 		return
 	}
 	apiKey := os.Getenv("LIGHTHOUSE_API_KEY")
+
+	if e.ID == "" {
+		e.ID = generateEventID()
+	}
 
 	// Read timeout from environment, defaulting to 500ms for CLI flush budget
 	timeout := 500 * time.Millisecond

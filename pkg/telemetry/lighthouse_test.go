@@ -897,7 +897,7 @@ func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
 
 	// Verify that withFileLock automatically cleans up the stale lock and succeeds
 	actionCalled := false
-	err := withFileLock(spoolPath, func() error {
+	err := withFileLock(spoolPath, 10*time.Second, func() error {
 		actionCalled = true
 		return nil
 	})
