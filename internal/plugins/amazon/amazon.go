@@ -139,7 +139,7 @@ func parseResponsePayload(body io.Reader) (int, error) {
 		return 0, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Try extracting count from multiple potential fields returned by ScaleSerp / Rainforest
+	// Try extracting count from multiple potential fields returned by ScaleSerp
 	count := payload.SearchInformation.TotalResults
 	if count == 0 {
 		count = payload.TotalResults

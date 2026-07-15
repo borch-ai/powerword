@@ -170,7 +170,7 @@ type envAlias struct {
 	target string
 }
 
-// aliases is an ordered list of canonical provider env var aliases.
+// aliases is an ordered list of canonical provider and plugin env var aliases.
 // Precedence is determined by order: aliases appearing earlier (e.g. GEMINI_API_KEY)
 // take precedence over aliases appearing later (e.g. GOOGLE_API_KEY).
 // When an alias is found in .env, the target POWERWORD_ var is set from the alias

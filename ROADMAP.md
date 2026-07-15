@@ -135,7 +135,7 @@ Focus: Delivering a standard set of native, high-performance Go MCP servers, a c
     *   Implement a native Go MCP server exposing tools to store, search, and retrieve chunks of text semantically using a lightweight in-process vector space model or local vector database.
     *   [Implementation Plan](plans/phase_3/task_3_24_memory_mcp.md)
 *   [x] **Task 3.25: Amazon Search MCP Plugin (`pw-mcp-amazon`)**
-    *   Implement a native Go MCP server exposing tools to query the commercial Amazon Search API (via Rainforest or ScaleSerp) to retrieve product listing counts for keywords.
+    *   Implement a native Go MCP server exposing tools to query the commercial Amazon Search API (via ScaleSerp) to retrieve product listing counts for keywords.
     *   [Implementation Plan](plans/phase_3/task_3_25_amazon_mcp.md)
 
 ---
