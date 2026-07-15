@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,8 +19,12 @@ import (
 	"time"
 )
 
+// ErrEmptySpool is returned when the spool file contains no events to rename or sync.
+var ErrEmptySpool = errors.New("spool file is empty")
+
 // TelemetryEvent represents a telemetry record submitted to Lighthouse.
 type TelemetryEvent struct {
+	ID           string            `json:"id,omitempty"`
 	Project      string            `json:"project"`
 	Command      string            `json:"command"`
 	Stage        string            `json:"stage"`
@@ -53,10 +58,20 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("unexpected status code %d (%s)", e.StatusCode, e.Status)
 }
 
+func generateEventID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
 // Submit sends the telemetry event to the Lighthouse collector.
 func (a *LighthouseAdapter) Submit(ctx context.Context, e TelemetryEvent) error {
 	if a.URL == "" {
 		return fmt.Errorf("lighthouse URL is required")
+	}
+
+	if e.ID == "" {
+		e.ID = generateEventID()
 	}
 
 	payload, err := json.Marshal(e)
@@ -111,6 +126,12 @@ func (a *LighthouseAdapter) SubmitBatch(ctx context.Context, events []TelemetryE
 		return fmt.Errorf("lighthouse URL is required")
 	}
 
+	for i := range events {
+		if events[i].ID == "" {
+			events[i].ID = generateEventID()
+		}
+	}
+
 	payload, err := json.Marshal(events)
 	if err != nil {
 		return fmt.Errorf("failed to marshal telemetry payload batch: %w", err)
@@ -156,25 +177,54 @@ func (a *LighthouseAdapter) SubmitBatch(ctx context.Context, events []TelemetryE
 
 var lockTimeout = 200 * time.Millisecond
 
+// isLockStale reads the lock file and checks if the lock has exceeded staleThreshold.
+func isLockStale(lockPath string, staleThreshold time.Duration) bool {
+	//nolint:gosec // G304: lockPath is resolved from secure UserHomeDir
+	content, err := os.ReadFile(lockPath)
+	if err != nil || len(content) == 0 {
+		return false
+	}
+	parts := strings.Split(string(content), ",")
+	if len(parts) != 2 {
+		return false
+	}
+	var ts int64
+	if _, scanErr := fmt.Sscanf(parts[1], "%d", &ts); scanErr != nil {
+		return false
+	}
+	return time.Since(time.Unix(0, ts)) > staleThreshold
+}
+
 // withFileLock executes the given action while holding an exclusive filesystem-level lock
 // on the spool file (via a lock file). It retries lock acquisition for up to lockTimeout.
+// If the lock file is found to be older than staleThreshold (e.g. from a crashed process),
+// it is automatically cleaned up.
 func withFileLock(spoolPath string, action func() error) error {
 	lockPath := spoolPath + ".lock"
 	acquired := false
+	const staleThreshold = 10 * time.Second
 
 	// Try to acquire the lock using O_EXCL (atomic creation)
-	for start := time.Now(); time.Since(start) < lockTimeout; time.Sleep(10 * time.Millisecond) {
+	for start := time.Now(); time.Since(start) < lockTimeout; {
 		//nolint:gosec // G304: lockPath is resolved from secure UserHomeDir
 		lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if err == nil {
+			_, _ = fmt.Fprintf(lf, "%d,%d", os.Getpid(), time.Now().UnixNano())
 			_ = lf.Close()
 			acquired = true
 			break
 		}
-		// If the error is NOT that the lock file already exists, abort retrying immediately
+
 		if !os.IsExist(err) {
 			return fmt.Errorf("failed to create lock file: %w", err)
 		}
+
+		if isLockStale(lockPath, staleThreshold) {
+			_ = os.Remove(lockPath)
+			continue
+		}
+
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	if !acquired {
@@ -203,6 +253,11 @@ func spoolOfflineEvent(e TelemetryEvent) {
 	}
 
 	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+
+	if e.ID == "" {
+		e.ID = generateEventID()
+	}
+
 	payload, marshalErr := json.Marshal(e)
 	if marshalErr != nil {
 		log.Printf("Warning: failed to marshal telemetry event for spooling: %v", marshalErr)
@@ -234,10 +289,11 @@ func spoolOfflineEvent(e TelemetryEvent) {
 }
 
 // parseLine trims and unmarshals a single JSONL line into a TelemetryEvent.
+// Returns the event and a boolean indicating if it was parsed successfully (or was empty).
 func parseLine(line []byte) (TelemetryEvent, bool) {
 	line = bytes.TrimSpace(line)
 	if len(line) == 0 {
-		return TelemetryEvent{}, false
+		return TelemetryEvent{}, true
 	}
 	var ev TelemetryEvent
 	if err := json.Unmarshal(line, &ev); err != nil {
@@ -248,32 +304,35 @@ func parseLine(line []byte) (TelemetryEvent, bool) {
 }
 
 // readSpooledEvents opens the sync file, reads and parses events line by line.
-func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, error) {
+// Returns the list of parsed events, a boolean indicating if any parse error occurred, and any file I/O error.
+func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, bool, error) {
 	//nolint:gosec // G304: path is resolved from secure UserHomeDir
 	f, err := os.Open(tempSyncPath)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer func() { _ = f.Close() }()
 
 	var events []TelemetryEvent
-	reader := bufio.NewReader(f)
-	for {
-		line, readErr := reader.ReadBytes('\n')
-		if readErr != nil {
-			if readErr == io.EOF {
-				if ev, ok := parseLine(line); ok {
-					events = append(events, ev)
-				}
-				break
-			}
-			return nil, readErr
+	hasParseError := false
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		ev, ok := parseLine(line)
+		if !ok {
+			hasParseError = true
+			continue
 		}
-		if ev, ok := parseLine(line); ok {
+		if ev.ID != "" || ev.Project != "" {
 			events = append(events, ev)
 		}
 	}
-	return events, nil
+
+	if scanErr := scanner.Err(); scanErr != nil {
+		return nil, false, scanErr
+	}
+
+	return events, hasParseError, nil
 }
 
 // sendBatchEvents posts events in batches of 100 to the Lighthouse adapter.
@@ -346,7 +405,7 @@ func handleSyncFailure(spoolPath, syncPath string, events []TelemetryEvent, sent
 
 // syncFileEvents reads and synchronizes spooled events from the syncPath file.
 func syncFileEvents(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) error {
-	events, readErr := readSpooledEvents(syncPath)
+	events, hasParseError, readErr := readSpooledEvents(syncPath)
 	if readErr != nil {
 		if os.IsNotExist(readErr) {
 			return nil
@@ -364,6 +423,14 @@ func syncFileEvents(ctx context.Context, adapter *LighthouseAdapter, syncPath, s
 	if syncErr != nil {
 		handleSyncFailure(spoolPath, syncPath, events, sentCount, syncErr)
 		return nil
+	}
+
+	if hasParseError {
+		corruptPath := syncPath + ".corrupt"
+		log.Printf("Warning: temporary telemetry sync file contained unparseable events; renaming to %s for inspection", corruptPath)
+		if renameErr := os.Rename(syncPath, corruptPath); renameErr == nil {
+			return nil
+		}
 	}
 
 	if removeErr := os.Remove(syncPath); removeErr != nil {
@@ -403,7 +470,7 @@ func renameSpoolUnderLock(spoolPath, tempSyncPath string) error {
 			return statErrInner
 		}
 		if fiInner.Size() == 0 {
-			return fmt.Errorf("spool file is empty")
+			return ErrEmptySpool
 		}
 		return os.Rename(spoolPath, tempSyncPath)
 	})
@@ -446,7 +513,7 @@ func SyncSpooledEvents(ctx context.Context, url, apiKey string) {
 	// Atomic Rename strategy under lock
 	tempSyncPath := filepath.Join(spoolDir, fmt.Sprintf("telemetry_spool_sync_%d.jsonl", time.Now().UnixNano()))
 	if renameErr := renameSpoolUnderLock(spoolPath, tempSyncPath); renameErr != nil {
-		if !os.IsNotExist(renameErr) && renameErr.Error() != "spool file is empty" {
+		if !os.IsNotExist(renameErr) && !errors.Is(renameErr, ErrEmptySpool) {
 			log.Printf("Warning: failed to rename telemetry spool file: %v", renameErr)
 		}
 		return

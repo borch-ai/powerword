@@ -15,8 +15,12 @@ import (
 	"time"
 )
 
-func init() {
+func TestMain(m *testing.M) {
+	oldLockTimeout := lockTimeout
 	lockTimeout = 5 * time.Millisecond
+	code := m.Run()
+	lockTimeout = oldLockTimeout
+	os.Exit(code)
 }
 
 func TestLighthouseAdapter_Submit_Success(t *testing.T) {
@@ -774,7 +778,7 @@ func TestTelemetrySync_PartialBatchSync(t *testing.T) {
 
 	// 4. Verify that the main spool file now contains exactly the 50 unsent events
 	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
-	events, err := readSpooledEvents(spoolPath)
+	events, _, err := readSpooledEvents(spoolPath)
 	if err != nil {
 		t.Fatalf("failed to read main spool: %v", err)
 	}
@@ -801,9 +805,9 @@ func TestTelemetrySync_CorruptFileRetention(t *testing.T) {
 		t.Fatalf("failed to create spool dir: %v", err)
 	}
 
-	// Create a temporary sync file with invalid JSON content (non-empty)
-	syncPath := filepath.Join(spoolDir, "telemetry_spool_sync_99999.jsonl")
-	if err := os.WriteFile(syncPath, []byte("corrupt-invalid-json-content\n"), 0600); err != nil {
+	// 1. Create a temporary sync file with only invalid JSON content (non-empty)
+	syncPathOnlyCorrupt := filepath.Join(spoolDir, "telemetry_spool_sync_99999.jsonl")
+	if err := os.WriteFile(syncPathOnlyCorrupt, []byte("corrupt-invalid-json-content\n"), 0600); err != nil {
 		t.Fatalf("failed to write corrupt sync file: %v", err)
 	}
 
@@ -815,11 +819,31 @@ func TestTelemetrySync_CorruptFileRetention(t *testing.T) {
 	SyncSpooledEvents(context.Background(), server.URL, "")
 
 	// Verify that the sync file is RETAINED for inspection because it has size > 0 but 0 parsed events
-	if _, err := os.Stat(syncPath); os.IsNotExist(err) {
-		t.Errorf("expected corrupt sync file to be retained, but it was deleted")
+	if _, err := os.Stat(syncPathOnlyCorrupt); os.IsNotExist(err) {
+		t.Errorf("expected only corrupt sync file to be retained, but it was deleted")
 	}
 
-	// Verify that if the file was completely empty (size == 0), it is deleted
+	// 2. Create a temporary sync file with a MIX of valid and invalid JSON content (non-empty)
+	syncPathMixed := filepath.Join(spoolDir, "telemetry_spool_sync_77777.jsonl")
+	validEvent := TelemetryEvent{Project: "valid-event", Command: "run"}
+	validBytes, _ := json.Marshal(validEvent)
+	mixedContent := string(validBytes) + "\ninvalid-json-here\n"
+	if err := os.WriteFile(syncPathMixed, []byte(mixedContent), 0600); err != nil {
+		t.Fatalf("failed to write mixed sync file: %v", err)
+	}
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify that the original sync file was deleted, but renamed to a .corrupt path
+	if _, err := os.Stat(syncPathMixed); !os.IsNotExist(err) {
+		t.Errorf("expected original mixed sync file to be renamed/deleted, but it still exists")
+	}
+	corruptPath := syncPathMixed + ".corrupt"
+	if _, err := os.Stat(corruptPath); os.IsNotExist(err) {
+		t.Errorf("expected mixed sync file to be renamed to %s, but it does not exist", corruptPath)
+	}
+
+	// 3. Verify that if the file was completely empty (size == 0), it is deleted
 	emptySyncPath := filepath.Join(spoolDir, "telemetry_spool_sync_88888.jsonl")
 	if err := os.WriteFile(emptySyncPath, []byte(""), 0600); err != nil {
 		t.Fatalf("failed to write empty sync file: %v", err)
@@ -843,4 +867,65 @@ func stringContains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	lockPath := spoolPath + ".lock"
+
+	// Create a stale lock file with timestamp from 1 hour ago
+	staleTime := time.Now().Add(-1 * time.Hour).UnixNano()
+	content := fmt.Sprintf("%d,%d", os.Getpid(), staleTime)
+	if err := os.WriteFile(lockPath, []byte(content), 0600); err != nil {
+		t.Fatalf("failed to write stale lock file: %v", err)
+	}
+
+	// Verify that isLockStale returns true
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected isLockStale to return true for lock from 1 hour ago, got false")
+	}
+
+	// Verify that withFileLock automatically cleans up the stale lock and succeeds
+	actionCalled := false
+	err := withFileLock(spoolPath, func() error {
+		actionCalled = true
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("expected withFileLock to clean up stale lock and succeed, but got error: %v", err)
+	}
+	if !actionCalled {
+		t.Errorf("expected action to be called")
+	}
+
+	// Also verify that isLockStale returns false for non-existent file
+	if isLockStale(lockPath+"-nonexistent", 10*time.Second) {
+		t.Errorf("expected isLockStale to return false for non-existent file")
+	}
+
+	// Verify isLockStale returns false for fresh lock
+	freshContent := fmt.Sprintf("%d,%d", os.Getpid(), time.Now().UnixNano())
+	if err := os.WriteFile(lockPath, []byte(freshContent), 0600); err != nil {
+		t.Fatalf("failed to write fresh lock file: %v", err)
+	}
+	if isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected isLockStale to return false for fresh lock")
+	}
+
+	// Verify isLockStale returns false for malformed content
+	if err := os.WriteFile(lockPath, []byte("malformed"), 0600); err != nil {
+		t.Fatalf("failed to write malformed lock file: %v", err)
+	}
+	if isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected isLockStale to return false for malformed lock content")
+	}
 }
