@@ -288,3 +288,33 @@ func TestAmazonService_SearchResultsWithWhitespace(t *testing.T) {
 		t.Errorf("expected 7777, got %d", count)
 	}
 }
+
+func TestAmazonService_RedactURLEncodedKey(t *testing.T) {
+	apiKeyWithSpecialChars := "key+with/special=chars"
+	encodedKey := "key%2Bwith%2Fspecial%3Dchars"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("unauthorized for key: " + encodedKey))
+	}))
+	defer srv.Close()
+
+	cfg := &config.Config{}
+	cfg.Plugins.Amazon.APIKey = apiKeyWithSpecialChars
+	cfg.Plugins.Amazon.BaseURL = srv.URL
+
+	svc := amazon.NewAmazonService(cfg, nil)
+	_, err := svc.GetListingCount(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), apiKeyWithSpecialChars) {
+		t.Errorf("expected raw API key to be redacted, got: %v", err)
+	}
+	if strings.Contains(err.Error(), encodedKey) {
+		t.Errorf("expected URL-encoded API key to be redacted, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "REDACTED") {
+		t.Errorf("expected error message to contain 'REDACTED', got: %v", err)
+	}
+}

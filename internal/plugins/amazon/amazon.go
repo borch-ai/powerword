@@ -59,24 +59,28 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 
 	resp, err := as.client.Do(req)
 	if err != nil {
-		errStr := err.Error()
-		if apiKey != "" {
-			errStr = strings.ReplaceAll(errStr, apiKey, "REDACTED")
-		}
-		return 0, fmt.Errorf("http request failed: %s", errStr)
+		return 0, fmt.Errorf("http request failed: %s", redactKey(err.Error(), apiKey))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		bodyStr := string(bodyBytes)
-		if apiKey != "" {
-			bodyStr = strings.ReplaceAll(bodyStr, apiKey, "REDACTED")
-		}
-		return 0, fmt.Errorf("api returned status %d: %s", resp.StatusCode, bodyStr)
+		return 0, fmt.Errorf("api returned status %d: %s", resp.StatusCode, redactKey(string(bodyBytes), apiKey))
 	}
 
 	return parseResponsePayload(resp.Body)
+}
+
+func redactKey(str, apiKey string) string {
+	if apiKey == "" {
+		return str
+	}
+	str = strings.ReplaceAll(str, apiKey, "REDACTED")
+	encoded := url.QueryEscape(apiKey)
+	if encoded != apiKey {
+		str = strings.ReplaceAll(str, encoded, "REDACTED")
+	}
+	return str
 }
 
 func (as *AmazonService) buildURL(apiKey, keyword string) (*url.URL, error) {
