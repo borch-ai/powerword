@@ -718,6 +718,75 @@ func TestIsRetryableError(t *testing.T) {
 	}
 }
 
+func TestTelemetrySync_PartialBatchSync(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// 1. Create a sync file with 150 events (will be split into two batches: 100 and 50)
+	syncPath := filepath.Join(spoolDir, "telemetry_spool_sync_77777.jsonl")
+	var filePayload []byte
+	for i := 0; i < 150; i++ {
+		event := TelemetryEvent{Project: fmt.Sprintf("event-%d", i)}
+		payload, _ := json.Marshal(event)
+		filePayload = append(filePayload, append(payload, '\n')...)
+	}
+	if err := os.WriteFile(syncPath, filePayload, 0600); err != nil {
+		t.Fatalf("failed to write sync file: %v", err)
+	}
+
+	// 2. Start mock server: accept the first request (batch of 100), fail the second (batch of 50)
+	var (
+		mu        sync.Mutex
+		callCount int
+		totalSent int
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		callCount++
+		if callCount == 1 {
+			var batch []TelemetryEvent
+			_ = json.NewDecoder(r.Body).Decode(&batch)
+			totalSent += len(batch)
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// 3. Verify that the sync file was deleted (rolled back)
+	if _, err := os.Stat(syncPath); !os.IsNotExist(err) {
+		t.Errorf("expected temporary sync file to be deleted on partial sync, but it still exists")
+	}
+
+	// 4. Verify that the main spool file now contains exactly the 50 unsent events
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	events, err := readSpooledEvents(spoolPath)
+	if err != nil {
+		t.Fatalf("failed to read main spool: %v", err)
+	}
+	if len(events) != 50 {
+		t.Errorf("expected 50 rolled back events in main spool, got %d", len(events))
+	}
+	if events[0].Project != "event-100" {
+		t.Errorf("expected first unsent event to be event-100, got %s", events[0].Project)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if totalSent != 100 {
+		t.Errorf("expected 100 events to be successfully sent in first batch, got %d", totalSent)
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || s[0:len(substr)] == substr || s[len(s)-len(substr):] == substr || stringContains(s, substr))
 }

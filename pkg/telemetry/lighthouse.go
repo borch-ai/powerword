@@ -221,7 +221,8 @@ func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, error) {
 }
 
 // sendBatchEvents posts events in batches of 100 to the Lighthouse adapter.
-func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []TelemetryEvent) error {
+// Returns the count of successfully sent events and any error encountered.
+func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []TelemetryEvent) (int, error) {
 	const batchSize = 100
 	for i := 0; i < len(events); i += batchSize {
 		end := i + batchSize
@@ -229,10 +230,10 @@ func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []T
 			end = len(events)
 		}
 		if err := adapter.SubmitBatch(ctx, events[i:end]); err != nil {
-			return err
+			return i, err
 		}
 	}
-	return nil
+	return len(events), nil
 }
 
 // rollbackSpooledEvents writes events back to the spool file on sync failure.
@@ -276,13 +277,16 @@ func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, 
 		return
 	}
 
-	syncErr := sendBatchEvents(ctx, adapter, events)
+	sentCount, syncErr := sendBatchEvents(ctx, adapter, events)
 	if syncErr != nil {
 		log.Printf("Warning: failed to sync spooled telemetry events: %v", syncErr)
-		rollbackErr := rollbackSpooledEvents(spoolPath, events)
-		if rollbackErr != nil {
-			log.Printf("Warning: failed to rollback spooled telemetry events: %v", rollbackErr)
-			return // Keep the sync file so we don't lose the telemetry events
+		unsentEvents := events[sentCount:]
+		if len(unsentEvents) > 0 {
+			rollbackErr := rollbackSpooledEvents(spoolPath, unsentEvents)
+			if rollbackErr != nil {
+				log.Printf("Warning: failed to rollback spooled telemetry events: %v", rollbackErr)
+				return // Keep the sync file so we don't lose the telemetry events
+			}
 		}
 		_ = os.Remove(syncPath)
 		return
