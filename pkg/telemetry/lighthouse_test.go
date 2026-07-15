@@ -3,6 +3,7 @@ package telemetry
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -927,5 +929,24 @@ func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
 	}
 	if isLockStale(lockPath, 10*time.Second) {
 		t.Errorf("expected isLockStale to return false for malformed lock content")
+	}
+}
+
+func TestGenerateEventID_Fallback(t *testing.T) {
+	oldReader := rand.Reader
+	// Mock rand.Reader to return an error
+	rand.Reader = io.LimitReader(bytes.NewBuffer(nil), 0)
+	defer func() {
+		rand.Reader = oldReader
+	}()
+
+	id1 := generateEventID()
+	if !strings.HasPrefix(id1, "fallback-") {
+		t.Errorf("expected fallback ID starting with 'fallback-', got: %s", id1)
+	}
+
+	id2 := generateEventID()
+	if id1 == id2 {
+		t.Errorf("expected consecutive fallback IDs to be unique, but got duplicates: %s", id1)
 	}
 }

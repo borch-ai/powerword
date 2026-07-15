@@ -58,9 +58,21 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("unexpected status code %d (%s)", e.StatusCode, e.Status)
 }
 
+var (
+	fallbackMu      sync.Mutex
+	fallbackCounter int64
+)
+
 func generateEventID() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	_, err := rand.Reader.Read(b)
+	if err != nil {
+		fallbackMu.Lock()
+		fallbackCounter++
+		counter := fallbackCounter
+		fallbackMu.Unlock()
+		return fmt.Sprintf("fallback-%d-%d-%d", os.Getpid(), time.Now().UnixNano(), counter)
+	}
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
@@ -197,12 +209,12 @@ func isLockStale(lockPath string, staleThreshold time.Duration) bool {
 
 // withFileLock executes the given action while holding an exclusive filesystem-level lock
 // on the spool file (via a lock file). It retries lock acquisition for up to lockTimeout.
-// If the lock file is found to be older than staleThreshold (e.g. from a crashed process),
+// If the lock file is found to be older than staleThreshold (5 minutes, e.g. from a crashed process),
 // it is automatically cleaned up.
 func withFileLock(spoolPath string, action func() error) error {
 	lockPath := spoolPath + ".lock"
 	acquired := false
-	const staleThreshold = 10 * time.Second
+	const staleThreshold = 5 * time.Minute
 
 	// Try to acquire the lock using O_EXCL (atomic creation)
 	for start := time.Now(); time.Since(start) < lockTimeout; {
@@ -316,6 +328,10 @@ func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, bool, error) {
 	var events []TelemetryEvent
 	hasParseError := false
 	scanner := bufio.NewScanner(f)
+	// Increase buffer size to handle lines up to the 5 MB max spool limit
+	const maxSpoolBytes = 5 * 1024 * 1024
+	scanner.Buffer(make([]byte, 64*1024), maxSpoolBytes)
+
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		ev, ok := parseLine(line)
@@ -442,7 +458,7 @@ func syncFileEvents(ctx context.Context, adapter *LighthouseAdapter, syncPath, s
 // processSyncFile processes a single temporary sync file: syncs to Lighthouse, deletes on success, rolls back on failure.
 func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) {
 	// Use lock coordination on the sync file to prevent concurrent processes from processing the same file.
-	// If we fail to acquire the lock immediately, it means another process is already processing it, so we skip.
+	// If we fail to acquire the lock within lockTimeout, it means another process is already processing it, so we skip.
 	_ = withFileLock(syncPath, func() error {
 		return syncFileEvents(ctx, adapter, syncPath, spoolPath)
 	})
