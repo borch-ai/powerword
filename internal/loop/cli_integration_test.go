@@ -733,6 +733,11 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 	}))
 	defer llmServer.Close()
 
+	// Get a deterministically unreachable URL by closing a mock server immediately
+	unreachableServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	unreachableURL := unreachableServer.URL
+	unreachableServer.Close()
+
 	// 1. Run with invalid LIGHTHOUSE_URL -> should spool event offline
 	cmd1 := exec.Command(binaryPath, "test offline telemetry", "--json", "--headless")
 	cmd1.Env = append(os.Environ(),
@@ -740,7 +745,7 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 		"OPENAI_BASE_URL="+llmServer.URL,
 		"POWERWORD_OPENAI_API_KEY=dummy",
 		"POWERWORD_MODEL=gpt-4",
-		"LIGHTHOUSE_URL=http://localhost:9999", // Unreachable Lighthouse url
+		"LIGHTHOUSE_URL="+unreachableURL, // Unreachable Lighthouse url
 		"POWERWORD_TELEMETRY_TIMEOUT=500ms",
 	)
 	cmd1.Stderr = os.Stderr

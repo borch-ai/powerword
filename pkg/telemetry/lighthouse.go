@@ -229,12 +229,11 @@ func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []T
 }
 
 // rollbackSpooledEvents writes events back to the spool file on sync failure.
-func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) {
+func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
 	//nolint:gosec // G304: path is resolved from secure UserHomeDir
 	spoolFile, err := os.OpenFile(spoolPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
-		log.Printf("Warning: failed to open telemetry spool file for rollback: %v", err)
-		return
+		return err
 	}
 	defer func() { _ = spoolFile.Close() }()
 
@@ -243,8 +242,11 @@ func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) {
 		if err != nil {
 			continue
 		}
-		_, _ = spoolFile.Write(append(payload, '\n'))
+		if _, writeErr := spoolFile.Write(append(payload, '\n')); writeErr != nil {
+			return writeErr
+		}
 	}
+	return nil
 }
 
 // processSyncFile processes a single temporary sync file: syncs to Lighthouse, deletes on success, rolls back on failure.
@@ -252,6 +254,7 @@ func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, 
 	events, readErr := readSpooledEvents(syncPath)
 	if readErr != nil {
 		log.Printf("Warning: error reading temporary telemetry sync file: %v", readErr)
+		return // Keep the sync file so it is retried next time
 	}
 
 	if len(events) == 0 {
@@ -259,14 +262,20 @@ func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, 
 		return
 	}
 
-	if syncErr := sendBatchEvents(ctx, adapter, events); syncErr == nil {
-		if removeErr := os.Remove(syncPath); removeErr != nil {
-			log.Printf("Warning: failed to remove temporary telemetry sync file: %v", removeErr)
-		}
-	} else {
+	syncErr := sendBatchEvents(ctx, adapter, events)
+	if syncErr != nil {
 		log.Printf("Warning: failed to sync spooled telemetry events: %v", syncErr)
-		rollbackSpooledEvents(spoolPath, events)
+		rollbackErr := rollbackSpooledEvents(spoolPath, events)
+		if rollbackErr != nil {
+			log.Printf("Warning: failed to rollback spooled telemetry events: %v", rollbackErr)
+			return // Keep the sync file so we don't lose the telemetry events
+		}
 		_ = os.Remove(syncPath)
+		return
+	}
+
+	if removeErr := os.Remove(syncPath); removeErr != nil {
+		log.Printf("Warning: failed to remove temporary telemetry sync file: %v", removeErr)
 	}
 }
 
