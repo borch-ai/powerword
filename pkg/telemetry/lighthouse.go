@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +37,20 @@ type LighthouseAdapter struct {
 	URL    string
 	APIKey string
 	Client *http.Client
+}
+
+// HTTPError represents an HTTP status error returned by the collector.
+type HTTPError struct {
+	StatusCode int
+	Status     string
+	Body       string
+}
+
+func (e *HTTPError) Error() string {
+	if e.Body != "" {
+		return fmt.Sprintf("unexpected status code %d (%s): %s", e.StatusCode, e.Status, e.Body)
+	}
+	return fmt.Sprintf("unexpected status code %d (%s)", e.StatusCode, e.Status)
 }
 
 // Submit sends the telemetry event to the Lighthouse collector.
@@ -76,10 +92,11 @@ func (a *LighthouseAdapter) Submit(ctx context.Context, e TelemetryEvent) error 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		bodyStr := strings.TrimSpace(string(bodyBytes))
-		if bodyStr != "" {
-			return fmt.Errorf("unexpected status code %d (%s): %s", resp.StatusCode, resp.Status, bodyStr)
+		return &HTTPError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Body:       bodyStr,
 		}
-		return fmt.Errorf("unexpected status code %d (%s)", resp.StatusCode, resp.Status)
 	}
 
 	return nil
@@ -127,13 +144,44 @@ func (a *LighthouseAdapter) SubmitBatch(ctx context.Context, events []TelemetryE
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		bodyStr := strings.TrimSpace(string(bodyBytes))
-		if bodyStr != "" {
-			return fmt.Errorf("unexpected status code %d (%s): %s", resp.StatusCode, resp.Status, bodyStr)
+		return &HTTPError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Body:       bodyStr,
 		}
-		return fmt.Errorf("unexpected status code %d (%s)", resp.StatusCode, resp.Status)
 	}
 
 	return nil
+}
+
+var lockTimeout = 200 * time.Millisecond
+
+// withFileLock executes the given action while holding an exclusive filesystem-level lock
+// on the spool file (via a lock file). It retries lock acquisition for up to lockTimeout.
+func withFileLock(spoolPath string, action func() error) error {
+	lockPath := spoolPath + ".lock"
+	acquired := false
+
+	// Try to acquire the lock using O_EXCL (atomic creation)
+	for start := time.Now(); time.Since(start) < lockTimeout; time.Sleep(10 * time.Millisecond) {
+		//nolint:gosec // G304: lockPath is resolved from secure UserHomeDir
+		lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err == nil {
+			_ = lf.Close()
+			acquired = true
+			break
+		}
+	}
+
+	if !acquired {
+		return fmt.Errorf("failed to acquire telemetry lock")
+	}
+
+	defer func() {
+		_ = os.Remove(lockPath)
+	}()
+
+	return action()
 }
 
 // spoolOfflineEvent appends a telemetry event to the local spool file.
@@ -157,17 +205,26 @@ func spoolOfflineEvent(e TelemetryEvent) {
 		return
 	}
 
-	//nolint:gosec // G304: path is resolved from secure UserHomeDir
-	f, openErr := os.OpenFile(spoolPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if openErr != nil {
-		log.Printf("Warning: failed to open telemetry spool file: %v", openErr)
-		return
-	}
-	defer func() { _ = f.Close() }()
+	_ = withFileLock(spoolPath, func() error {
+		// Enforce max spool size limit of 5 MB to avoid unbounded disk growth
+		const maxSpoolBytes = 5 * 1024 * 1024
+		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
+			log.Printf("Warning: telemetry spool file size limit exceeded; dropping event")
+			return nil
+		}
 
-	if _, writeErr := f.Write(append(payload, '\n')); writeErr != nil {
-		log.Printf("Warning: failed to write to telemetry spool file: %v", writeErr)
-	}
+		//nolint:gosec // G304: path is resolved from secure UserHomeDir
+		f, openErr := os.OpenFile(spoolPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		if openErr != nil {
+			return openErr
+		}
+		defer func() { _ = f.Close() }()
+
+		if _, writeErr := f.Write(append(payload, '\n')); writeErr != nil {
+			return writeErr
+		}
+		return nil
+	})
 }
 
 // parseLine trims and unmarshals a single JSONL line into a TelemetryEvent.
@@ -231,23 +288,31 @@ func sendBatchEvents(ctx context.Context, adapter *LighthouseAdapter, events []T
 
 // rollbackSpooledEvents writes events back to the spool file on sync failure.
 func rollbackSpooledEvents(spoolPath string, events []TelemetryEvent) error {
-	//nolint:gosec // G304: path is resolved from secure UserHomeDir
-	spoolFile, err := os.OpenFile(spoolPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = spoolFile.Close() }()
+	return withFileLock(spoolPath, func() error {
+		// Enforce max spool size limit of 5 MB
+		const maxSpoolBytes = 5 * 1024 * 1024
+		if fi, err := os.Stat(spoolPath); err == nil && fi.Size() >= maxSpoolBytes {
+			return fmt.Errorf("telemetry spool file size limit exceeded")
+		}
 
-	for _, ev := range events {
-		payload, err := json.Marshal(ev)
+		//nolint:gosec // G304: path is resolved from secure UserHomeDir
+		spoolFile, err := os.OpenFile(spoolPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
-			continue
+			return err
 		}
-		if _, writeErr := spoolFile.Write(append(payload, '\n')); writeErr != nil {
-			return writeErr
+		defer func() { _ = spoolFile.Close() }()
+
+		for _, ev := range events {
+			payload, err := json.Marshal(ev)
+			if err != nil {
+				continue
+			}
+			if _, writeErr := spoolFile.Write(append(payload, '\n')); writeErr != nil {
+				return writeErr
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // processSyncFile processes a single temporary sync file: syncs to Lighthouse, deletes on success, rolls back on failure.
@@ -318,22 +383,26 @@ func SyncSpooledEvents(ctx context.Context, url, apiKey string) {
 	}
 
 	// 2. Process the main spool file if it exists and has content
-	fi, statErr := os.Stat(spoolPath)
-	if statErr != nil {
-		if os.IsNotExist(statErr) {
-			return
-		}
-		log.Printf("Warning: failed to stat telemetry spool file: %v", statErr)
-		return
-	}
-	if fi.Size() == 0 {
-		return
-	}
-
-	// Atomic Rename strategy
 	tempSyncPath := filepath.Join(spoolDir, fmt.Sprintf("telemetry_spool_sync_%d.jsonl", time.Now().UnixNano()))
-	if renameErr := os.Rename(spoolPath, tempSyncPath); renameErr != nil {
-		log.Printf("Warning: failed to rename telemetry spool file: %v", renameErr)
+
+	renameErr := withFileLock(spoolPath, func() error {
+		fi, statErr := os.Stat(spoolPath)
+		if statErr != nil {
+			return statErr
+		}
+		if fi.Size() == 0 {
+			return fmt.Errorf("spool file is empty")
+		}
+		if err := os.Rename(spoolPath, tempSyncPath); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if renameErr != nil {
+		if !os.IsNotExist(renameErr) && renameErr.Error() != "spool file is empty" {
+			log.Printf("Warning: failed to rename telemetry spool file: %v", renameErr)
+		}
 		return
 	}
 
@@ -352,6 +421,25 @@ func isRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
+
+	// 1. Check context cancellation/timeout
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	// 2. Check net.Error (timeouts, DNS failures, connection refused, etc.)
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	// 3. Check structured HTTP status error (429 or 5xx)
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
+		return httpErr.StatusCode == 429 || httpErr.StatusCode >= 500
+	}
+
+	// 4. Fallback string-based matching for backwards compatibility and generic error wrappers
 	errStr := err.Error()
 	if strings.Contains(errStr, "unexpected status code") {
 		var code int
@@ -362,12 +450,11 @@ func isRetryableError(err error) bool {
 		// Fallback matches:
 		return strings.Contains(errStr, "429") || strings.Contains(errStr, "500") || strings.Contains(errStr, "502") || strings.Contains(errStr, "503") || strings.Contains(errStr, "504")
 	}
-	// Restrict transport errors specifically to network timeouts, cancellations, or connection failures.
-	// In LighthouseAdapter.Submit/SubmitBatch, these are returned as:
-	// "http request failed: %w" or context errors ("context canceled", "context deadline exceeded").
 	return strings.Contains(errStr, "http request failed") ||
 		strings.Contains(errStr, "context canceled") ||
-		strings.Contains(errStr, "context deadline exceeded")
+		strings.Contains(errStr, "context deadline exceeded") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "connection reset")
 }
 
 // SubmitToLighthouse reads configuration from the environment and submits

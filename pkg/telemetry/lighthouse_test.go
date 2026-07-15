@@ -12,7 +12,12 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 )
+
+func init() {
+	lockTimeout = 5 * time.Millisecond
+}
 
 func TestLighthouseAdapter_Submit_Success(t *testing.T) {
 	var (

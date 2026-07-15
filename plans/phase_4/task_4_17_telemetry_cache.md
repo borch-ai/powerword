@@ -10,12 +10,15 @@ This task extends the shareable `pkg/telemetry` package to support local offline
 ## User Review Required
 
 > [!IMPORTANT]
-> **Race-Free Concurrency via Atomic Rename**:
-> Multiple tool commands or concurrent sibling runs (e.g. Kiln, Pithos) can execute simultaneously. To prevent race conditions where one process is writing a new event to the spool while another process is reading/flushing and truncating it, we will use an **atomic rename strategy**:
-> 1. When syncing, we rename `telemetry_spool.jsonl` to `telemetry_spool_sync_<timestamp>.jsonl` (which is atomic on POSIX).
-> 2. The syncing process reads this renamed file, posts its contents via a batch API, and deletes it on success.
-> 3. If posting fails, we append the events back to `telemetry_spool.jsonl`.
-> 4. Any concurrent processes writing new telemetry during the sync will simply create a new `telemetry_spool.jsonl` and append to it without interference.
+> **Race-Free Concurrency via Atomic Rename & File Lock Coordination**:
+> Multiple tool commands or concurrent sibling runs (e.g. Kiln, Pithos) can execute simultaneously. To prevent race conditions where one process is writing a new event to the spool while another process is reading/flushing and truncating it, we use an **atomic rename strategy** coupled with **lock file coordination**:
+> 1. Writes to the spool file, renames, and rollbacks are protected by a cross-process lock file (`telemetry_spool.jsonl.lock`) using `os.O_EXCL` file creation.
+> 2. When syncing, we acquire the lock, rename `telemetry_spool.jsonl` to `telemetry_spool_sync_<timestamp>.jsonl` (which is atomic), and release the lock.
+> 3. The syncing process reads this renamed file, posts its contents via a batch API, and deletes it on success.
+> 4. If posting fails, we append the events back to `telemetry_spool.jsonl` under the lock.
+> 5. Any concurrent processes writing new telemetry during the sync will be blocked until the rename completes. Once the lock is released, they will simply create a new `telemetry_spool.jsonl` and append to it without interference, ensuring zero event loss.
+> 6. We enforce a maximum size limit of **5 MB** on the spool file to bound disk usage and subsequent sync latency.
+> 7. The retryability checks are based on structured HTTP error responses (`HTTPError`), context cancellation, and `net.Error` transport timeouts, with a fallback string parser for backwards compatibility.
 
 ---
 
@@ -24,30 +27,28 @@ This task extends the shareable `pkg/telemetry` package to support local offline
 ### Telemetry Package (`pkg/telemetry`)
 
 #### [MODIFY] [lighthouse.go](file://../../pkg/telemetry/lighthouse.go)
+- Add `HTTPError` struct and return it from `Submit` and `SubmitBatch` on non-2xx status codes.
+- Implement `withFileLock(spoolPath string, action func() error) error` helper implementing lock file coordination via an `O_EXCL` lock file `telemetry_spool.jsonl.lock`.
 - Add `SubmitBatch(ctx context.Context, events []TelemetryEvent) error` to `LighthouseAdapter` to submit an array of events to `/api/telemetry/batch`.
 - Implement `spoolOfflineEvent(e TelemetryEvent)`:
   - Resolves standard directory `~/.local/share/powerword/` using `os.UserHomeDir()`.
   - Appends the event as a single line JSON-marshaled payload into `telemetry_spool.jsonl` with a trailing newline (`\n`).
-  - Ensures parent directories are created with `0750` permissions and the file is opened/created with `0600` permissions.
+  - Limits spool file size to 5 MB.
 - Implement `SyncSpooledEvents(ctx context.Context)`:
-  - Runs in a background goroutine during telemetry initialization (once per CLI invocation).
-  - Uses `os.Rename` to atomically move `telemetry_spool.jsonl` to a temporary sync file `telemetry_spool_sync_<timestamp>.jsonl`.
-  - Reads and parses all events from the temporary sync file.
-  - Sends the events to Lighthouse via `SubmitBatch` (e.g. in batches of 100).
+  - Runs once per process under `sync.Once`.
+  - Uses `withFileLock` to safely rename `telemetry_spool.jsonl` to `telemetry_spool_sync_<timestamp>.jsonl`.
+  - Sends events in batches of 100 via `SubmitBatch`.
   - Deletes the temporary sync file on success.
-  - Appends the events back to `telemetry_spool.jsonl` on failure.
-- Modify `SubmitToLighthouse(e TelemetryEvent)` to spool the event using `spoolOfflineEvent` if `Submit` fails.
-- Wire up a `sync.Once` to ensure `SyncSpooledEvents` is triggered exactly once on the first call to `SubmitToLighthouse`.
+  - Appends events back to `telemetry_spool.jsonl` on failure under lock.
+- Refactor `isRetryableError(err error) bool` to perform structured checks for context cancellation, `net.Error`, and `HTTPError`, with a fallback string parser for raw errors.
 
 #### [MODIFY] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
-- No changes required if all initialization and caching logic is encapsulated inside `lighthouse.go`.
+- No changes required.
 
 #### [MODIFY] [lighthouse_test.go](file://../../pkg/telemetry/lighthouse_test.go)
+- Add `init()` override to set `lockTimeout = 5 * time.Millisecond` to keep unit test suites running in milliseconds.
 - Add `TestLighthouseAdapter_SubmitBatch_Success` and `TestLighthouseAdapter_SubmitBatch_Error`.
-- Add unit tests verifying:
-  - Writing events to the spool file on submission failure.
-  - Atomic rename, reading, batching, and deleting on successful sync.
-  - Correct rollback (re-spooling) if batch sync fails.
+- Add unit tests verifying spooling, atomic rename/locking, batching, error rollback, file size capping, and structured error retry categorizations.
 
 ---
 
