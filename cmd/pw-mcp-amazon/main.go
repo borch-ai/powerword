@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -44,7 +45,8 @@ func run() error {
 	transport := &mcp.StdioTransport{}
 	err = srv.Run(context.Background(), transport)
 	if err != nil {
-		if errors.Is(err, io.EOF) || err.Error() == "server is closing: EOF" {
+		errStr := err.Error()
+		if errors.Is(err, io.EOF) || (strings.HasSuffix(errStr, "EOF") && !strings.Contains(errStr, "unexpected EOF")) {
 			return nil
 		}
 		return err

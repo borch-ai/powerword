@@ -16,7 +16,7 @@ func clearEnv() func() {
 			return true
 		}
 		switch name {
-		case "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "SERP_API_KEY":
+		case "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "SERP_API_KEY", "AMAZON_API_KEY":
 			return true
 		}
 		return false
@@ -587,10 +587,12 @@ SERP_API_KEY=dotenv-serp-key
 	_ = os.Unsetenv("POWERWORD_OPENAI_API_KEY")
 	_ = os.Unsetenv("POWERWORD_ANTHROPIC_API_KEY")
 	_ = os.Unsetenv("POWERWORD_SERP_API_KEY")
+	_ = os.Unsetenv("POWERWORD_AMAZON_API_KEY")
 	_ = os.Unsetenv("GEMINI_API_KEY")
 	_ = os.Unsetenv("OPENAI_API_KEY")
 	_ = os.Unsetenv("ANTHROPIC_API_KEY")
 	_ = os.Unsetenv("SERP_API_KEY")
+	_ = os.Unsetenv("AMAZON_API_KEY")
 
 	cfg, err := LoadConfig("")
 	if err != nil {
@@ -615,6 +617,7 @@ SERP_API_KEY=dotenv-serp-key
 	_ = os.Unsetenv("POWERWORD_OPENAI_API_KEY")
 	_ = os.Unsetenv("POWERWORD_ANTHROPIC_API_KEY")
 	_ = os.Unsetenv("POWERWORD_SERP_API_KEY")
+	_ = os.Unsetenv("POWERWORD_AMAZON_API_KEY")
 	t.Setenv("GEMINI_API_KEY", "os-gemini-override")
 	cfg, err = LoadConfig("")
 	if err != nil {

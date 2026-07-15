@@ -1,6 +1,7 @@
 package amazon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -45,32 +46,10 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 		return 0, errors.New("amazon api key is required (set to 'mock' for local offline testing)")
 	}
 
-	baseURL := as.cfg.Plugins.Amazon.BaseURL
-	if baseURL == "" {
-		baseURL = "https://api.scaleserp.com"
-	}
-
-	parsedBase, err := url.Parse(baseURL)
+	u, err := as.buildURL(apiKey, keyword)
 	if err != nil {
-		return 0, fmt.Errorf("invalid base url: %w", err)
+		return 0, err
 	}
-	if parsedBase.Scheme != "http" && parsedBase.Scheme != "https" {
-		return 0, fmt.Errorf("invalid base url scheme %q: must be http or https", parsedBase.Scheme)
-	}
-	if parsedBase.Host == "" {
-		return 0, fmt.Errorf("invalid base url: missing host")
-	}
-
-	u := parsedBase.JoinPath("search")
-
-	q := u.Query()
-	q.Set("api_key", apiKey)
-	q.Set("q", keyword)
-
-	// Set query parameters for ScaleSerp Search:
-	q.Set("search_type", "products")
-
-	u.RawQuery = q.Encode()
 
 	//nolint:gosec // G107: URL is constructed from pre-configured baseURL and query parameters
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
@@ -97,6 +76,40 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 		return 0, fmt.Errorf("api returned status %d: %s", resp.StatusCode, bodyStr)
 	}
 
+	return parseResponsePayload(resp.Body)
+}
+
+func (as *AmazonService) buildURL(apiKey, keyword string) (*url.URL, error) {
+	baseURL := as.cfg.Plugins.Amazon.BaseURL
+	if baseURL == "" {
+		baseURL = "https://api.scaleserp.com"
+	}
+
+	parsedBase, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base url: %w", err)
+	}
+	if parsedBase.Scheme != "http" && parsedBase.Scheme != "https" {
+		return nil, fmt.Errorf("invalid base url scheme %q: must be http or https", parsedBase.Scheme)
+	}
+	if parsedBase.Host == "" {
+		return nil, fmt.Errorf("invalid base url: missing host")
+	}
+
+	u := parsedBase.JoinPath("search")
+
+	q := u.Query()
+	q.Set("api_key", apiKey)
+	q.Set("q", keyword)
+
+	// Set query parameters for ScaleSerp Search:
+	q.Set("search_type", "products")
+
+	u.RawQuery = q.Encode()
+	return u, nil
+}
+
+func parseResponsePayload(body io.Reader) (int, error) {
 	var payload struct {
 		SearchInformation struct {
 			TotalResults int `json:"total_results"`
@@ -105,7 +118,7 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 		TotalResults  int             `json:"total_results"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(body).Decode(&payload); err != nil {
 		return 0, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -114,11 +127,12 @@ func (as *AmazonService) GetListingCount(ctx context.Context, keyword string) (i
 	if count == 0 {
 		count = payload.TotalResults
 	}
-	if count == 0 && len(payload.SearchResults) > 0 && payload.SearchResults[0] == '{' {
+	trimmed := bytes.TrimSpace(payload.SearchResults)
+	if count == 0 && len(trimmed) > 0 && trimmed[0] == '{' {
 		var searchResultsObj struct {
 			TotalResults int `json:"total_results"`
 		}
-		if err := json.Unmarshal(payload.SearchResults, &searchResultsObj); err != nil {
+		if err := json.Unmarshal(trimmed, &searchResultsObj); err != nil {
 			return 0, fmt.Errorf("failed to decode search_results object: %w", err)
 		}
 		count = searchResultsObj.TotalResults
