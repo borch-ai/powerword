@@ -5,6 +5,7 @@ package loop_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -699,5 +700,101 @@ func TestCLI_SessionPauseAndReject(t *testing.T) {
 	}
 	if session.Messages[3].Content != "All done!" {
 		t.Errorf("expected final message to be 'All done!', got %s", session.Messages[3].Content)
+	}
+}
+
+func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
+	tempHomeDir, err := os.MkdirTemp("", "pw-telemetry-integration-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempHomeDir)
+
+	// Mock LLM server
+	llmServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: "Hello from telemetry integration!",
+					},
+				},
+			},
+			Usage: openai.Usage{
+				PromptTokens:     5,
+				CompletionTokens: 5,
+				TotalTokens:      10,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer llmServer.Close()
+
+	// 1. Run with invalid LIGHTHOUSE_URL -> should spool event offline
+	cmd1 := exec.Command(binaryPath, "test offline telemetry", "--json", "--headless")
+	cmd1.Env = append(os.Environ(),
+		"HOME="+tempHomeDir,
+		"OPENAI_BASE_URL="+llmServer.URL,
+		"POWERWORD_OPENAI_API_KEY=dummy",
+		"POWERWORD_MODEL=gpt-4",
+		"LIGHTHOUSE_URL=http://localhost:9999", // Unreachable Lighthouse url
+		"POWERWORD_TELEMETRY_TIMEOUT=500ms",
+	)
+	cmd1.Stderr = os.Stderr
+	_, err = cmd1.Output()
+	if err != nil {
+		t.Fatalf("CLI command 1 failed: %v", err)
+	}
+
+	spoolPath := filepath.Join(tempHomeDir, ".local", "share", "powerword", "telemetry_spool.jsonl")
+	if _, err := os.Stat(spoolPath); err != nil {
+		t.Fatalf("expected spool file to be created at %s, got error: %v", spoolPath, err)
+	}
+
+	// 2. Start mock Lighthouse server to sync events
+	var (
+		receivedBatch bool
+		batchLength   int
+	)
+	lhServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/telemetry/batch" {
+			receivedBatch = true
+			var events []interface{}
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &events)
+			batchLength = len(events)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer lhServer.Close()
+
+	// Run with valid LIGHTHOUSE_URL -> should sync spooled events and delete spool
+	cmd2 := exec.Command(binaryPath, "test sync telemetry", "--json", "--headless")
+	cmd2.Env = append(os.Environ(),
+		"HOME="+tempHomeDir,
+		"OPENAI_BASE_URL="+llmServer.URL,
+		"POWERWORD_OPENAI_API_KEY=dummy",
+		"POWERWORD_MODEL=gpt-4",
+		"LIGHTHOUSE_URL="+lhServer.URL, // Valid Lighthouse URL
+		"POWERWORD_TELEMETRY_TIMEOUT=2s", // Give enough time for background sync
+	)
+	cmd2.Stderr = os.Stderr
+	_, err = cmd2.Output()
+	if err != nil {
+		t.Fatalf("CLI command 2 failed: %v", err)
+	}
+
+	// Spool file should be gone (synced and deleted)
+	if _, err := os.Stat(spoolPath); !os.IsNotExist(err) {
+		t.Errorf("expected spool file at %s to be deleted after successful sync, but it still exists", spoolPath)
+	}
+
+	if !receivedBatch {
+		t.Error("expected mock Lighthouse server to receive telemetry batch endpoint call")
+	}
+	if batchLength != 1 {
+		t.Errorf("expected batch length to be 1, got %d", batchLength)
 	}
 }
