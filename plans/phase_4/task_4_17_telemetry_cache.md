@@ -28,17 +28,19 @@ This task extends the shareable `pkg/telemetry` package to support local offline
 
 #### [MODIFY] [lighthouse.go](file://../../pkg/telemetry/lighthouse.go)
 - Add `HTTPError` struct and return it from `Submit` and `SubmitBatch` on non-2xx status codes.
-- Implement `withFileLock(spoolPath string, action func() error) error` helper implementing lock file coordination via an `O_EXCL` lock file `telemetry_spool.jsonl.lock`.
+- Implement `withFileLock(spoolPath string, staleThreshold time.Duration, action func() error) error` helper implementing lock file coordination via an `O_EXCL` lock file. Enforces configurable staleness checks and dynamic retry sleep durations based on `lockTimeout` to eliminate test flakiness.
+- Implement `generateEventID` to assign unique event IDs using `crypto/rand`, falling back to a thread-safe deterministic schema on entropy error. Assign event ID once at the start of `SubmitToLighthouse` to ensure consistent ID spooling.
 - Add `SubmitBatch(ctx context.Context, events []TelemetryEvent) error` to `LighthouseAdapter` to submit an array of events to `/api/telemetry/batch`.
 - Implement `spoolOfflineEvent(e TelemetryEvent)`:
-  - Resolves standard directory `~/.local/share/powerword/` using `os.UserHomeDir()`.
+  - Resolves standard directory `~/.local/share/powerword/` using `os.UserHomeDir()` with secure permissions (`0700`).
   - Appends the event as a single line JSON-marshaled payload into `telemetry_spool.jsonl` with a trailing newline (`\n`).
-  - Limits spool file size to 5 MB.
+  - Limits spool file size to 5 MB, accounting for the appended event size even when the file does not exist yet.
 - Implement `SyncSpooledEvents(ctx context.Context)`:
   - Runs once per process under `sync.Once`.
   - Uses `withFileLock` to safely rename `telemetry_spool.jsonl` to `telemetry_spool_sync_<timestamp>.jsonl`.
+  - Configures `bufio.Scanner` with a 5 MB buffer limit to handle large lines.
   - Sends events in batches of 100 via `SubmitBatch`.
-  - Deletes the temporary sync file on success.
+  - Deletes the temporary sync file on success (or renames corrupt lines to `.corrupt`).
   - Appends events back to `telemetry_spool.jsonl` on failure under lock.
 - Refactor `isRetryableError(err error) bool` to perform structured checks for context cancellation, `net.Error`, and `HTTPError`, with a fallback string parser for raw errors.
 
@@ -46,9 +48,9 @@ This task extends the shareable `pkg/telemetry` package to support local offline
 - No changes required.
 
 #### [MODIFY] [lighthouse_test.go](file://../../pkg/telemetry/lighthouse_test.go)
-- Add `init()` override to set `lockTimeout = 5 * time.Millisecond` to keep unit test suites running in milliseconds.
+- Add `TestMain` override to set `lockTimeout = 5 * time.Millisecond` to keep unit test suites running in milliseconds.
 - Add `TestLighthouseAdapter_SubmitBatch_Success` and `TestLighthouseAdapter_SubmitBatch_Error`.
-- Add unit tests verifying spooling, atomic rename/locking, batching, error rollback, file size capping, and structured error retry categorizations.
+- Add unit tests verifying spooling, atomic rename/locking, batching, error rollback, file size capping, stale lock recovery, and structured error retry categorizations.
 
 ---
 
