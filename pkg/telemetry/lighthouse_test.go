@@ -17,11 +17,31 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	code := runTests(m)
+	os.Exit(code)
+}
+
+func runTests(m *testing.M) int {
 	oldLockTimeout := lockTimeout
 	lockTimeout = 5 * time.Millisecond
-	code := m.Run()
-	lockTimeout = oldLockTimeout
-	os.Exit(code)
+	defer func() {
+		lockTimeout = oldLockTimeout
+	}()
+
+	tempHome, err := os.MkdirTemp("", "powerword-test-home")
+	if err != nil {
+		fmt.Printf("failed to create temp home: %v\n", err)
+		return 1
+	}
+	defer func() { _ = os.RemoveAll(tempHome) }()
+
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tempHome)
+	defer func() {
+		_ = os.Setenv("HOME", oldHome)
+	}()
+
+	return m.Run()
 }
 
 func TestLighthouseAdapter_Submit_Success(t *testing.T) {

@@ -744,7 +744,7 @@ func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
 		"POWERWORD_OPENAI_API_KEY=dummy",
 		"POWERWORD_MODEL=gpt-4",
 		"LIGHTHOUSE_URL="+unreachableURL, // Unreachable Lighthouse url
-		"POWERWORD_TELEMETRY_TIMEOUT=500ms",
+		"POWERWORD_TELEMETRY_TIMEOUT=2s",
 	)
 	cmd1.Stderr = os.Stderr
 	_, err = cmd1.Output()

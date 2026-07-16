@@ -498,7 +498,7 @@ func processStrandedSyncFiles(ctx context.Context, adapter *LighthouseAdapter, s
 		return
 	}
 	for _, entry := range files {
-		if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), "telemetry_spool_sync_") && strings.HasSuffix(entry.Name(), ".jsonl") {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "telemetry_spool_sync_") && strings.HasSuffix(entry.Name(), ".jsonl") {
 			syncPath := filepath.Join(spoolDir, entry.Name())
 			processSyncFile(ctx, adapter, syncPath, spoolPath)
 		}
