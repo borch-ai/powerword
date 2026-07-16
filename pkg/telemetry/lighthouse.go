@@ -355,7 +355,10 @@ func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, bool, error) {
 			hasParseError = true
 			continue
 		}
-		events = append(events, ev)
+		if ev.ID != "" || ev.Project != "" || ev.Command != "" || ev.Stage != "" || ev.ErrorMsg != "" ||
+			ev.DurationMs != 0 || ev.CostUSD != 0 || ev.TokensIn != 0 || ev.TokensOut != 0 || ev.TokensCached != 0 || len(ev.Meta) > 0 {
+			events = append(events, ev)
+		}
 	}
 
 	if scanErr := scanner.Err(); scanErr != nil {
@@ -493,7 +496,7 @@ func syncFileEvents(ctx context.Context, adapter *LighthouseAdapter, syncPath, s
 func processSyncFile(ctx context.Context, adapter *LighthouseAdapter, syncPath, spoolPath string) {
 	// Use lock coordination on the sync file to prevent concurrent processes from processing the same file.
 	// If we fail to acquire the lock within lockTimeout, it means another process is already processing it, so we skip.
-	_ = withFileLock(syncPath, 1*time.Minute, func() error {
+	_ = withFileLock(syncPath, 15*time.Minute, func() error {
 		return syncFileEvents(ctx, adapter, syncPath, spoolPath)
 	})
 }
@@ -638,7 +641,9 @@ func SubmitToLighthouse(e TelemetryEvent) {
 	timeout := 500 * time.Millisecond
 	if tStr := os.Getenv("POWERWORD_TELEMETRY_TIMEOUT"); tStr != "" {
 		if d, pErr := time.ParseDuration(tStr); pErr == nil {
-			timeout = d
+			if d > 0 {
+				timeout = d
+			}
 		}
 	}
 
