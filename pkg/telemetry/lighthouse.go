@@ -198,7 +198,7 @@ func isLockStale(lockPath string, staleThreshold time.Duration) bool {
 		return false
 	}
 	parts := strings.Split(string(content), ",")
-	if len(parts) != 2 {
+	if len(parts) != 3 {
 		return false
 	}
 	var ts int64
@@ -214,13 +214,14 @@ func isLockStale(lockPath string, staleThreshold time.Duration) bool {
 func withFileLock(spoolPath string, staleThreshold time.Duration, action func() error) error {
 	lockPath := spoolPath + ".lock"
 	acquired := false
+	nonce := generateEventID()
 
 	// Try to acquire the lock using O_EXCL (atomic creation)
 	for start := time.Now(); time.Since(start) < lockTimeout; {
 		//nolint:gosec // G304: lockPath is resolved from secure UserHomeDir
 		lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if err == nil {
-			_, _ = fmt.Fprintf(lf, "%d,%d", os.Getpid(), time.Now().UnixNano())
+			_, _ = fmt.Fprintf(lf, "%d,%d,%s", os.Getpid(), time.Now().UnixNano(), nonce)
 			_ = lf.Close()
 			acquired = true
 			break
@@ -247,7 +248,15 @@ func withFileLock(spoolPath string, staleThreshold time.Duration, action func() 
 	}
 
 	defer func() {
-		_ = os.Remove(lockPath)
+		// Read the lock file, verify it's our lock (matches nonce), and remove it.
+		//nolint:gosec // G304: lockPath is resolved from secure UserHomeDir
+		data, err := os.ReadFile(lockPath)
+		if err == nil {
+			parts := strings.Split(string(data), ",")
+			if len(parts) == 3 && parts[2] == nonce {
+				_ = os.Remove(lockPath)
+			}
+		}
 	}()
 
 	return action()
@@ -346,9 +355,7 @@ func readSpooledEvents(tempSyncPath string) ([]TelemetryEvent, bool, error) {
 			hasParseError = true
 			continue
 		}
-		if ev.ID != "" || ev.Project != "" {
-			events = append(events, ev)
-		}
+		events = append(events, ev)
 	}
 
 	if scanErr := scanner.Err(); scanErr != nil {

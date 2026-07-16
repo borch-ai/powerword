@@ -904,7 +904,7 @@ func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
 
 	// Create a stale lock file with timestamp from 1 hour ago
 	staleTime := time.Now().Add(-1 * time.Hour).UnixNano()
-	content := fmt.Sprintf("%d,%d", os.Getpid(), staleTime)
+	content := fmt.Sprintf("%d,%d,stalenonce", os.Getpid(), staleTime)
 	if err := os.WriteFile(lockPath, []byte(content), 0600); err != nil {
 		t.Fatalf("failed to write stale lock file: %v", err)
 	}
