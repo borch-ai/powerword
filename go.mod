@@ -3,7 +3,7 @@ module github.com/borch-ai/powerword
 go 1.26.5
 
 require (
-	cloud.google.com/go/bigquery v1.77.0
+	cloud.google.com/go/bigquery v1.79.0
 	cloud.google.com/go/storage v1.63.1
 	github.com/anthropics/anthropic-sdk-go v1.46.0
 	github.com/aws/aws-sdk-go-v2 v1.42.1
