@@ -110,7 +110,7 @@ Powerword works in tandem with other applications (e.g., the Lamplighter dashboa
 3. **Egress Traffic Auditing:**
    - Custom local workflows MUST execute `step-security/harden-runner` with egress auditing enabled as their first step.
 4. **Dependabot Hygiene:**
-   - Dependabot is configured to check daily. Ensure all generated dependabot PR commit messages follow the conventional prefix formatting (`chore(deps): ...` or `chore(deps-dev): ...`).
+   - Dependabot is configured to check daily. Ensure all generated dependabot PR commit messages follow the conventional prefix formatting (e.g., `chore(gomod): ...` or `chore(github-actions): ...`).
 
 ---
 
