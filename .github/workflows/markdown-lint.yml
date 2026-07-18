@@ -13,3 +13,4 @@ permissions:
 jobs:
   lint:
     uses: borch-ai/.github/.github/workflows/markdown-lint.yml@v0.2.2
+    secrets: inherit
