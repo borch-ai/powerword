@@ -89,4 +89,3 @@ jobs:
           VERSION_NUM="${VERSION#v}"
           VERSION_TAG="v${VERSION_NUM}"
           gh release upload "$VERSION_TAG" dist/* --clobber
-

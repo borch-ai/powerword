@@ -1,0 +1,9 @@
+{
+  "config": {
+    "MD033": false
+  },
+  "ignores": [
+    "plans/**/*.md",
+    "pkg/**/*.md"
+  ]
+}

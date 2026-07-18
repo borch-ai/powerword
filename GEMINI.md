@@ -6,7 +6,7 @@ Welcome, AI Agent! This document outlines the design patterns, architectural sta
 
 Powerword is a vendor-agnostic Agentic CLI written in Go. The directory layout follows standard Go project structure conventions:
 
-```
+```text
 powerword/
 ├── cmd/
 │   └── powerword/          # Main CLI application entry point
