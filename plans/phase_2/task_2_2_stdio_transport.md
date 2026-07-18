@@ -55,3 +55,4 @@ Implement the process control logic to launch, supervise, communicate with, and 
 - **Process Supervision:** `internal/mcp/process.go` implements `ServerProcess` which captures stdin/stdout/stderr pipes, wrapping the streams in `mcpsdk.IOTransport`. A background goroutine reads `stderr` to `log.Printf` for diagnostics.
 - **Graceful Shutdown:** `internal/mcp/lifecycle.go` exports `ProcessManager` which listens for `os.Interrupt` and `syscall.SIGTERM`. On receipt, it issues `client.Close()`, sends `os.Interrupt` to the child process, and waits. If the child process exceeds a 5-second timeout, `SIGKILL` is issued.
 - **Testing:** Implemented comprehensive unit tests for config map updates and process lifecycle/signal hooking. Maintained 91% global test coverage threshold (`make check-coverage` verified).
+

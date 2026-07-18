@@ -1,0 +1,21 @@
+name: Lint Markdown
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**/*.md'
+      - '.markdownlint-cli2.jsonc'
+      - '!plans/**/*.md'
+      - '!pkg/**/*.md'
+      - '!ROADMAP.md'
+      - '!README.md'
+      - '!VISION.md'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: borch-ai/.github/.github/workflows/markdown-lint.yml@v0.2.2
+    secrets: inherit
