@@ -1,0 +1,13 @@
+name: PR Description
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    uses: borch-ai/.github/.github/workflows/pr-description.yml@v0.2.2
