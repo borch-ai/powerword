@@ -6,6 +6,11 @@ on:
     paths:
       - '**/*.md'
       - '.markdownlint-cli2.jsonc'
+      - '!plans/**/*.md'
+      - '!pkg/**/*.md'
+      - '!ROADMAP.md'
+      - '!README.md'
+      - '!VISION.md'
 
 permissions:
   contents: read
