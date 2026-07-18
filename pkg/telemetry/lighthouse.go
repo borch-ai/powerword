@@ -66,7 +66,7 @@ var (
 
 func generateEventID() string {
 	b := make([]byte, 16)
-	_, err := randReader.Read(b)
+	_, err := io.ReadFull(randReader, b)
 	if err != nil {
 		fallbackMu.Lock()
 		fallbackCounter++
@@ -139,13 +139,15 @@ func (a *LighthouseAdapter) SubmitBatch(ctx context.Context, events []TelemetryE
 		return fmt.Errorf("lighthouse URL is required")
 	}
 
-	for i := range events {
-		if events[i].ID == "" {
-			events[i].ID = generateEventID()
+	eventsCopy := make([]TelemetryEvent, len(events))
+	copy(eventsCopy, events)
+	for i := range eventsCopy {
+		if eventsCopy[i].ID == "" {
+			eventsCopy[i].ID = generateEventID()
 		}
 	}
 
-	payload, err := json.Marshal(events)
+	payload, err := json.Marshal(eventsCopy)
 	if err != nil {
 		return fmt.Errorf("failed to marshal telemetry payload batch: %w", err)
 	}
@@ -194,15 +196,27 @@ var lockTimeout = 2 * time.Second
 func isLockStale(lockPath string, staleThreshold time.Duration) bool {
 	//nolint:gosec // G304: lockPath is resolved from secure UserHomeDir
 	content, err := os.ReadFile(lockPath)
-	if err != nil || len(content) == 0 {
+	if err != nil {
+		return false
+	}
+	if len(content) == 0 {
+		if fi, statErr := os.Stat(lockPath); statErr == nil {
+			return time.Since(fi.ModTime()) > staleThreshold
+		}
 		return false
 	}
 	parts := strings.Split(string(content), ",")
 	if len(parts) != 3 {
+		if fi, statErr := os.Stat(lockPath); statErr == nil {
+			return time.Since(fi.ModTime()) > staleThreshold
+		}
 		return false
 	}
 	var ts int64
 	if _, scanErr := fmt.Sscanf(parts[1], "%d", &ts); scanErr != nil {
+		if fi, statErr := os.Stat(lockPath); statErr == nil {
+			return time.Since(fi.ModTime()) > staleThreshold
+		}
 		return false
 	}
 	return time.Since(time.Unix(0, ts)) > staleThreshold

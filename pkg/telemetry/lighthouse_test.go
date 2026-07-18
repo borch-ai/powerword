@@ -934,7 +934,7 @@ func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
 	}
 
 	// Verify isLockStale returns false for fresh lock
-	freshContent := fmt.Sprintf("%d,%d", os.Getpid(), time.Now().UnixNano())
+	freshContent := fmt.Sprintf("%d,%d,freshnonce", os.Getpid(), time.Now().UnixNano())
 	if err := os.WriteFile(lockPath, []byte(freshContent), 0600); err != nil {
 		t.Fatalf("failed to write fresh lock file: %v", err)
 	}
@@ -942,12 +942,38 @@ func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
 		t.Errorf("expected isLockStale to return false for fresh lock")
 	}
 
-	// Verify isLockStale returns false for malformed content
+	// Verify ModTime fallback for empty lock file
+	if err := os.WriteFile(lockPath, nil, 0600); err != nil {
+		t.Fatalf("failed to write empty lock file: %v", err)
+	}
+	oldTime := time.Now().Add(-1 * time.Hour)
+	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to change lock times: %v", err)
+	}
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected empty lock file to be stale based on ModTime fallback")
+	}
+
+	// Verify ModTime fallback for malformed lock content
 	if err := os.WriteFile(lockPath, []byte("malformed"), 0600); err != nil {
 		t.Fatalf("failed to write malformed lock file: %v", err)
 	}
-	if isLockStale(lockPath, 10*time.Second) {
-		t.Errorf("expected isLockStale to return false for malformed lock content")
+	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to change lock times: %v", err)
+	}
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected malformed lock file to be stale based on ModTime fallback")
+	}
+
+	// Verify ModTime fallback for invalid timestamp in lock file
+	if err := os.WriteFile(lockPath, []byte("pid,notAnInt,nonce"), 0600); err != nil {
+		t.Fatalf("failed to write invalid timestamp lock file: %v", err)
+	}
+	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to change lock times: %v", err)
+	}
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected invalid timestamp lock file to be stale based on ModTime fallback")
 	}
 }
 
