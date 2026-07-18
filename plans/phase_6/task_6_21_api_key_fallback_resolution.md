@@ -21,7 +21,7 @@ Every tool in the Borch-AI stack (Powerword, Pithos, Kiln) ultimately routes LLM
 However, a developer setting up the stack for the first time will likely try the provider's own canonical env var names first — the names documented by Google, Anthropic, and OpenAI themselves:
 
 | Provider | Canonical SDK var | Powerword var |
-|---|---|---|
+| --- | --- | --- |
 | Google Gemini | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | `POWERWORD_GEMINI_API_KEY` |
 | Anthropic | `ANTHROPIC_API_KEY` | `POWERWORD_ANTHROPIC_API_KEY` |
 | OpenAI | `OPENAI_API_KEY` | `POWERWORD_OPENAI_API_KEY` |
@@ -35,7 +35,7 @@ Today, setting `GEMINI_API_KEY` has no effect — Powerword ignores it entirely.
 
 Implement **fallback resolution** so that provider canonical var names are recognised when the `POWERWORD_*` prefixed var is not set. The resolution order for each key is:
 
-```
+```text
 api_keys.gemini:
   1. POWERWORD_GEMINI_API_KEY    (tool-specific, highest precedence)
   2. GEMINI_API_KEY              (Google AI Studio canonical)
@@ -110,6 +110,7 @@ When a canonical key is found in `.env`, set the `POWERWORD_*` target **only if 
 ### `pkg/config/config_test.go`
 
 Add test cases:
+
 - `GEMINI_API_KEY` set in env → `cfg.APIKeys.Gemini` is populated.
 - `POWERWORD_GEMINI_API_KEY` set alongside `GEMINI_API_KEY` → `POWERWORD_` wins.
 - `GOOGLE_API_KEY` set, neither `GEMINI_API_KEY` nor `POWERWORD_GEMINI_API_KEY` set → `cfg.APIKeys.Gemini` is populated.
@@ -138,10 +139,12 @@ No `POWERWORD_` prefix required. Tools that already set `POWERWORD_*` vars are u
 ## Verification Plan
 
 ### Automated Tests
+
 - `go test -race ./pkg/config/...` — all fallback resolution tests pass.
 - `make check-coverage` — ≥91%.
 
 ### Manual Verification
+
 ```bash
 # Unset POWERWORD_ vars, set only canonical names:
 unset POWERWORD_GEMINI_API_KEY

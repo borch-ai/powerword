@@ -19,6 +19,7 @@ Powerword frequently executes external MCP servers (often written in Node.js). B
 ## Proposed Changes
 
 ### [NEW] [setup_toolchain.sh](file://../../scripts/setup_toolchain.sh)
+
 - A short Bash script to fetch `node-v20.15.0-darwin-arm64.tar.gz`.
 - Extracts it into `.tools/node`.
 - Instructs the user to run `export PATH=$PWD/.tools/node/bin:$PATH` to use it.

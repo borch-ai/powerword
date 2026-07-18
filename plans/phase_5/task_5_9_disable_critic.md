@@ -18,6 +18,7 @@ Introduce a configuration option `enable_critic` to run the LLM-powered review s
 ### Config Subsystem
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [x] Add the `EnableCritic bool` field to the `Config` struct.
 - [x] In `LoadConfig`, define a default value of `false` for `enable_critic` (so it defaults to inactive unless explicitly enabled).
 - [x] Bind `enable_critic` to the environment variable `POWERWORD_ENABLE_CRITIC`.
@@ -25,6 +26,7 @@ Introduce a configuration option `enable_critic` to run the LLM-powered review s
 ### Review Subsystem
 
 #### [MODIFY] [critic.go](file://../../internal/review/critic.go)
+
 - [x] In `VerifyWorkspace`, check if `cfg.EnableCritic` is false.
 - [x] If it is false:
   - Print a message: `"Critic LLM review is disabled in config. Skipping LLM review."`
@@ -33,6 +35,7 @@ Introduce a configuration option `enable_critic` to run the LLM-powered review s
   - If it succeeds, return `nil` immediately, skipping the MCP process start and the LLM analysis entirely.
 
 #### [MODIFY] [critic_test.go](file://../../internal/review/critic_test.go)
+
 - [x] Add unit tests for `VerifyWorkspace` when `EnableCritic` is false:
   - Verify it runs the validation command and returns `nil` on success.
   - Verify it runs the validation command and returns an error if the command fails.
@@ -41,6 +44,7 @@ Introduce a configuration option `enable_critic` to run the LLM-powered review s
 ### Default Repository Configuration
 
 #### [MODIFY] [powerword.example.toml](file://../../powerword.example.toml)
+
 - [x] Add `enable_critic = false` to disable the LLM reviews by default for developers in this repository until a local model (e.g. Ollama) is configured.
 
 ---
@@ -48,9 +52,11 @@ Introduce a configuration option `enable_critic` to run the LLM-powered review s
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `make check-coverage` and verify tests pass with statement coverage at or above **91%**.
 
 ### Manual Verification
+
 - Run `powerword review --local` with `enable_critic = false` in `powerword.example.toml` (or by copying it to local `powerword.toml`). Verify that:
   - `make all` runs.
   - No MCP processes are spawned and no LLM API calls are made.

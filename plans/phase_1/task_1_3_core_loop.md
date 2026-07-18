@@ -13,6 +13,7 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 > **Completed Implementation Details (Go Version: Go 1.23+)**:
 > Rather than relying on static markdown rendering libraries (like Glamour), which require buffering the entire output before rendering, we implement a stateful, streaming-compatible token printer.
 > This printer:
+>
 > - Highlights code blocks with beautiful Unicode box-drawing borders and color codes.
 > - Preserves list-item indentation across wrapped lines.
 > - Formats headers with decorative blocks (e.g. `█`, `▓`).
@@ -28,21 +29,27 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 ### Core Loop & Output Formatter
 
 #### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
+
 - Updated `RunLoop` to set up client streaming, instantiate `TerminalFormatter`, and write text chunks.
 
 #### [NEW] [terminal.go](file://../../internal/loop/terminal.go)
+
 - Stateful stream formatting state machine tracking markdown token boundaries and layout/style transitions.
 
 #### [NEW] [terminal_width.go](file://../../internal/loop/terminal_width.go)
+
 - Unix ioctl window size check.
 
 #### [NEW] [terminal_width_windows.go](file://../../internal/loop/terminal_width_windows.go)
+
 - Windows terminal size fallback.
 
 #### [MODIFY] [root.go](file://../../pkg/config/root.go)
+
 - Decouples loop execution and Cobra CLI parsing via `config.Runner` to avoid import cycles.
 
 #### [MODIFY] [main.go](file://../../cmd/powerword/main.go)
+
 - Registers `loop.RunLoop` to `config.Runner` on startup.
 
 ---
@@ -50,6 +57,7 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `make check-coverage` and `make lint` to verify that all targets are clean.
 - Unit tests in `internal/loop/terminal_test.go` and `internal/loop/loop_test.go`:
   - Verified word wrapping at line length boundaries (character and word wrapping).
@@ -59,4 +67,5 @@ Implement the primary non-interactive CLI execution pipeline. Capture prompt str
   - Verified 91.60% unit test coverage across `./internal/...`.
 
 ### Manual Verification
+
 - Execute a query using Gemini/OpenAI (e.g. `powerword "write a python function to fetch status codes"`) and verify that formatting matches standard markdown styling in standard terminal setups.

@@ -5,7 +5,6 @@
 **Date Completed:** 2026-06-11
 **Unit Test Coverage:** 91%
 
-
 Establish a configuration-driven mechanism to discover, configure, and mount third-party or local MCP servers. Define a clean TOML configuration schema within `powerword.toml` to register these servers and their runtime parameters.
 
 ## User Review Required
@@ -18,7 +17,9 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
 ### Configuration Mapping & Startup Logic
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - *Already Implemented*: Extends Config structures to support a map of Server definitions keyed by server name via the `servers` TOML block.
+
   ```toml
   [servers.filesystem]
      command = "pw-mcp-fs"
@@ -31,6 +32,7 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
   ```
 
 #### [MODIFY] [process.go](file://../../internal/mcp/process.go) & [loop.go](file://../../internal/loop/loop.go)
+
 - *Already Implemented*: Parses the configuration definitions during boot in the `RunLoop`.
 - *Already Implemented*: Locates executables in system `$PATH` or uses absolute paths to start server sub-processes.
 - *Already Implemented*: Gracefully logs failures to initialize individual servers, keeping the rest of the working plugins operational.
@@ -40,11 +42,14 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
 ## Verification Plan
 
 ### Automated Tests
+
 - Test parsing various TOML syntax layouts (including environment variables, command lists, and custom arguments). Tests are available in `internal/config/config_test.go`.
 - Ensure configuration loading handles empty server maps, and validates command paths.
 
 ### Manual Verification
+
 - Create a `powerword.toml` file in the project root containing the following native plugins:
+
   ```toml
   [servers.filesystem]
      command = "go"
@@ -58,16 +63,23 @@ Establish a configuration-driven mechanism to discover, configure, and mount thi
      command = "go"
      args = ["run", "./cmd/pw-mcp-shell"]
   ```
+
 - Run the CLI application to trigger the startup sequence:
+
   ```bash
   go run ./cmd/powerword
   ```
+
 - To test the plugins interactively, run a query that requires them. For example:
+
   ```bash
   go run ./cmd/powerword "list the files in the current directory and read powerword.toml"
   ```
+
 - Or pass the `--verbose` flag (or `POWERWORD_VERBOSE=true`) to see more detailed execution logging:
+
   ```bash
   go run ./cmd/powerword --verbose
   ```
+
 - Verify the startup process successfully registers tools from these specified plugins without any `Warning: failed to start MCP server` errors.

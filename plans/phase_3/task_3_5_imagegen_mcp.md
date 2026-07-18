@@ -16,9 +16,11 @@ This task implements a native Go-based MCP server (`pw-mcp-imagegen`) that integ
 ## Proposed Changes
 
 ### ImageGen Plugin Component
+
 Create a new directory `internal/plugins/imagegen/` to contain the image generator implementation.
 
 #### [NEW] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
+
 - [x] Define standard interfaces for image generation backends.
 - [x] Implement OpenAI client integration for DALL-E 3.
 - [x] Implement Google predict client integration for Imagen 3 (`imagen-3.0-generate-002`).
@@ -30,16 +32,23 @@ Create a new directory `internal/plugins/imagegen/` to contain the image generat
   - `imagegen_list_styles`: Lists currently registered style profiles.
 
 #### [NEW] [imagegen_test.go](file://../../internal/plugins/imagegen/imagegen_test.go)
+
 - [x] Unit tests mocking API endpoints using `httptest.NewServer` to verify parameter formatting, style parsing, and file download flows.
 
 ### CLI Manifest Integration
+
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [x] Register the `pw-mcp-imagegen` server within the global native plugin registry under the config key `[plugins.imagegen]`.
 
 ### Verification and Test Scripts
+
 #### [MODIFY] [check_coverage.go](file://../../cmd/powerword/check_coverage.go)
+
 - [x] Clean the coverage profile of concurrency-generated null bytes and execute the `go tool cover` tool internally.
+
 #### [MODIFY] [Makefile](file://../../Makefile)
+
 - [x] Pass `coverage.out` directly to the updated `check_coverage.go` validator script.
 
 ---
@@ -47,16 +56,20 @@ Create a new directory `internal/plugins/imagegen/` to contain the image generat
 ## Verification Plan
 
 ### Automated Tests
+
 - [x] Run `make test` and `make check-coverage` to assert proper error handling, mock HTTP responses, and configuration parsing.
 - [x] Enforce the 91% unit test coverage requirement (achieved **91.10%**).
 
 ### Manual Verification
+
 - [x] Set up an OpenAI or Google Gemini API key in `powerword.toml` or environment variables:
+
   ```toml
   [api_keys]
   gemini = "YOUR_GEMINI_API_KEY"
   openai = "YOUR_OPENAI_API_KEY"
   ```
+
 - [x] Validate Image Generation (OpenAI / Imagen 3):
   1. Configure `backend = "google"` or `backend = "openai"` in `powerword.toml`.
   2. Invoke CLI tool/prompt: `powerword "generate a 1024x1024 vintage oil painting image of a computer in a forest"`.

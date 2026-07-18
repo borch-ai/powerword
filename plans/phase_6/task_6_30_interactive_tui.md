@@ -22,6 +22,7 @@ Build a rich interactive terminal user interface (TUI) command `powerword chat` 
 ### CLI Component (`cmd/powerword`)
 
 #### [NEW] [chat.go](file://../../cmd/powerword/chat.go)
+
 * Define the `powerword chat` command.
 * Initialize a Bubbletea application using a custom chat model.
 * Wire input keys (Enter to submit, Up/Down to scroll, Esc to quit/pause).
@@ -32,6 +33,7 @@ Build a rich interactive terminal user interface (TUI) command `powerword chat` 
 ### TUI Component (`internal/tui`)
 
 #### [NEW] [tui.go](file://../../internal/tui/tui.go)
+
 * Build the Bubbletea Update, View, and Init functions.
 * Implement custom viewport scroll and text input bindings.
 * Implement styled blocks to render collapsible JSON details for tool inputs and output values.
@@ -41,12 +43,14 @@ Build a rich interactive terminal user interface (TUI) command `powerword chat` 
 ## Verification Plan
 
 ### Automated Tests
+
 * Create unit tests in `internal/tui/tui_test.go` verifying:
   * Keypress events are mapped correctly to model messages.
   * Collapsible view states toggle correctly.
   * Graceful fallback when terminal is non-TTY.
 
 ### Manual Verification
+
 1. Run `go build -o bin/powerword ./cmd/powerword`.
 2. Execute `bin/powerword chat` and verify that the TUI initializes.
 3. Submit a prompt and observe that MCP tool executions are rendered as collapsible elements while the cost tracker updates.

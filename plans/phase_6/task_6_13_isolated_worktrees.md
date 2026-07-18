@@ -9,7 +9,7 @@ This task introduces support for running the agent reasoning loop inside an isol
 > [!NOTE]
 > **Performance vs. Isolation**:
 > Running in a separate worktree is highly secure and non-destructive. However, to keep build times fast, we must selectively symlink untracked caches and dependencies (such as `node_modules/`, `.venv/`, or `.gradle/`) from the main workspace. Users should be able to configure which paths are symlinked.
-
+>
 > [!WARNING]
 > **Git Worktree Cleanup**:
 > If the process is forcefully killed (e.g., SIGKILL), the worktree and branch might be left behind. The CLI should auto-prune stale `powerword-worktree-*` directories and branches on the next startup.
@@ -21,16 +21,19 @@ This task introduces support for running the agent reasoning loop inside an isol
 ### Configuration Subsystem
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - Add `IsolatedWorktree bool` (`isolated_worktree`) to `Config` struct.
 - Add `WorktreeSymlinks []string` (`worktree_symlinks`) to `Config` struct to specify untracked folders to symlink (e.g., `["node_modules", ".venv"]`).
 
 #### [MODIFY] [root.go](file://../../pkg/config/root.go)
+
 - Add a new CLI flag `--worktree` to run the session inside an isolated worktree.
 - Add `--worktree-symlinks` to configure folders to link.
 
 ### Worktree Orchestration Layer
 
 #### [NEW] [worktree.go](file://../../internal/loop/worktree.go)
+
 - Implement `WorktreeSession` struct to manage the life-cycle of the temporary worktree:
   - `Path string` (Path to the temporary worktree directory under `.git/powerword/worktrees/<session_id>`).
   - `BranchName string` (Name of the temporary git branch).
@@ -56,11 +59,13 @@ This task introduces support for running the agent reasoning loop inside an isol
 ### Core Execution Loop Integration
 
 #### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
+
 - In `RunLoop`:
   - If `cfg.IsolatedWorktree` is enabled, wrap the execution inside `NewWorktreeSession`.
   - Direct all file readers/writers, command execution, and MCP servers to work inside the temp worktree directory.
 
 #### [MODIFY] [repair.go](file://../../internal/review/repair.go)
+
 - In `RunAutonomousLoop`:
   - Support running the repair iterations inside the isolated worktree session if configured, ensuring the repository's main copy is never altered during failures.
 
@@ -69,6 +74,7 @@ This task introduces support for running the agent reasoning loop inside an isol
 ## Verification Plan
 
 ### Automated Tests
+
 - Create `internal/loop/worktree_test.go`:
   - Initialize a temporary Git repository.
   - Mock config files and write files to the repository.
@@ -78,5 +84,6 @@ This task introduces support for running the agent reasoning loop inside an isol
 - Run command: `go test -v ./internal/loop/... -run TestWorktree`
 
 ### Manual Verification
+
 - Run `powerword run "implement test function" --worktree --worktree-symlinks node_modules` on a project.
 - Check that a new temporary directory is created in `.git/powerword/worktrees/`, dependencies are accessible via symlinks, and the agent operates successfully without affecting the main working copy.

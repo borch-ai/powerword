@@ -21,6 +21,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-music` to encapsul
 ### Sibling: Powerword (`cmd/pw-mcp-music`)
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-music/main.go)
+
 * Initializes the MCP server using `github.com/modelcontextprotocol/go-sdk`.
 * Secret Management:
   * Sourced via environment variables (e.g., `POWERWORD_MUSIC_DISTRIBUTOR_TOKEN`) rather than passed as tool arguments, to prevent sensitive tokens from leaking in LLM traces or agent transcripts.
@@ -37,13 +38,17 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-music` to encapsul
 ## Verification Plan
 
 ### Automated Tests
+
 * Create unit tests in `cmd/pw-mcp-music/main_test.go` to check:
   * Resolution validation correctly catches non-3000x3000px files and logs formatting violations.
   * Correct construction of the multipart form request payloads.
 
 ### Manual Verification
+
 1. Run local build:
+
    ```bash
    go build -o bin/pw-mcp-music cmd/pw-mcp-music/main.go
    ```
+
 2. Call `music_validate_artwork` with a non-compliant image size and verify that the tool returns a validation error detailing size mismatch.
