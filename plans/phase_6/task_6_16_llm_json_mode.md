@@ -18,7 +18,9 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
 ### pkg/llm
 
 #### [MODIFY] [client.go](file://../../pkg/llm/client.go)
+
 - Add a `GenerateOption` functional options pattern to `Generate`:
+
   ```go
   type GenerateOption func(*generateOptions)
 
@@ -32,14 +34,18 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
       }
   }
   ```
+
 - Update the `LLMClient` interface signature for `Generate` to accept variadic options:
+
   ```go
   Generate(ctx context.Context, messages []Message, tools []ToolDefinition, opts ...GenerateOption) (*Message, error)
   ```
 
 #### [MODIFY] [gemini.go](file://../../pkg/llm/gemini.go)
+
 - Update `Generate` to accept `opts ...GenerateOption`.
 - In `prepareModel` (or inside `Generate`), apply the functional options:
+
   ```go
   cfg := &generateOptions{}
   for _, opt := range opts {
@@ -49,11 +55,14 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
       model.GenerationConfig.ResponseMIMEType = cfg.ResponseMIMEType
   }
   ```
+
 - Add support for custom base URLs in `GeminiClient` if needed by checking for custom endpoints.
 
 #### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
+
 - Update `Generate` to accept `opts ...GenerateOption`.
 - In `prepareRequest`, parse the options. If `ResponseMIMEType` is set to `"application/json"`, set the response format parameter:
+
   ```go
   cfg := &generateOptions{}
   for _, opt := range opts {
@@ -67,6 +76,7 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
   ```
 
 #### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
+
 - Update `Generate` to accept `opts ...GenerateOption` (accept but ignore or handle as supported).
 
 ---
@@ -74,5 +84,6 @@ Refactor `pkg/llm` in Powerword to support structured JSON generation via respon
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test ./pkg/llm/...`
 - Add a new unit test verifying that `Generate` correctly parses and applies `WithResponseMIMEType("application/json")` options to the underlying SDK request structures.

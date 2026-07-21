@@ -19,14 +19,14 @@ checks can be bypassed if upstream models change.
 
 ## Final Implementation
 
-**Architecture: Backend-Owned Capabilities**
+### Architecture: Backend-Owned Capabilities
 
 Each backend struct owns and reports its own capability set via a `Capabilities()` method.
 The service delegates to the active backend type (via a zero-value instance), then applies
 `ForceCref`/`ForceSref` configuration overrides:
 
 | Backend | `supports_cref` | `supports_sref` |
-|---|---|---|
+| --- | --- | --- |
 | `OpenAIBackend` | `false` | `false` |
 | `GoogleBackend` (Imagen API) | `false` | `false` |
 | `VeoBackend` | `true` | `false` |
@@ -43,16 +43,20 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 ### Configuration Layer
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - Add `ForceCref` and `ForceSref` fields to `ImageGenConfig` struct:
+
   ```go
   ForceCref bool `mapstructure:"force_cref"`
   ForceSref bool `mapstructure:"force_sref"`
   ```
+
 - Add `SetDefault` calls and `bindEnv` bindings for `POWERWORD_IMAGEGEN_FORCE_CREF` / `POWERWORD_IMAGEGEN_FORCE_SREF`.
 
 ### Capabilities Service
 
 #### [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
+
 - Add `Capabilities()` method to `OpenAIBackend`, `GoogleBackend`, `VeoBackend`, `MidjourneyBackend`.
 - Refactor `GetCapabilities()` on `ImageGenService` to delegate to the active backend type (via
   zero-value struct instance), then apply `ForceCref`/`ForceSref` overrides.
@@ -64,6 +68,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 ### Tests
 
 #### [MODIFY] [imagegen_test.go](file://../../internal/plugins/imagegen/imagegen_test.go)
+
 - `TestBackendCapabilities`: table-driven test verifying each backend's `Capabilities()` directly.
 - `TestGetCapabilities`: updated table (removed model-name cases; google/imagen always `false`).
 - `TestGetCapabilities_ForceOverrides`: verifies ForceCref/ForceSref override behavior (3 sub-tests).
@@ -72,6 +77,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 - `TestGoogleBackend_CharacterReference`: updated to expect plain prompt (no text prepend).
 
 #### [MODIFY] [main_integration_test.go](file://../../cmd/pw-mcp-imagegen/main_integration_test.go)
+
 - `TestMCP_ImageGenPlugin_GoogleBackend_CrefNotSupported`: verifies `supports_cref: false` over MCP
   and that `cref_url` returns a capability validation error for the google/Imagen backend.
 - `TestMCP_ImageGenPlugin_ForceCref_BypassesValidation`: hermetic test with mock Imagen server;
@@ -82,6 +88,7 @@ is provided on the Imagen backend without `ForceCref`, `GenerateImage` returns a
 ## Verification Plan
 
 ### Automated Tests
+
 All tests hermetic (httptest mocks, no real network calls).
 
 - `make check-coverage` → **91.2%** ✅ (threshold: 91.0%)
@@ -90,11 +97,13 @@ All tests hermetic (httptest mocks, no real network calls).
 - Integration tests: `go test -tags=integration ./cmd/pw-mcp-imagegen/...` → **PASS** ✅
 
 ### PR & Code Review
+
 - PR [#115](https://github.com/borch-ai/powerword/pull/115) opened against `main`.
 - Copilot Code Review posted 4 comments on commit `5e64a20`; all addressed in follow-up commit `7563c0e`.
 - Copilot did not post further comments on `7563c0e` after the 7-minute polling window.
 
 ### Manual Verification
+
 - Query `imagegen_get_capabilities` with `backend = "google"` + `google_model = "imagen-4.0-generate-001"` → `supports_cref: false`.
 - Call `imagegen_generate` with `cref_url` on the google backend → capability validation error.
 - Set `force_cref = true` in `powerword.toml` → `supports_cref: true`, generate call proceeds.
