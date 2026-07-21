@@ -16,7 +16,7 @@ Written entirely in Go, Powerword prioritizes performance, single-binary distrib
 
 Powerword sits at the **base of the Borch-AI stack**. Everything above it is a consumer; Powerword depends on nothing within the ecosystem.
 
-```
+```text
 Kiln (intelligence + orchestration)
   └── Pithos (book factory)
         └── pw-mcp-imagegen  ─┐
@@ -45,6 +45,7 @@ Powerword never imports Kiln or Pithos. They import Powerword.
 ### 1. The Core Interactive Loop (`cmd/powerword/`)
 
 The `powerword` CLI binary — the developer-facing agentic copilot:
+
 - **LLM Abstraction** (`pkg/llm`): Uniform `Generate`/`Stream` interface over Gemini, Claude, OpenAI.
 - **Session Management**: Persistent conversation history with checkpoint/resume capability.
 - **MCP Client**: Dynamically loads and invokes `pw-mcp-*` plugins via stdio transport.
@@ -57,7 +58,7 @@ Each plugin is an independent Go binary implementing the MCP server protocol. Pl
 **Current and planned plugins:**
 
 | Plugin | Purpose | Primary Consumer |
-|---|---|---|
+| --- | --- | --- |
 | `pw-mcp-imagegen` | DALL-E 3 image generation with style references | Pithos (`brew`), Kiln (validate cover) |
 | `pw-mcp-seo` | Amazon KDP keyword and A+ content generation | Kiln (`deploy`) |
 | `pw-mcp-kdp-math` | Print margin, spine, bleed calculations | Pithos (`assemble`) |
@@ -77,7 +78,7 @@ Each plugin is an independent Go binary implementing the MCP server protocol. Pl
 ## Technology Stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | Language | Go 1.26+ |
 | CLI Framework | `spf13/cobra` + `spf13/viper` |
 | MCP Protocol | `github.com/modelcontextprotocol/go-sdk` |

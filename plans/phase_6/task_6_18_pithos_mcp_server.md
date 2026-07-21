@@ -7,18 +7,18 @@
 
 Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pithos`). This enables Kiln and Lamplighter to invoke and monitor `initiate`, `brew`, `assemble`, and `deploy` stages via standard MCP protocol instead of raw subprocess calls. This is the long-term upgrade path for Kiln's forge integration (Kiln Phase 4 → Phase 6 migration).
 
-### PR Feedback & Hardening Updates
+## PR Feedback & Hardening Updates
+
 - **Hard-Pinned Go Version**: Hard-pinned the Go version in `go.mod` to `1.26.5` to ensure environment consistency across developers.
 - **Telemetry Flush Timeout**: Made the telemetry flush timeout configurable via `POWERWORD_TELEMETRY_TIMEOUT` environment variable (defaulting to 500ms) to prevent slow flush processes from hanging or delaying CLI execution.
 - **Memory Store Concurrency Control**: Added cross-process advisory file locking (`flock` on Unix, `LockFileEx` on Windows) to the JSON-backed memory store (`pw-mcp-memory`) to prevent record interleaving and data loss during concurrent write operations.
-
 
 ## User Review Required
 
 > [!IMPORTANT]
 > **Subprocess Invocation vs. Library Import**:
 > Since Powerword is the infrastructure layer and shouldn't depend on Pithos code directly, `pw-mcp-pithos` will wrap calls to the `pithos` CLI binary using `os/exec`. This means the `pithos` binary must be available in the `PATH` of the environment where this MCP server runs. Does this align with the expected deployment model?
-
+>
 > [!WARNING]
 > **Progress Monitoring**:
 > `pithos` stages can take a long time (especially `brew`). How should the MCP server handle long-running operations? Should it block and stream stdout/stderr back as progress notifications, or return a job ID for polling? Standard MCP tools usually block until completion. We plan to have the tool block and capture stdout/stderr, returning the final output.
@@ -33,12 +33,14 @@ Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pit
 ### MCP Server Entrypoint
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-pithos/main.go)
+
 - Create the standard CLI scaffolding for `pw-mcp-pithos` to initialize and serve the MCP protocol over `stdio`.
 - Wire up the server using `github.com/modelcontextprotocol/go-sdk/mcp`.
 
 ### Pipeline Execution Logic
 
 #### [NEW] [server.go](file://../../internal/mcp/pithos/server.go)
+
 - Implement the MCP server tool definitions and handlers.
 - Register discrete tools for the pipeline stages:
   - `pithos_initiate`: Takes `project_path` and `theme` arguments.
@@ -54,6 +56,7 @@ Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pit
 ### Build and Makefile Updates
 
 #### [MODIFY] [Makefile](file://../../Makefile)
+
 - Add `cmd/pw-mcp-pithos/main.go` to the `build` target so `bin/pw-mcp-pithos` is compiled alongside other plugins.
 
 ---
@@ -61,10 +64,12 @@ Wrap the Pithos book production pipeline behind a formal MCP server (`pw-mcp-pit
 ## Verification Plan
 
 ### Automated Tests
+
 - `go test ./internal/mcp/pithos/...` (unit tests mocking `os/exec` using a fake test binary to simulate Pithos output).
 - `go test ./cmd/pw-mcp-pithos/...` (verifying entrypoint configuration loading and stdio execution).
 
 ### Manual Verification
+
 - Compile `make build`.
 - Use a test MCP client (or `powerword` chat if available) to connect to `./bin/pw-mcp-pithos`.
 - Invoke the `pithos_initiate` tool on a dummy path and verify it successfully calls the installed `pithos` binary.

@@ -19,7 +19,7 @@ The codebase currently carries **185 `//nolint` suppressions** across production
 Current breakdown:
 
 | Linter | Total | Prod | Tests |
-|--------|-------|------|-------|
+| -------- | ------- | ------ | ------- |
 | `gosec` | 151 | 95 | 56 |
 | `gocognit` | 24 | ~16 | ~8 |
 | `funlen` | 14 | ~10 | ~4 |
@@ -44,6 +44,7 @@ Currently ~12 call sites in `pkg/linter` and `pkg/config` each carry their own `
 **Fix:** Introduce `safeReadFile(path string) ([]byte, error)` and `safeStat(path string) (os.FileInfo, error)` private helpers in the affected packages. Each carries a single, justified suppression with a full explanation. All call sites drop their per-line tags.
 
 Affected files:
+
 - [MODIFY] [validator.go](file://../../pkg/linter/validator.go)
 - [MODIFY] [config.go](file://../../pkg/config/config.go)
 
@@ -54,6 +55,7 @@ Affected files:
 **Fix:** Extract a `runFFmpeg(ctx context.Context, ffmpegCmd string, args []string) ([]byte, error)` private helper in the `viral` package, carrying the single justified suppression. All 5+ call sites drop their tags.
 
 Affected files:
+
 - [MODIFY] [viral.go](file://../../internal/plugins/viral/viral.go)
 
 #### Pattern C: HTTP requests to dynamic-but-trusted URLs (G107)
@@ -61,6 +63,7 @@ Affected files:
 Multiple plugins (`viral.go`, `imagegen.go`, `trends/source.go`, `seo/seo.go`) carry `//nolint:gosec` on both `http.NewRequestWithContext` *and* `client.Do`. The `client.Do` suppression is redundant — G107 does not fire on `client.Do`. The `NewRequestWithContext` suppressions can be consolidated into a package-level `newTrustedRequest(ctx, method, url, body)` helper per plugin.
 
 Affected files:
+
 - [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
 - [MODIFY] [viral.go](file://../../internal/plugins/viral/viral.go)
 - [MODIFY] [source.go](file://../../internal/plugins/trends/source.go)
@@ -71,6 +74,7 @@ Affected files:
 8 MCP server entry points (`pw-mcp-epub`, `pw-mcp-cloud`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-pdfcheck`, `pw-mcp-seo`, `pw-mcp-trends`, `pw-mcp-viral`, `pw-mcp-youtube`) share the same boilerplate: build `cfgPath` from `workspaceRoot` and immediately `//nolint:gosec` the `os.ReadFile` call. This logic should be extracted into a shared `config.LoadFromWorkspace(root string) (*config.Config, error)` function in `pkg/config` that wraps the suppression once.
 
 Affected files:
+
 - [MODIFY] [config.go](file://../../pkg/config/config.go)
 - [MODIFY] [main.go](file://../../cmd/pw-mcp-epub/main.go)
 - [MODIFY] [main.go](file://../../cmd/pw-mcp-cloud/main.go)
@@ -93,12 +97,14 @@ Every `gocognit`, `funlen`, `nestif`, and `gocyclo` suppression is a direct cons
 `VerifyWorkspace` (line 96) carries `//nolint:gocognit,funlen,nestif`. It handles plan linting, optional local build validation, MCP critic server startup, tool invocation, and result parsing in a single function.
 
 **Fix:** Extract:
+
 - `runLocalValidation(ctx, validationCmd) error` — handles `make all` execution
 - `startCriticServer(ctx, cfg) (*internalmcp.ServerProcess, error)` — handles server discovery and startup
 - `invokeCriticTool(ctx, srv, plan, validationCmd) (string, error)` — calls the MCP tool and extracts text
 - `parseCriticResult(output string) error` — validates the VERDICT suffix
 
 Affected files:
+
 - [MODIFY] [critic.go](file://../../internal/review/critic.go)
 
 #### `pkg/linter/validator.go` — `validateSinglePlan` and `FixAbsolutePathsInPlans`
@@ -106,6 +112,7 @@ Affected files:
 `validateSinglePlan` (line 172) carries `//nolint:gocognit,funlen`. It does scanning, heading tracking, status/metadata parsing, and link validation in one pass.
 
 **Fix:** Extract:
+
 - `parsePlanContent(content string) planParseResult` — pure scanning, returns a struct with all parsed fields
 - `checkCompletedMetadata(planFile string, result planParseResult) []string` — validates Go version, date, coverage
 - `collectLinkErrors(workspaceRoot, planFile string, lines []string, status *string) []string` — link validation loop
@@ -113,10 +120,12 @@ Affected files:
 `FixAbsolutePathsInPlans` (line 436) carries `//nolint:gocognit,funlen,nestif`. The inner line-editing loop mixes link-fixing and metadata-patching concerns.
 
 **Fix:** Extract:
+
 - `fixPlanFileLinks(workspaceRoot, planFile string, lines []string) ([]string, bool, error)` — link normalization pass
 - `patchCompletedMetadata(lines []string, goVersion, today string) ([]string, bool)` — metadata auto-fill pass
 
 Affected files:
+
 - [MODIFY] [validator.go](file://../../pkg/linter/validator.go)
 
 #### `internal/plugins/cloud/cloud.go` — Multiple Functions
@@ -126,6 +135,7 @@ Four functions carry complexity suppressions, with one (`//nolint:gocognit,gocyc
 **Fix:** Audit each function and extract sub-operations (input validation, pagination, resource mapping, error formatting) into focused helpers. Exact decomposition to be determined during implementation once function bodies are reviewed in detail.
 
 Affected files:
+
 - [MODIFY] [cloud.go](file://../../internal/plugins/cloud/cloud.go)
 
 #### `internal/mcp/critic/server.go` — Handler Function
@@ -135,6 +145,7 @@ Line 64 carries `//nolint:gocognit,nestif`. The MCP tool handler likely mixes ar
 **Fix:** Extract argument parsing, validation, and execution into separate helpers following the same pattern used in other MCP server handlers.
 
 Affected files:
+
 - [MODIFY] [server.go](file://../../internal/mcp/critic/server.go)
 
 #### `internal/mcp/git_diff.go` and `cmd/powerword/lint.go`
@@ -142,6 +153,7 @@ Affected files:
 Both carry `//nolint:gocognit,nestif` and `//nolint:nestif` respectively.
 
 Affected files:
+
 - [MODIFY] [git_diff.go](file://../../internal/mcp/git_diff.go)
 - [MODIFY] [lint.go](file://../../cmd/powerword/lint.go)
 
@@ -182,11 +194,13 @@ These suppressions are kept with no changes:
 ## Verification Plan
 
 ### Automated Tests
+
 - `make lint` — must pass with zero issues and zero suppression warnings after all changes.
 - `make check-coverage` — 91% threshold must be maintained. New helper functions must have corresponding unit tests.
 - `make all` — full build and test suite must pass clean.
 
 ### Manual Verification
+
 - Run `grep -rn "//nolint" --include="*.go" | wc -l` before and after to confirm net reduction.
 - Verify that the `gosec` G304, G107, G204 findings are correctly suppressed at the helper level and not at every call site.
 - Confirm no regressions in `pw-mcp-viral`, `pw-mcp-imagegen`, `pw-mcp-pdfcheck`, and the `powerword review` command.

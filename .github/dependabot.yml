@@ -4,12 +4,18 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
 
   # Keep GitHub Actions dependencies updated (e.g., checkout, setup-go)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"

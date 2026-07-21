@@ -1,0 +1,9 @@
+{
+  "config": {
+    "MD033": false,
+    "MD013": false
+  },
+  "ignores": [
+    "ROADMAP.md"
+  ]
+}

@@ -9,7 +9,7 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 > [!NOTE]
 > **Standalone Repository Creation**:
 > This task involves setting up a brand new Git repository `github.com/borch-ai/mcp-telemetry` to build the `pw-mcp-telemetry` binary.
-
+>
 > [!NOTE]
 > **Lamplighter Telemetry Compatibility**:
 > The JSON-RPC tool returns from `pw-mcp-telemetry` (specifically token counts and estimated costs) will conform to Lamplighter's signaling payload requirements (`input_tokens`, `output_tokens`, `estimated_cost`, `daily_quota_cap`). This allows Powerword (or wrapping IDE extensions) to cleanly serialize and publish these metrics directly to the Firebase Realtime Database at `/tunnels/{tunnelId}/telemetry`.
@@ -21,20 +21,23 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 ### Standalone Server Development
 
 #### [NEW] [powerword](file://../..)
+
 - Set up a new Go codebase compiling to the binary executable `pw-mcp-telemetry`.
 - Implement standard Model Context Protocol Go SDK integration.
 - Relocate pricing database arrays and prefix-matching logic from `powerword`'s package.
 - Expose the following JSON-RPC tools:
-  * `calculate_tokens_cost`
-  * `get_model_pricing`
+  - `calculate_tokens_cost`
+  - `get_model_pricing`
 
 ### Powerword Client Refactoring
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - Remove the local `Pricing` map structure from the global configuration struct.
 - Add configuration settings to register and mount `pw-mcp-telemetry` under standard plugins.
 
 #### [MODIFY] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
+
 - Refactor the cost calculation methods to query the mounted `pw-mcp-telemetry` MCP client connection instead of executing native pricing lookups.
 
 ---
@@ -42,5 +45,6 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 ## Verification Plan
 
 ### Automated Tests
+
 - Run command: `go test ./pkg/telemetry/... ./internal/...`
 - Verify that tests correctly spin up a mock telemetry MCP server to test the cost query loops.

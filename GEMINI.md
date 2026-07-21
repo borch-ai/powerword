@@ -6,7 +6,7 @@ Welcome, AI Agent! This document outlines the design patterns, architectural sta
 
 Powerword is a vendor-agnostic Agentic CLI written in Go. The directory layout follows standard Go project structure conventions:
 
-```
+```text
 powerword/
 ├── cmd/
 │   └── powerword/          # Main CLI application entry point
@@ -98,6 +98,19 @@ Powerword works in tandem with other applications (e.g., the Lamplighter dashboa
   - Avoid real network requests in unit tests. Use `httptest.NewServer` or mock clients.
 - **Integration Tests:**
   - Place integrations tests under a separate test flow or use build tags (e.g., `//go:build integration`) to separate them from fast unit tests.
+
+---
+
+## GitHub Actions & CI/CD Hardening
+
+1. **Reusable Workflows (Internal):**
+   - Reusable workflows called from the `borch-ai/.github` repository MUST be pinned to **tag numbers** (e.g., `@v0.2.2`), not commit SHAs, to ensure Dependabot can track, parse, and automatically bump them on its daily schedule.
+2. **Third-Party Actions (External):**
+   - Direct, external GitHub Actions used in custom workflow files (such as `release.yml`, `link-task-issue.yml`) MUST be pinned to **exact commit SHAs** with trailing comments indicating the version (e.g., `uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0`) for supply chain security.
+3. **Egress Traffic Auditing:**
+   - Custom local workflows MUST execute `step-security/harden-runner` with egress auditing enabled as their first step.
+4. **Dependabot Hygiene:**
+   - Dependabot is configured to check daily. Ensure all generated dependabot PR commit messages follow the conventional prefix formatting (e.g., `chore(gomod): ...` or `chore(github-actions): ...`).
 
 ---
 

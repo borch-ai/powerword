@@ -14,6 +14,7 @@ This task extends the MCP client capabilities by adding transport layers to conn
 ### MCP Transport
 
 #### [MODIFY] [client.go](file://../../pkg/llm/client.go)
+
 - [ ] Implement SSE and HTTP/WebSocket transport mappings matching the `modelcontextprotocol/go-sdk` standards.
 - [ ] Support custom HTTP headers to pass API keys or bearer tokens.
 
@@ -22,7 +23,9 @@ This task extends the MCP client capabilities by adding transport layers to conn
 ## Verification Plan
 
 ### Automated Tests
+
 - [ ] Run `go test ./internal/mcp/...` spinning up an `httptest` SSE server to verify message loops.
 
 ### Manual Verification
+
 - [ ] Spin up an external Node/Python SSE MCP server and connect Powerword client to it via remote configuration.
