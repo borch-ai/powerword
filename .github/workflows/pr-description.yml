@@ -1,15 +1,14 @@
-name: PR Title
+name: PR Description
 
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
 
 permissions:
-  statuses: write
-  pull-requests: read
   contents: read
+  pull-requests: read
 
 jobs:
   check:
-    uses: borch-ai/.github/.github/workflows/pr-title.yml@v0.2.2
+    uses: borch-ai/.github/.github/workflows/pr-description.yml@v0.2.2
     secrets: inherit

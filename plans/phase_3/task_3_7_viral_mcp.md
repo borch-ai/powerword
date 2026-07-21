@@ -15,9 +15,11 @@ This task implements a native Go-based MCP server (`pw-mcp-viral`) that coordina
 ## Proposed Changes
 
 ### Viral Plugin Component
+
 Create a new directory `internal/plugins/viral/` to contain the media asset compiler.
 
 #### [NEW] [viral.go](file://../../internal/plugins/viral/viral.go)
+
 - [x] Implement text-to-speech API bindings (ElevenLabs/OpenAI TTS).
 - [x] Implement video generator hooks (Veo/Sora or similar web service clients).
 - [x] Implement an executor wrapper for running local `ffmpeg` commands.
@@ -27,10 +29,13 @@ Create a new directory `internal/plugins/viral/` to contain the media asset comp
   - `viral_stitch_trailer`: Runs `ffmpeg` to merge background audio, voiceover tracks, and video clips into a vertical MP4 trailer.
 
 #### [NEW] [viral_test.go](file://../../internal/plugins/viral/viral_test.go)
+
 - [x] Unit tests mocking API clients and checking command arguments constructed for `ffmpeg`.
 
 ### CLI Manifest Integration
+
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [x] Register the `pw-mcp-viral` server within the native plugin registry under the config key `[plugins.viral]`.
 
 ---
@@ -38,14 +43,17 @@ Create a new directory `internal/plugins/viral/` to contain the media asset comp
 ## Verification Plan
 
 ### Automated Tests
+
 - [x] Run `go test ./internal/plugins/viral/...` to ensure parameters are validated and `ffmpeg` execution path boundaries are guarded.
 - [x] Enforce the 91% unit test coverage requirement (achieved 91.2% overall internal package coverage).
 
 ### Manual Verification
+
 - [x] Write a short parody script.
 - [x] Run `powerword "create a 15-second ASMR voiceover and stitch it with a background clip into a vertical video"` and verify the final MP4 output.
 
 ## Implementation Details
+
 - **Go version:** Go 1.26.4
 - **CLI Plugin:** Exposes three MCP tools via stdio transport protocol.
 - **Config:** Configurable via environment variables (e.g. `POWERWORD_VIRAL_TTS_PROVIDER`) and `powerword.toml`.

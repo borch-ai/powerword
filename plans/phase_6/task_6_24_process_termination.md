@@ -2,8 +2,8 @@
 
 **Status:** Open
 **Go Version:** 1.26.4
-**Date Completed:** 
-**Unit Test Coverage:** 
+**Date Completed:**
+**Unit Test Coverage:**
 
 ---
 
@@ -23,6 +23,7 @@ When the main agent loop aborts, hits a budget limit, or is cancelled by the use
 ## Goal
 
 Audit and enforce strict cancellation propagation:
+
 1. Ensure all `exec.CommandContext` child processes spawned in native plugins are forcefully killed (sent appropriate termination signals) when the context is cancelled.
 2. Ensure all background loops and tickers immediately stop polling remote endpoints and release their resources.
 
@@ -35,9 +36,11 @@ Audit and enforce strict cancellation propagation:
 #### [MODIFY] [viral.go](file://../../internal/plugins/viral/viral.go)
 
 - Refactor `exec.CommandContext` calls (e.g., in `runMockVideo`, `generateTTSMock`, `StitchTrailer`) to monitor the context state:
+
   ```go
   // Ensure that on context cancellation, we send a kill signal to the process group if it hasn't exited
   ```
+
 - Ensure temporary files are cleaned up via `defer` in error paths.
 
 ### `internal/plugins/imagegen/`
@@ -51,15 +54,19 @@ Audit and enforce strict cancellation propagation:
 ## Verification Plan
 
 ### Automated Tests
+
 - Create unit/integration tests that trigger a long command (like `sleep 10` or a slow loop) and cancel the context, asserting:
   - The command process is no longer running in the OS process list.
   - Tickers and tickers channels are fully closed and GC-able.
 - Run tests:
+
   ```bash
   go test -v ./internal/plugins/viral/...
   go test -v ./internal/plugins/imagegen/...
   ```
+
 - Verify code coverage:
+
   ```bash
   make check-coverage
   ```

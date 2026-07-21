@@ -20,20 +20,26 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 ### Linter Promotion to Public Package
 
 #### [DELETE] [linter.go](file://../../internal/linter/linter.go)
+
 #### [DELETE] [linter_test.go](file://../../internal/linter/linter_test.go)
 
 #### [NEW] [linter.go](file://../../pkg/linter/linter.go)
+
 - Relocate markdown linting logic from `internal/linter/linter.go` to public package `pkg/linter`.
 
 #### [NEW] [validator.go](file://../../pkg/linter/validator.go)
+
 - Move plan template validation and absolute/relative link conformance logic from `internal/review/validator.go` to public package `pkg/linter`.
 - Clean up imports to use `github.com/borch-ai/powerword/pkg/config`.
 
 #### [MODIFY] [critic.go](file://../../internal/review/critic.go)
+
 - Update imports to use `github.com/borch-ai/powerword/pkg/linter` for `ValidatePlans` and `FixAbsolutePathsInPlans`.
 
 #### [NEW] [linter_test.go](file://../../pkg/linter/linter_test.go)
+
 #### [NEW] [validator_test.go](file://../../pkg/linter/validator_test.go)
+
 - Migrate respective tests to `pkg/linter`.
 
 ---
@@ -41,6 +47,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 ### Command Subsystem
 
 #### [NEW] [lint.go](file://../../cmd/powerword/lint.go)
+
 - Implement `powerword lint-plans` and `powerword lint-go` commands.
 - **`powerword lint-plans`**:
   - Arguments/Flags:
@@ -63,6 +70,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 ### Standalone Plugin Entrypoint
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-linter/main.go)
+
 - Create CLI scaffolding to bootstrap the `pw-mcp-linter` plugin.
 - Support reading `POWERWORD_WORKSPACE_ROOT` environment variable or falling back to local working directory.
 - Initialize and serve the MCP server over standard I/O (`stdio`).
@@ -70,6 +78,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 ### MCP Server Tool Registration
 
 #### [NEW] [server.go](file://../../internal/mcp/linter/server.go)
+
 - Define a standard MCP server structure utilizing `github.com/modelcontextprotocol/go-sdk/mcp`.
 - Register the `lint_plans` tool with the following JSON schema parameters:
   - `workspace_root` (string, required): Absolute or relative path to the repository workspace containing `plans/`.
@@ -77,6 +86,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 - Implement the tool handler:
   1. Call `pkg/linter.ValidatePlans(workspace_root, cfg)`.
   2. If errors are found, return `IsError = false` (as the tool itself executed successfully) but provide a structured JSON payload detailing the failures:
+
      ```json
      {
        "valid": false,
@@ -90,7 +100,9 @@ Promote the plan validation and markdown formatting linter logic to a public, re
        ]
      }
      ```
+
   3. If all plans conform, return:
+
      ```json
      {
        "valid": true,
@@ -101,6 +113,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 ### Build and Makefile Integration
 
 #### [MODIFY] [Makefile](file://../../Makefile)
+
 - Add `pw-mcp-linter` to the `build` target to compile `bin/pw-mcp-linter` if `cmd/pw-mcp-linter` exists.
 - Add `pw-mcp-linter` to the `install` target.
 
@@ -109,6 +122,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./pkg/linter/...` to verify both markdown linting and plan template validation pass.
 - Create `internal/mcp/linter/server_test.go` to test:
   - Tool execution with a valid plan workspace returning `{"valid": true}`.
@@ -117,6 +131,7 @@ Promote the plan validation and markdown formatting linter logic to a public, re
 - Verify `powerword check-coverage` still meets the 91% threshold.
 
 ### Manual Verification
+
 - Compile powerword: `make build`.
 - Run `./bin/powerword lint-plans` on the local codebase. Verify it exits with `0`.
 - Temporarily corrupt a plan file or link label. Run `./bin/powerword lint-plans` and verify it displays the formatting errors and exits with `1`.

@@ -33,7 +33,7 @@ makes it reusable by any MCP client in the ecosystem (Lamplighter, future agents
 > is absent from `powerword.toml`), the `serp` source is silently skipped and
 > only Amazon completions are returned. Consumers receive a partial but valid
 > result — never an error due to a missing key.
-
+>
 > [!NOTE]
 > **`TrendSource` is the extension point.** Additional backends (Reddit Trends,
 > TikTok For Business) can be added without changing the MCP tool interface.
@@ -73,6 +73,7 @@ func main() {
 Returns ranked keyword candidates for a seed niche term.
 
 **Input schema:**
+
 ```json
 {
   "keyword": "string",
@@ -82,6 +83,7 @@ Returns ranked keyword candidates for a seed niche term.
 ```
 
 **Output:** Array of `ScoredCandidate`:
+
 ```json
 [
   { "keyword": "radon detector home", "completions": 8, "trend_score": 0.92 },
@@ -95,6 +97,7 @@ Returns a single keyword's trend velocity derived from the SerpAPI 3-month
 time-series.
 
 **Input schema:**
+
 ```json
 {
   "keyword": "string",
@@ -103,6 +106,7 @@ time-series.
 ```
 
 **Output:**
+
 ```json
 { "trend_score": 0.87, "direction": "rising" }
 ```
@@ -136,11 +140,13 @@ Implementations in the same package:
   (velocity is only available from SerpAPI).
 - **`SerpAPITrends`** — `GET https://serpapi.com/search?engine=google_trends&...`
   Parses `interest_over_time.timeline_data`; computes:
-  ```
+
+  ```text
   recentAvg = mean(last 4 weeks)
   olderAvg  = mean(weeks 5–12)
   TrendScore = min(1.0, recentAvg / max(olderAvg, 1))
   ```
+
   Returns `Completions = 0` (only SerpAPI provides velocity).
 
 The MCP handler merges results by keyword, summing `Completions` and taking the
@@ -149,6 +155,7 @@ max `TrendScore` across sources.
 #### [NEW] [source_test.go](file://../../internal/trends/source_test.go)
 
 Mock HTTP servers:
+
 - Amazon: correct completion JSON → correct `Candidate` list.
 - SerpAPI: fixture time-series → correct `TrendScore` (rising ≥0.9, flat ≈1.0, declining <0.7).
 - SerpAPI: empty key → zero-score candidates, no error.

@@ -20,16 +20,19 @@ This task implements Google Artifact Registry verification tools inside `pw-mcp-
 Implement Google Artifact Registry checks using `cloud.google.com/go/artifactregistry/apiv1`.
 
 #### [NEW] [registry.go](file://../../internal/plugins/cloud/registry.go)
+
 - Initialize the Artifact Registry API client.
 - Implement `CheckRegistryImage(ctx context.Context, repository, image, tag string) (bool, error)` to verify if the specified tag is uploaded and readable.
 
 #### [MODIFY] [cloud.go](file://../../internal/plugins/cloud/cloud.go)
+
 - Register the new MCP tool:
-  * **`cloud_check_registry_image`**
-    * Parameters: `repository` (string, e.g. `projects/my-project/locations/us-central1/repositories/my-repo`), `image_name` (string), `tag` (string).
+  - **`cloud_check_registry_image`**
+    - Parameters: `repository` (string, e.g. `projects/my-project/locations/us-central1/repositories/my-repo`), `image_name` (string), `tag` (string).
 - Route the tool handler to `CheckRegistryImage` logic.
 
 #### [NEW] [registry_test.go](file://../../internal/plugins/cloud/registry_test.go)
+
 - Add unit tests using mock API client layers to check correct handling of image-found, image-not-found, and API-error states.
 
 ---
@@ -37,5 +40,6 @@ Implement Google Artifact Registry checks using `cloud.google.com/go/artifactreg
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./internal/plugins/cloud/...` to verify tool registrations and mock API responses.
 - Ensure package test coverage meets the 91% requirement.

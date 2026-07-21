@@ -18,7 +18,7 @@
 
 When using `pithos brew`, generation of the character seed portrait or page illustrations using Google's Imagen model (`imagen-4.0-generate-001` or `imagen-3.0-generate-002`) can fail with a timeout:
 
-```
+```text
 failed to generate character seed portrait: tool execution failed: failed to generate image: google predict request failed: Post "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=...": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
 ```
 
@@ -66,16 +66,21 @@ Generalize image and video generation timeouts by making them configurable via a
 ## Verification Plan
 
 ### Automated Tests
+
 - Run unit tests for `imagegen` and `viral` packages:
+
   ```bash
   go test -v ./internal/plugins/imagegen/...
   go test -v ./internal/plugins/viral/...
   ```
+
 - Run the full project-wide checks to verify 91% code coverage:
+
   ```bash
   make check-coverage
   ```
 
 ### Manual Verification
+
 - Compile powerword: `make build`
 - Verify image generation executes successfully using various backends.

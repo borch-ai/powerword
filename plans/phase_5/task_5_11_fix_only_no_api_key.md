@@ -23,7 +23,7 @@ requirement is spurious.
 
 ## Root Cause
 
-```
+```text
 persistentPreRunE
   └─ cfg.Validate()          ← always called, regardless of flags
        └─ error: no API keys
@@ -67,7 +67,7 @@ This is consistent with how `--list-sessions` already skips validation today.
 need it is the correct design — `PersistentPreRunE` should load config but not
 assert capabilities that only some commands need.
 
-#### Changes to `persistentPreRunE`:
+#### Changes to `persistentPreRunE`
 
 ```go
 func persistentPreRunE(cmd *cobra.Command, args []string) error {
@@ -98,7 +98,7 @@ func persistentPreRunE(cmd *cobra.Command, args []string) error {
 }
 ```
 
-#### Changes to `cmd/powerword/review.go`:
+#### Changes to `cmd/powerword/review.go`
 
 Call `cfg.Validate()` inside `RunE`, **only** when the command will perform
 LLM-backed operations (i.e., when `localOnly` or `issueID != ""`):
@@ -146,21 +146,27 @@ RunE: func(cmd *cobra.Command, args []string) error {
 ### Manual Verification
 
 1. From kiln repo (which has `POWERWORD_*` keys in `.env` but no `powerword.toml`):
+
    ```bash
    make fix-plans
    ```
+
    Should succeed, print `Auto-fix complete. Modified N plan file(s).`
 
 2. From a repo with no powerword config at all:
+
    ```bash
    powerword review --fix
    ```
+
    Should succeed (fix runs) even with no API keys.
 
 3. From a repo with no powerword config:
+
    ```bash
    powerword review --local
    ```
+
    Should still fail with `"no API keys found"` (LLM step requires keys).
 
 4. `make fix-plans` from powerword itself — unchanged behavior.

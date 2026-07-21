@@ -17,15 +17,19 @@ This task adds user-defined token and cost budgeting guardrails to prevent infin
 ### Config and Telemetry
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [x] Add config options `max_cost` and `max_tokens` (input/output/cached).
 
 #### [MODIFY] [root.go](file://../../pkg/config/root.go)
+
 - [x] Declare and register persistent CLI flags for `--max-cost`, `--max-tokens`, `--max-input-tokens`, `--max-output-tokens`, and `--max-cached-tokens` with default values matching the config defaults.
 
 #### [MODIFY] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
+
 - [x] Add checks within the telemetry tracking logic to verify if the current session costs have crossed the defined budget threshold.
 
 #### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
+
 - [x] Integrate budget check into the loop step validator and return a distinct budget exhaustion error.
 
 ---
@@ -33,7 +37,9 @@ This task adds user-defined token and cost budgeting guardrails to prevent infin
 ## Verification Plan
 
 ### Automated Tests
+
 - [x] Run `go test ./pkg/telemetry/...` and `go test ./internal/loop/...` testing with mock token budgets.
 
 ### Manual Verification
+
 - [x] Run `powerword` with `--max-cost 0.01` and verify that the run is aborted early when tool executions or prompt completions trigger costs exceeding $0.01.

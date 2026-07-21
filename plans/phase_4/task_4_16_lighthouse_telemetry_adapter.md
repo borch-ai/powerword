@@ -30,6 +30,7 @@ This plan introduces a new `LighthouseAdapter` in `pkg/telemetry` and wires it i
 ## Proposed Changes
 
 ### `pkg/telemetry/lighthouse.go` [NEW]
+
 ```go
 // LighthouseAdapter submits a TelemetryEvent to a Lighthouse collector.
 // It runs in a detached goroutine and must not block the caller.
@@ -43,6 +44,7 @@ func (a *LighthouseAdapter) Submit(ctx context.Context, e TelemetryEvent)
 ```
 
 `TelemetryEvent` struct:
+
 ```go
 type TelemetryEvent struct {
     Project    string            `json:"project"`
@@ -57,7 +59,9 @@ type TelemetryEvent struct {
 ```
 
 ### `pkg/telemetry/telemetry.go` [MODIFY]
+
 Add `SubmitToLighthouse(event TelemetryEvent)` convenience function that:
+
 1. Reads `LIGHTHOUSE_URL` env var. If unset, returns immediately (no-op).
 2. Reads `LIGHTHOUSE_API_KEY` env var for the Bearer token.
 3. Spawns `LighthouseAdapter.Submit()` in a goroutine with a 3-second context deadline.
@@ -81,7 +85,7 @@ telemetry.Flush(manifest)
 ## Environment Variables
 
 | Variable | Description |
-|---|---|
+| --- | --- |
 | `LIGHTHOUSE_URL` | Base URL of the Lighthouse instance (e.g. `http://localhost:8080`). If unset, the adapter is a no-op. |
 | `LIGHTHOUSE_API_KEY` | Bearer token for the Lighthouse collector. Optional — if unset, the request is sent without auth (suitable for local instances). |
 
@@ -90,11 +94,13 @@ telemetry.Flush(manifest)
 ## Verification Plan
 
 ### Automated Tests
+
 - `TestLighthouseAdapter_Submit_Success`: Start a mock HTTP server, call `Submit()`, verify the correct JSON body is posted to `/api/telemetry`.
 - `TestLighthouseAdapter_Submit_NoURL`: Verify that `SubmitToLighthouse` returns immediately without spawning a goroutine when `LIGHTHOUSE_URL` is unset.
 - `TestLighthouseAdapter_Submit_Timeout`: Verify that the adapter times out after 3 seconds and does not block.
 
 ### Manual Verification
+
 - Set `LIGHTHOUSE_URL=http://localhost:8080` in the test env.
 - Run `pithos brew --dry-run` (Task 5.37, after it ships).
 - Verify a row appears in the Lighthouse `system_telemetry` table with `project="pithos"`.
