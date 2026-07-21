@@ -15,9 +15,11 @@ Preserve single newline markers within Markdown manuscript stanzas and format th
 ## Proposed Changes
 
 ### Parser
+
 Modify `ParseManuscript` parser to preserve line breaks or format them as Typst-friendly layout breaks.
 
 #### [MODIFY] [parser.go](file://../../internal/plugins/typst/parser.go)
+
 - Enhance `cleanPages` to replace `\n` in `Text` fields with Typst line break syntax (` \\\n `).
 
 ---
@@ -25,7 +27,9 @@ Modify `ParseManuscript` parser to preserve line breaks or format them as Typst-
 ## Verification Plan
 
 ### Automated Tests
+
 - Add unit test verifying that parsed manuscript stanzas maintain explicit line breaks.
 
 ### Manual Verification
+
 - Compile `pw-mcp-typst` and run `compile_interior` to verify that output PDF stanzas display as separate lines.

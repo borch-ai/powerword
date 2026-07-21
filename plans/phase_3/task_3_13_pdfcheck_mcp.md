@@ -18,7 +18,9 @@ Implement `pw-mcp-pdfcheck`, a native Go MCP server that performs preflight vali
 ### New Binary: `cmd/pw-mcp-pdfcheck/`
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-pdfcheck/main.go)
+
 Standard MCP server entry point registering the `validate_pdf` tool:
+
 ```go
 func main() {
     srv := mcp.NewServer(&mcp.Implementation{
@@ -35,7 +37,9 @@ func main() {
 ### MCP Tools
 
 #### Tool: `validate_pdf`
+
 **Input schema:**
+
 ```json
 {
     "pdf_path": "string (path to target PDF file)",
@@ -49,6 +53,7 @@ func main() {
 ```
 
 **Implementation:**
+
 1. Check that the PDF exists and is a readable file.
 2. Read the page count, crop box, and media box specifications of the PDF file to verify exact paper dimensions match:
    `width = expected_width_inches + (bleed_inches * 2)`
@@ -57,6 +62,7 @@ func main() {
 4. Run font analysis on the document structure to assert that every single referenced font is marked as "Embedded" or "Embedded Subset".
 5. Optionally verify that the color spaces of embedded images do not contain RGB coordinates if `enforce_cmyk` is enabled.
 6. Return a structured JSON verdict:
+
    ```json
    {
        "valid": true,
@@ -70,11 +76,13 @@ func main() {
 ### PDF Validation Logic
 
 #### [NEW] [validator.go](file://../../internal/plugins/pdfcheck/validator.go)
+
 Core validation functions analyzing page configurations, image sizes, and font mappings.
 
 ### Tests
 
 #### [NEW] [validator_test.go](file://../../internal/plugins/pdfcheck/validator_test.go)
+
 - Unit tests compiling dynamic test PDF containers containing embedded elements to verify parser accuracy.
 - Mocking tool subprocess checks.
 - 91%+ coverage.
@@ -84,10 +92,12 @@ Core validation functions analyzing page configurations, image sizes, and font m
 ## Verification Plan
 
 ### Automated Tests
+
 - `go test -race ./cmd/pw-mcp-pdfcheck/... ./internal/plugins/pdfcheck/...`
 - `make check-coverage` — ≥91%
 
 ### Manual Verification
+
 1. `./bin/pw-mcp-pdfcheck` — starts and waits for stdio input.
 2. Pass a valid children's book interior PDF compiled by Typst; verify that the validator returns a successful result showing correct page sizes.
 3. Pass a modified PDF containing a non-embedded font or a low-resolution image (e.g., 72 DPI); verify that the tool returns a failed verdict with specific error descriptions.

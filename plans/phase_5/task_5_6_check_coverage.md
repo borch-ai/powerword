@@ -22,6 +22,7 @@ Add a project-agnostic `powerword check-coverage` subcommand to the Powerword CL
 ### Command Line Interface
 
 #### [NEW] [check_coverage.go](file://../../cmd/powerword/check_coverage.go)
+
 - Define and register the `check-coverage` Cobra subcommand under the root command.
 - Set arguments constraints (requires minimum 1 arg representing threshold, optionally accepts profile path).
 - Handler logic:
@@ -32,6 +33,7 @@ Add a project-agnostic `powerword check-coverage` subcommand to the Powerword CL
 ### Review Subsystem
 
 #### [NEW] [coverage.go](file://../../internal/review/coverage.go)
+
 - Implement `VerifyCoverage(threshold float64, profilePath string) error`:
   1. **Clean NULL bytes:** Read and sanitize the target coverage profile file, stripping any null bytes or incomplete lines to prevent parser syntax errors.
   2. **Run go tool cover:** Execute `go tool cover -func=<profilePath>` inside the workspace context.
@@ -43,6 +45,7 @@ Add a project-agnostic `powerword check-coverage` subcommand to the Powerword CL
 ## Verification Plan
 
 ### Automated Tests
+
 - Create `internal/review/coverage_test.go` verifying:
   - Sanitization of coverage files containing null bytes.
   - Correct parsing of `go tool cover` output blocks.
@@ -52,6 +55,7 @@ Add a project-agnostic `powerword check-coverage` subcommand to the Powerword CL
 - Ensure that unit test coverage across the modified packages meets or exceeds the **91% threshold**.
 
 ### Manual Verification
+
 - In the Pithos or Powerword repository, run `powerword check-coverage 91.0 coverage.out`.
 - Verify it correctly parses and prints output, exiting with code `0`.
 - Run `powerword check-coverage 99.9 coverage.out` and verify it fails, printing the failure diagnostic and exiting with code `1`.

@@ -1,14 +1,48 @@
 package telemetry
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 )
+
+func TestMain(m *testing.M) {
+	code := runTests(m)
+	os.Exit(code)
+}
+
+func runTests(m *testing.M) int {
+	oldLockTimeout := lockTimeout
+	lockTimeout = 5 * time.Millisecond
+	defer func() {
+		lockTimeout = oldLockTimeout
+	}()
+
+	tempHome, err := os.MkdirTemp("", "powerword-test-home")
+	if err != nil {
+		fmt.Printf("failed to create temp home: %v\n", err)
+		return 1
+	}
+	defer func() { _ = os.RemoveAll(tempHome) }()
+
+	oldHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tempHome)
+	defer func() {
+		_ = os.Setenv("HOME", oldHome)
+	}()
+
+	return m.Run()
+}
 
 func TestLighthouseAdapter_Submit_Success(t *testing.T) {
 	var (
@@ -116,6 +150,27 @@ func TestLighthouseAdapter_Submit_Error(t *testing.T) {
 	}
 }
 
+func TestLighthouseAdapter_Submit_ErrorWithBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("unauthorized access token"))
+	}))
+	defer server.Close()
+
+	adapter := &LighthouseAdapter{
+		URL:    server.URL,
+		Client: server.Client(),
+	}
+
+	err := adapter.Submit(context.Background(), TelemetryEvent{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !containsString(err.Error(), "unauthorized access token") {
+		t.Errorf("expected 'unauthorized access token' in error, got %v", err)
+	}
+}
+
 func TestLighthouseAdapter_Submit_NoURL(t *testing.T) {
 	adapter := &LighthouseAdapter{}
 	err := adapter.Submit(context.Background(), TelemetryEvent{})
@@ -163,6 +218,665 @@ func TestSubmitToLighthouse_NoURL(t *testing.T) {
 	Wait()
 }
 
+func TestLighthouseAdapter_SubmitBatch_Success(t *testing.T) {
+	var (
+		mu          sync.Mutex
+		receivedReq *http.Request
+		receivedVal []TelemetryEvent
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		receivedReq = r
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("failed to read request body: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := json.Unmarshal(body, &receivedVal); err != nil {
+			t.Errorf("failed to unmarshal JSON: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	adapter := &LighthouseAdapter{
+		URL:    server.URL,
+		APIKey: "batch-key",
+		Client: server.Client(),
+	}
+
+	events := []TelemetryEvent{
+		{Project: "p1", Command: "run"},
+		{Project: "p2", Command: "audit"},
+	}
+
+	err := adapter.SubmitBatch(context.Background(), events)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if receivedReq == nil {
+		t.Fatal("expected server to receive a request")
+	}
+
+	if receivedReq.URL.Path != "/api/telemetry/batch" {
+		t.Errorf("expected path /api/telemetry/batch, got %s", receivedReq.URL.Path)
+	}
+
+	if receivedReq.Header.Get("Content-Type") != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", receivedReq.Header.Get("Content-Type"))
+	}
+
+	if receivedReq.Header.Get("Authorization") != "Bearer batch-key" {
+		t.Errorf("expected Authorization Bearer batch-key, got %s", receivedReq.Header.Get("Authorization"))
+	}
+
+	if len(receivedVal) != 2 {
+		t.Errorf("expected 2 events, got %d", len(receivedVal))
+	}
+}
+
+func TestLighthouseAdapter_SubmitBatch_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	adapter := &LighthouseAdapter{
+		URL:    server.URL,
+		Client: server.Client(),
+	}
+
+	err := adapter.SubmitBatch(context.Background(), []TelemetryEvent{{Project: "err"}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestTelemetrySpoolAndSync(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	// Spool 2 events
+	event1 := TelemetryEvent{Project: "spool-1", Command: "test"}
+	event2 := TelemetryEvent{Project: "spool-2", Command: "test"}
+
+	spoolOfflineEvent(event1)
+	spoolOfflineEvent(event2)
+
+	// Verify spool file contains events
+	spoolPath := filepath.Join(tempHome, ".local", "share", "powerword", "telemetry_spool.jsonl")
+	if _, err := os.Stat(spoolPath); err != nil {
+		t.Fatalf("expected spool file to exist, got error: %v", err)
+	}
+
+	// Setup sync mock server
+	var (
+		mu          sync.Mutex
+		receivedVal []TelemetryEvent
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var batch []TelemetryEvent
+		if err := json.Unmarshal(body, &batch); err == nil {
+			receivedVal = append(receivedVal, batch...)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Sync events
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify spool file was deleted (synced successfully)
+	if _, err := os.Stat(spoolPath); !os.IsNotExist(err) {
+		t.Error("expected spool file to be deleted after sync success")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(receivedVal) != 2 {
+		t.Errorf("expected 2 received events, got %d", len(receivedVal))
+	}
+}
+
+func TestTelemetrySync_FailureRollback(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	event := TelemetryEvent{Project: "rollback-me"}
+	spoolOfflineEvent(event)
+
+	spoolPath := filepath.Join(tempHome, ".local", "share", "powerword", "telemetry_spool.jsonl")
+
+	// Mock server that returns error to trigger rollback
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	// Sync should fail and spool events back
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Spool file should still exist and contain the event
+	if _, err := os.Stat(spoolPath); err != nil {
+		t.Fatalf("expected spool file to exist after rollback, got: %v", err)
+	}
+
+	//nolint:gosec // G304: test file path pre-validated
+	content, err := os.ReadFile(spoolPath)
+	if err != nil {
+		t.Fatalf("failed to read spool file: %v", err)
+	}
+
+	var restored TelemetryEvent
+	if err := json.Unmarshal(bytes.TrimSpace(content), &restored); err != nil {
+		t.Fatalf("failed to parse restored event: %v", err)
+	}
+
+	if restored.Project != "rollback-me" {
+		t.Errorf("expected Project 'rollback-me', got %s", restored.Project)
+	}
+}
+
+func TestTelemetrySpool_MkdirError(t *testing.T) {
+	tempHome := t.TempDir()
+	blockedPath := filepath.Join(tempHome, ".local")
+	if err := os.WriteFile(blockedPath, []byte("blocked"), 0600); err != nil {
+		t.Fatalf("failed to create blocking file: %v", err)
+	}
+
+	t.Setenv("HOME", tempHome)
+
+	spoolOfflineEvent(TelemetryEvent{Project: "test"})
+}
+
+func TestTelemetrySpool_OpenFileError(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	if err := os.Mkdir(spoolPath, 0750); err != nil {
+		t.Fatalf("failed to create blocking dir: %v", err)
+	}
+
+	spoolOfflineEvent(TelemetryEvent{Project: "test"})
+}
+
+func TestTelemetrySync_InvalidJSON(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	content := []byte("{\n{\"project\":\"valid\"}\n")
+	if err := os.WriteFile(spoolPath, content, 0600); err != nil {
+		t.Fatalf("failed to write spool file: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	if _, err := os.Stat(spoolPath); !os.IsNotExist(err) {
+		t.Error("expected spool file to be deleted")
+	}
+}
+
+func TestTelemetrySync_RenameError(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	if err := os.WriteFile(spoolPath, []byte("{\n"), 0600); err != nil {
+		t.Fatalf("failed to write spool: %v", err)
+	}
+
+	//nolint:gosec // G302: directory permissions modified for testing read-only error handling
+	if err := os.Chmod(spoolDir, 0500); err != nil {
+		t.Fatalf("failed to chmod dir: %v", err)
+	}
+	defer func() {
+		//nolint:gosec // G302: directory permissions restored
+		_ = os.Chmod(spoolDir, 0750)
+	}()
+
+	SyncSpooledEvents(context.Background(), "http://localhost", "")
+}
+
+func TestTelemetrySync_RollbackError(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	event := TelemetryEvent{Project: "rollback-fail"}
+	spoolOfflineEvent(event)
+
+	spoolPath := filepath.Join(tempHome, ".local", "share", "powerword", "telemetry_spool.jsonl")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = os.Mkdir(spoolPath, 0750)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	_ = os.Remove(spoolPath)
+}
+
+func TestTelemetrySync_OpenError(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	if err := os.WriteFile(spoolPath, []byte("{\n"), 0000); err != nil {
+		t.Fatalf("failed to write spool: %v", err)
+	}
+
+	SyncSpooledEvents(context.Background(), "http://localhost", "")
+}
+
+func TestTelemetrySync_LargeBatch(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	for i := 0; i < 105; i++ {
+		spoolOfflineEvent(TelemetryEvent{Project: fmt.Sprintf("event-%d", i)})
+	}
+
+	var (
+		mu         sync.Mutex
+		callCount  int
+		totalEvent int
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		callCount++
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var batch []TelemetryEvent
+		if err := json.Unmarshal(body, &batch); err == nil {
+			totalEvent += len(batch)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	mu.Lock()
+	defer mu.Unlock()
+	if callCount != 2 {
+		t.Errorf("expected 2 batch calls, got %d", callCount)
+	}
+	if totalEvent != 105 {
+		t.Errorf("expected 105 total events, got %d", totalEvent)
+	}
+}
+
+func TestLighthouseAdapter_SubmitBatch_ErrorWithBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("server error payload"))
+	}))
+	defer server.Close()
+
+	adapter := &LighthouseAdapter{
+		URL:    server.URL,
+		Client: server.Client(),
+	}
+
+	err := adapter.SubmitBatch(context.Background(), []TelemetryEvent{{Project: "err"}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !containsString(err.Error(), "server error payload") {
+		t.Errorf("expected error payload in error message, got %v", err)
+	}
+}
+
+func TestTelemetrySync_StatPermissionError(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	if err := os.WriteFile(spoolPath, []byte("{\n"), 0600); err != nil {
+		t.Fatalf("failed to write spool: %v", err)
+	}
+
+	//nolint:gosec // G302: directory permissions modified for testing read-only error handling
+	if err := os.Chmod(spoolDir, 0000); err != nil {
+		t.Fatalf("failed to chmod dir: %v", err)
+	}
+	defer func() {
+		//nolint:gosec // G302: directory permissions restored
+		_ = os.Chmod(spoolDir, 0750)
+	}()
+
+	SyncSpooledEvents(context.Background(), "http://localhost", "")
+}
+
+func TestTelemetrySync_ContextCancelled(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	event := TelemetryEvent{Project: "cancelled"}
+	spoolOfflineEvent(event)
+
+	spoolPath := filepath.Join(tempHome, ".local", "share", "powerword", "telemetry_spool.jsonl")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	SyncSpooledEvents(ctx, "http://localhost", "")
+
+	if _, err := os.Stat(spoolPath); err != nil {
+		t.Errorf("expected spool file to still exist after context cancel, got: %v", err)
+	}
+}
+
+func TestTelemetrySync_StrandedSyncFiles(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// Write a stranded sync file
+	strandedPath := filepath.Join(spoolDir, "telemetry_spool_sync_12345.jsonl")
+	event := TelemetryEvent{Project: "stranded"}
+	payload, _ := json.Marshal(event)
+	if err := os.WriteFile(strandedPath, append(payload, '\n'), 0600); err != nil {
+		t.Fatalf("failed to write stranded file: %v", err)
+	}
+
+	// Start a mock server to receive it
+	var (
+		mu       sync.Mutex
+		received bool
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if r.URL.Path == "/api/telemetry/batch" {
+			received = true
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Check if stranded file was processed and deleted
+	if _, err := os.Stat(strandedPath); !os.IsNotExist(err) {
+		t.Errorf("expected stranded sync file to be deleted, but it still exists")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if !received {
+		t.Error("expected stranded events to be synced to the batch endpoint")
+	}
+}
+
+func TestTelemetrySync_RollbackFailureSyncFileRetention(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// Make the main spool path a directory, so rollback fails
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	if err := os.MkdirAll(spoolPath, 0750); err != nil {
+		t.Fatalf("failed to create spool path as directory: %v", err)
+	}
+
+	// Write a temporary sync file
+	syncPath := filepath.Join(spoolDir, "telemetry_spool_sync_99999.jsonl")
+	event := TelemetryEvent{Project: "rollback-fail"}
+	payload, _ := json.Marshal(event)
+	if err := os.WriteFile(syncPath, append(payload, '\n'), 0600); err != nil {
+		t.Fatalf("failed to write sync file: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify that the sync file is NOT deleted because rollback failed
+	if _, err := os.Stat(syncPath); os.IsNotExist(err) {
+		t.Errorf("expected temporary sync file to be retained on rollback failure, but it was deleted")
+	}
+}
+
+func TestLighthouseAdapter_SubmitBatch_EmptyAndNoURL(t *testing.T) {
+	adapter := &LighthouseAdapter{URL: ""}
+	// Empty events should succeed immediately
+	if err := adapter.SubmitBatch(context.Background(), nil); err != nil {
+		t.Errorf("expected nil error for empty events, got: %v", err)
+	}
+	// Non-empty events with empty URL should fail
+	if err := adapter.SubmitBatch(context.Background(), []TelemetryEvent{{}}); err == nil {
+		t.Error("expected error for empty URL, got nil")
+	}
+}
+
+func TestIsRetryableError(t *testing.T) {
+	tests := []struct {
+		err      error
+		expected bool
+	}{
+		{nil, false},
+		{fmt.Errorf("http request failed: connection refused"), true},
+		{fmt.Errorf("unexpected status code 400 (Bad Request)"), false},
+		{fmt.Errorf("unexpected status code 401 (Unauthorized)"), false},
+		{fmt.Errorf("unexpected status code 403 (Forbidden)"), false},
+		{fmt.Errorf("unexpected status code 404 (Not Found)"), false},
+		{fmt.Errorf("unexpected status code 429 (Too Many Requests)"), true},
+		{fmt.Errorf("unexpected status code 500 (Internal Server Error)"), true},
+		{fmt.Errorf("unexpected status code 503 (Service Unavailable)"), true},
+		{fmt.Errorf("unexpected status code 500"), true}, // fallback case
+		{fmt.Errorf("context canceled"), true},
+		{fmt.Errorf("context deadline exceeded"), true},
+		{fmt.Errorf("failed to marshal telemetry payload"), false},
+		{fmt.Errorf("failed to create http request"), false},
+	}
+
+	for _, tt := range tests {
+		result := isRetryableError(tt.err)
+		if result != tt.expected {
+			t.Errorf("isRetryableError(%v) = %v; expected %v", tt.err, result, tt.expected)
+		}
+	}
+}
+
+func TestTelemetrySync_PartialBatchSync(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// 1. Create a sync file with 150 events (will be split into two batches: 100 and 50)
+	syncPath := filepath.Join(spoolDir, "telemetry_spool_sync_77777.jsonl")
+	var filePayload []byte
+	for i := 0; i < 150; i++ {
+		event := TelemetryEvent{Project: fmt.Sprintf("event-%d", i)}
+		payload, _ := json.Marshal(event)
+		filePayload = append(filePayload, append(payload, '\n')...)
+	}
+	if err := os.WriteFile(syncPath, filePayload, 0600); err != nil {
+		t.Fatalf("failed to write sync file: %v", err)
+	}
+
+	// 2. Start mock server: accept the first request (batch of 100), fail the second (batch of 50)
+	var (
+		mu        sync.Mutex
+		callCount int
+		totalSent int
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		callCount++
+		if callCount == 1 {
+			var batch []TelemetryEvent
+			_ = json.NewDecoder(r.Body).Decode(&batch)
+			totalSent += len(batch)
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// 3. Verify that the sync file was deleted (rolled back)
+	if _, err := os.Stat(syncPath); !os.IsNotExist(err) {
+		t.Errorf("expected temporary sync file to be deleted on partial sync, but it still exists")
+	}
+
+	// 4. Verify that the main spool file now contains exactly the 50 unsent events
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	events, _, err := readSpooledEvents(spoolPath)
+	if err != nil {
+		t.Fatalf("failed to read main spool: %v", err)
+	}
+	if len(events) != 50 {
+		t.Errorf("expected 50 rolled back events in main spool, got %d", len(events))
+	}
+	if events[0].Project != "event-100" {
+		t.Errorf("expected first unsent event to be event-100, got %s", events[0].Project)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if totalSent != 100 {
+		t.Errorf("expected 100 events to be successfully sent in first batch, got %d", totalSent)
+	}
+}
+
+func TestTelemetrySync_CorruptFileRetention(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	// 1. Create a temporary sync file with only invalid JSON content (non-empty)
+	syncPathOnlyCorrupt := filepath.Join(spoolDir, "telemetry_spool_sync_99999.jsonl")
+	if err := os.WriteFile(syncPathOnlyCorrupt, []byte("corrupt-invalid-json-content\n"), 0600); err != nil {
+		t.Fatalf("failed to write corrupt sync file: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify that the sync file is RETAINED for inspection because it has size > 0 but 0 parsed events
+	if _, err := os.Stat(syncPathOnlyCorrupt); os.IsNotExist(err) {
+		t.Errorf("expected only corrupt sync file to be retained, but it was deleted")
+	}
+
+	// 2. Create a temporary sync file with a MIX of valid and invalid JSON content (non-empty)
+	syncPathMixed := filepath.Join(spoolDir, "telemetry_spool_sync_77777.jsonl")
+	validEvent := TelemetryEvent{Project: "valid-event", Command: "run"}
+	validBytes, _ := json.Marshal(validEvent)
+	mixedContent := string(validBytes) + "\ninvalid-json-here\n"
+	if err := os.WriteFile(syncPathMixed, []byte(mixedContent), 0600); err != nil {
+		t.Fatalf("failed to write mixed sync file: %v", err)
+	}
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	// Verify that the original sync file was deleted, but renamed to a .corrupt path
+	if _, err := os.Stat(syncPathMixed); !os.IsNotExist(err) {
+		t.Errorf("expected original mixed sync file to be renamed/deleted, but it still exists")
+	}
+	corruptPath := syncPathMixed + ".corrupt"
+	if _, err := os.Stat(corruptPath); os.IsNotExist(err) {
+		t.Errorf("expected mixed sync file to be renamed to %s, but it does not exist", corruptPath)
+	}
+
+	// 3. Verify that if the file was completely empty (size == 0), it is deleted
+	emptySyncPath := filepath.Join(spoolDir, "telemetry_spool_sync_88888.jsonl")
+	if err := os.WriteFile(emptySyncPath, []byte(""), 0600); err != nil {
+		t.Fatalf("failed to write empty sync file: %v", err)
+	}
+
+	SyncSpooledEvents(context.Background(), server.URL, "")
+
+	if _, err := os.Stat(emptySyncPath); !os.IsNotExist(err) {
+		t.Errorf("expected empty sync file to be deleted, but it still exists")
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || s[0:len(substr)] == substr || s[len(s)-len(substr):] == substr || stringContains(s, substr))
 }
@@ -174,4 +888,110 @@ func stringContains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestTelemetrySync_StaleLockRecovery(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	spoolDir := filepath.Join(tempHome, ".local", "share", "powerword")
+	if err := os.MkdirAll(spoolDir, 0750); err != nil {
+		t.Fatalf("failed to create spool dir: %v", err)
+	}
+
+	spoolPath := filepath.Join(spoolDir, "telemetry_spool.jsonl")
+	lockPath := spoolPath + ".lock"
+
+	// Create a stale lock file with timestamp from 1 hour ago
+	staleTime := time.Now().Add(-1 * time.Hour).UnixNano()
+	content := fmt.Sprintf("%d,%d,stalenonce", os.Getpid(), staleTime)
+	if err := os.WriteFile(lockPath, []byte(content), 0600); err != nil {
+		t.Fatalf("failed to write stale lock file: %v", err)
+	}
+
+	// Verify that isLockStale returns true
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected isLockStale to return true for lock from 1 hour ago, got false")
+	}
+
+	// Verify that withFileLock automatically cleans up the stale lock and succeeds
+	actionCalled := false
+	err := withFileLock(spoolPath, 10*time.Second, func() error {
+		actionCalled = true
+		return nil
+	})
+
+	if err != nil {
+		t.Errorf("expected withFileLock to clean up stale lock and succeed, but got error: %v", err)
+	}
+	if !actionCalled {
+		t.Errorf("expected action to be called")
+	}
+
+	// Also verify that isLockStale returns false for non-existent file
+	if isLockStale(lockPath+"-nonexistent", 10*time.Second) {
+		t.Errorf("expected isLockStale to return false for non-existent file")
+	}
+
+	// Verify isLockStale returns false for fresh lock
+	freshContent := fmt.Sprintf("%d,%d,freshnonce", os.Getpid(), time.Now().UnixNano())
+	if err := os.WriteFile(lockPath, []byte(freshContent), 0600); err != nil {
+		t.Fatalf("failed to write fresh lock file: %v", err)
+	}
+	if isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected isLockStale to return false for fresh lock")
+	}
+
+	// Verify ModTime fallback for empty lock file
+	if err := os.WriteFile(lockPath, nil, 0600); err != nil {
+		t.Fatalf("failed to write empty lock file: %v", err)
+	}
+	oldTime := time.Now().Add(-1 * time.Hour)
+	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to change lock times: %v", err)
+	}
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected empty lock file to be stale based on ModTime fallback")
+	}
+
+	// Verify ModTime fallback for malformed lock content
+	if err := os.WriteFile(lockPath, []byte("malformed"), 0600); err != nil {
+		t.Fatalf("failed to write malformed lock file: %v", err)
+	}
+	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to change lock times: %v", err)
+	}
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected malformed lock file to be stale based on ModTime fallback")
+	}
+
+	// Verify ModTime fallback for invalid timestamp in lock file
+	if err := os.WriteFile(lockPath, []byte("pid,notAnInt,nonce"), 0600); err != nil {
+		t.Fatalf("failed to write invalid timestamp lock file: %v", err)
+	}
+	if err := os.Chtimes(lockPath, oldTime, oldTime); err != nil {
+		t.Fatalf("failed to change lock times: %v", err)
+	}
+	if !isLockStale(lockPath, 10*time.Second) {
+		t.Errorf("expected invalid timestamp lock file to be stale based on ModTime fallback")
+	}
+}
+
+func TestGenerateEventID_Fallback(t *testing.T) {
+	oldReader := randReader
+	// Mock randReader to return an error
+	randReader = io.LimitReader(bytes.NewBuffer(nil), 0)
+	defer func() {
+		randReader = oldReader
+	}()
+
+	id1 := generateEventID()
+	if !strings.HasPrefix(id1, "fallback-") {
+		t.Errorf("expected fallback ID starting with 'fallback-', got: %s", id1)
+	}
+
+	id2 := generateEventID()
+	if id1 == id2 {
+		t.Errorf("expected consecutive fallback IDs to be unique, but got duplicates: %s", id1)
+	}
 }

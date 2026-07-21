@@ -17,7 +17,9 @@ This task updates the `pw-mcp-imagegen` server to include a new capability field
 ### Capabilities Definition
 
 #### [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
+
 - Define a new `OutputType` type and constants:
+
   ```go
   type OutputType string
 
@@ -26,7 +28,9 @@ This task updates the `pw-mcp-imagegen` server to include a new capability field
       OutputTypeVideo OutputType = "video"
   )
   ```
+
 - Extend the `Capabilities` struct:
+
   ```go
   type Capabilities struct {
       Backend      string     `json:"backend"`
@@ -35,6 +39,7 @@ This task updates the `pw-mcp-imagegen` server to include a new capability field
       OutputType   OutputType `json:"output_type"`
   }
   ```
+
 - Update individual backend capabilities:
   - `OpenAIBackend.Capabilities()`: returns `OutputTypeImage`.
   - `GoogleBackend.Capabilities()`: returns `OutputTypeImage`.
@@ -44,9 +49,11 @@ This task updates the `pw-mcp-imagegen` server to include a new capability field
 ### Tests
 
 #### [MODIFY] [imagegen_test.go](file://../../internal/plugins/imagegen/imagegen_test.go)
+
 - Update capability assertions in `TestBackendCapabilities` and `TestGetCapabilities` to verify that `output_type` matches the expected value for each backend.
 
 #### [MODIFY] [main_integration_test.go](file://../../cmd/pw-mcp-imagegen/main_integration_test.go)
+
 - Assert that the JSON responses returned by the `imagegen_get_capabilities` tool over the MCP channel include the correct `"output_type"` field.
 
 ---
@@ -54,16 +61,21 @@ This task updates the `pw-mcp-imagegen` server to include a new capability field
 ## Verification Plan
 
 ### Automated Tests
+
 - Run unit and integration tests and verify statement coverage remains $\ge 91\%$:
+
   ```bash
   make check-coverage
   ```
+
 - Run the linter:
+
   ```bash
   make lint
   ```
 
 ### Manual Verification
+
 - Start the `pw-mcp-imagegen` server.
 - Invoke the `imagegen_get_capabilities` tool with `backend = "google-veo"` and verify the response JSON includes `"output_type": "video"`.
 - Invoke the tool with `backend = "imagen"` and verify the response JSON includes `"output_type": "image"`.

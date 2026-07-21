@@ -12,6 +12,7 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
 > [!IMPORTANT]
 > **Google API Credentials**:
 > Running this plugin requires Google API credentials. We will support two authentication methods:
+>
 > 1. **OAuth2 User Auth**: A local browser-based authentication flow on first run. It will prompt the user to authorize the app via an OAuth URL, and save the access/refresh token locally to `~/.config/powerword/gdoc_token.json`.
 > 2. **Service Account Key**: A path to a Google Cloud Service Account JSON key file specified in `powerword.toml`. The user must share target Google Docs folders with the service account email address.
 
@@ -22,6 +23,7 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
 ### Plugin Command
 
 #### [NEW] [main.go](../../cmd/pw-mcp-gdoc/main.go)
+
 - Entry point for the `pw-mcp-gdoc` binary.
 - Set up MCP Server session using `modelcontextprotocol/go-sdk`.
 - Register the following tools:
@@ -33,16 +35,20 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
 ### CLI Subcommand for Token Audits
 
 #### [NEW] [audit.go](../../cmd/powerword/audit.go)
+
 - Implements the `powerword audit` subcommand to audit token usage and financial cost from a telemetry JSON file.
 - Supports filtering by limit/budget, strict validation exit codes, and output formatting (text or markdown).
 
 #### [MODIFY] [main.go](../../cmd/powerword/main.go)
+
 - Registers the new `audit` subcommand under Cobra's root command.
 
 ### Configuration Layer
 
 #### [MODIFY] [powerword.example.toml](../../powerword.example.toml)
+
 - Document configuration settings for the new `gdoc` plugin:
+
   ```toml
   [plugins.gdoc]
   credentials_path = "~/.config/powerword/credentials.json"
@@ -56,10 +62,12 @@ Implement a native Go Model Context Protocol (MCP) server `pw-mcp-gdoc` in the P
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./cmd/pw-mcp-gdoc/...`
 - Mock Google Docs API requests using custom HTTP transport clients (`http.RoundTripper` mocks) to test the tool handler outputs without making network requests.
 
 ### Manual Verification
+
 - Compile the plugin: `go build -o bin/pw-mcp-gdoc ./cmd/pw-mcp-gdoc`.
 - Run `bin/pw-mcp-gdoc` directly in a terminal using JSON-RPC stdio requests.
 - Verify that `gdoc_create` creates a doc and returns a valid URL, and `gdoc_read` returns the document content.

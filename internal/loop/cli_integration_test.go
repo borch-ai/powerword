@@ -5,6 +5,7 @@ package loop_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -699,5 +701,106 @@ func TestCLI_SessionPauseAndReject(t *testing.T) {
 	}
 	if session.Messages[3].Content != "All done!" {
 		t.Errorf("expected final message to be 'All done!', got %s", session.Messages[3].Content)
+	}
+}
+
+func TestCLI_OfflineTelemetrySpoolAndSync(t *testing.T) {
+	tempHomeDir, err := os.MkdirTemp("", "pw-telemetry-integration-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempHomeDir)
+
+	// Mock LLM server
+	llmServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: "Hello from telemetry integration!",
+					},
+				},
+			},
+			Usage: openai.Usage{
+				PromptTokens:     5,
+				CompletionTokens: 5,
+				TotalTokens:      10,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer llmServer.Close()
+
+	// Use a deterministically unreachable URL with port 0 to prevent flaky port reuse
+	unreachableURL := "http://127.0.0.1:0"
+
+	// 1. Run with invalid LIGHTHOUSE_URL -> should spool event offline
+	cmd1 := exec.Command(binaryPath, "test offline telemetry", "--json", "--headless")
+	cmd1.Env = append(os.Environ(),
+		"HOME="+tempHomeDir,
+		"OPENAI_BASE_URL="+llmServer.URL,
+		"POWERWORD_OPENAI_API_KEY=dummy",
+		"POWERWORD_MODEL=gpt-4",
+		"LIGHTHOUSE_URL="+unreachableURL, // Unreachable Lighthouse url
+		"POWERWORD_TELEMETRY_TIMEOUT=2s",
+	)
+	cmd1.Stderr = os.Stderr
+	_, err = cmd1.Output()
+	if err != nil {
+		t.Fatalf("CLI command 1 failed: %v", err)
+	}
+
+	spoolPath := filepath.Join(tempHomeDir, ".local", "share", "powerword", "telemetry_spool.jsonl")
+	if _, err := os.Stat(spoolPath); err != nil {
+		t.Fatalf("expected spool file to be created at %s, got error: %v", spoolPath, err)
+	}
+
+	// 2. Start mock Lighthouse server to sync events
+	receivedChan := make(chan int, 1)
+	lhServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/telemetry/batch" {
+			var events []interface{}
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &events)
+			select {
+			case receivedChan <- len(events):
+			default:
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer lhServer.Close()
+
+	// Run with valid LIGHTHOUSE_URL -> should sync spooled events and delete spool
+	cmd2 := exec.Command(binaryPath, "test sync telemetry", "--json", "--headless")
+	cmd2.Env = append(os.Environ(),
+		"HOME="+tempHomeDir,
+		"OPENAI_BASE_URL="+llmServer.URL,
+		"POWERWORD_OPENAI_API_KEY=dummy",
+		"POWERWORD_MODEL=gpt-4",
+		"LIGHTHOUSE_URL="+lhServer.URL,   // Valid Lighthouse URL
+		"POWERWORD_TELEMETRY_TIMEOUT=2s", // Give enough time for background sync
+	)
+	cmd2.Stderr = os.Stderr
+	_, err = cmd2.Output()
+	if err != nil {
+		t.Fatalf("CLI command 2 failed: %v", err)
+	}
+
+	// Spool file should be gone (synced and deleted)
+	if _, err := os.Stat(spoolPath); !os.IsNotExist(err) {
+		t.Errorf("expected spool file at %s to be deleted after successful sync, but it still exists", spoolPath)
+	}
+
+	// Verify we received the batch
+	select {
+	case length := <-receivedChan:
+		if length != 1 {
+			t.Errorf("expected batch length to be 1, got %d", length)
+		}
+	case <-time.After(3 * time.Second):
+		t.Error("timeout waiting to receive batch telemetry on mock server")
 	}
 }

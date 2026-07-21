@@ -18,6 +18,7 @@ Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` t
 ### MCP Server Tool Definition
 
 #### [MODIFY] [main.go](file://../../cmd/pw-mcp-pdfcheck/main.go)
+
 - Add optional input parameters to `validate_pdf` schema:
   - `min_gutter_inches` (number, optional): Minimum binding gutter required on the inside margins.
   - `min_margin_inches` (number, optional): Minimum safe zone margin required from the outer trim lines.
@@ -25,6 +26,7 @@ Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` t
 ### Safe-Zone Auditing Logic
 
 #### [MODIFY] [validator.go](file://../../internal/plugins/pdfcheck/validator.go)
+
 - In `ValidatePDFInput` struct, add fields:
   - `MinGutterInches *float64`
   - `MinMarginInches *float64`
@@ -41,10 +43,12 @@ Implement dynamic gutter and page margin safe-zone checks in `pw-mcp-pdfcheck` t
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./internal/plugins/pdfcheck/...` and verify code coverage is $\ge 91\%$.
 - Test cases validating margins:
   - Page with text within safe boundary returns valid.
   - Page with text crossing the gutter margin boundary returns invalid with line content details.
 
 ### Manual Verification
+
 - Run `./bin/powerword` and call `validate_pdf` on a compiled PDF interior manuscript with safe-zone parameters enabled, verifying output verdict.

@@ -18,7 +18,9 @@ Implement `pw-mcp-epub`, a native Go MCP server that compiles parodic manuscript
 ### New Binary: `cmd/pw-mcp-epub/`
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-epub/main.go)
+
 Standard MCP server entry point registering the `compile_epub` tool:
+
 ```go
 func main() {
     srv := mcp.NewServer(&mcp.Implementation{
@@ -35,7 +37,9 @@ func main() {
 ### MCP Tools
 
 #### Tool: `compile_epub`
+
 **Input schema:**
+
 ```json
 {
     "manuscript_path": "string (path to manuscript Markdown/HTML source)",
@@ -49,6 +53,7 @@ func main() {
 ```
 
 **Implementation:**
+
 1. Read the manuscript source file and parse chapters/stanzas into separate XHTML content documents.
 2. Embed the images found in `images_dir` into the EPUB package and write appropriate XHTML image references.
 3. Dynamically generate the standard package metadata files:
@@ -62,11 +67,13 @@ func main() {
 ### EPUB Core Packages
 
 #### [NEW] [epub.go](file://../../internal/plugins/epub/epub.go)
+
 Go library implementing EPUB container packaging and file structure layouts.
 
 ### Tests
 
 #### [NEW] [epub_test.go](file://../../internal/plugins/epub/epub_test.go)
+
 - Unit tests verifying correct OPF manifest xml generation.
 - Tests validating that standard zip outputs conform to mimetype uncompressed first-entry restrictions.
 - 91%+ test coverage.
@@ -76,11 +83,13 @@ Go library implementing EPUB container packaging and file structure layouts.
 ## Verification Plan
 
 ### Automated Tests
+
 - Unit Tests: `go test -race ./cmd/pw-mcp-epub/... ./internal/plugins/epub/...`
 - Integration Tests: `go test -v -tags=integration ./cmd/pw-mcp-epub/...` (specifically `TestMCP_EpubPlugin_StdoutStdin` which compiles and runs the plugin binary via stdio transport)
 - Coverage Check: `make check-coverage` — ≥91% overall coverage (currently 91.1%)
 
 ### Manual Verification
+
 1. Build the binary: `make build`.
 2. Launch manually: `./bin/pw-mcp-epub` (listens on stdio).
 3. Validate output files with standard ZIP and XML inspect tools.

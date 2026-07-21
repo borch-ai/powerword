@@ -8,15 +8,18 @@ This task implements a native Go-based MCP server (`pw-mcp-seo`) that queries ma
 
 > [!NOTE]
 > This plugin queries public search suggestion endpoints and competitor metadata. It strictly adheres to rate limits, implements standard backoff and caching policies, and uses standard request headers to ensure polite and compliant access.
+>
 > - An isolated local cache is created under `~/.cache/powerword/seo-cache` (using safe SHA-256 keys) to store responses and respect rate throttling.
 > - Go 1.26.4 is utilized as the development environment.
 
 ## Proposed Changes
 
 ### SEO Plugin Component
+
 Created new directory `internal/plugins/seo/` containing the keyword search engines.
 
 #### [NEW] [seo.go](file://../../internal/plugins/seo/seo.go)
+
 - [x] Implement search endpoint query helpers.
 - [x] Implement HTML parsing logic for Amazon product pages.
 - [x] Expose the following MCP tools:
@@ -24,10 +27,13 @@ Created new directory `internal/plugins/seo/` containing the keyword search engi
   - `seo_generate_listing`: Generates title, subtitle, seven search keywords, and description copy optimized for Amazon index algorithms.
 
 #### [NEW] [seo_test.go](file://../../internal/plugins/seo/seo_test.go)
+
 - [x] Unit tests validating search suggestion parsers and mock scraper responses using standard mock round trippers and isolated test cache directories.
 
 ### CLI Manifest Integration
+
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [x] Register the SEO plugin configuration structure (cache TTL / rate limit) under the config key `[plugins.seo]`.
 
 ---
@@ -35,11 +41,13 @@ Created new directory `internal/plugins/seo/` containing the keyword search engi
 ## Verification Plan
 
 ### Automated Tests
+
 - [x] Run `go test ./internal/plugins/seo/...` to assert parser resilience on varying HTML inputs.
 - [x] Enforce the 91% unit test coverage requirement (total coverage achieved: **91.40%**).
 - [x] Verify code format via `make fmt` and linter checks with `make lint`.
 
 ### Manual Verification
+
 - [x] Build binary: `make build`.
 - [x] Register `[servers.seo]` in `powerword.toml` to connect CLI to the plugin.
 - [x] Run `powerword` agent loops requesting SEO listing generations and verify appropriate outputs.
