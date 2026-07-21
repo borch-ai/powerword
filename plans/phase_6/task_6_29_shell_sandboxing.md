@@ -25,6 +25,7 @@ Introduce containerized and profile-based host sandboxing to the native Go shell
 ### Plugins Component (`pw-mcp-shell`)
 
 #### [NEW] [sandbox.go](file://../../cmd/pw-mcp-shell/sandbox.go)
+
 * Define `SandboxProfile` holding restrictions:
   * `AllowNetwork bool`
   * `AllowedPaths []string`
@@ -36,6 +37,7 @@ Introduce containerized and profile-based host sandboxing to the native Go shell
 * Implement `containerProvider` wrapping execution inside a transient `docker run` command mount.
 
 #### [MODIFY] [main.go](file://../../cmd/pw-mcp-shell/main.go)
+
 * Modify the shell command execution tool to parse sandbox parameters and run the command via the active `SandboxProvider`.
 
 ---
@@ -43,10 +45,12 @@ Introduce containerized and profile-based host sandboxing to the native Go shell
 ## Verification Plan
 
 ### Automated Tests
+
 * Create unit tests in `cmd/pw-mcp-shell/sandbox_test.go`:
   * Verify that a command executing network calls (e.g. `curl`) is blocked when `AllowNetwork = false`.
   * Verify file writes outside allowed paths are rejected.
 
 ### Manual Verification
+
 1. Run `pw-mcp-shell` under a strict read-only profile.
 2. Execute a tool call to write to `/tmp/unsafe` and verify that the operation is blocked by the sandbox.

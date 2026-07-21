@@ -17,6 +17,7 @@ Extend the `pw-mcp-viral` toolset with a slideshow generator tool that compiles 
 ### MCP Server Tool Definition
 
 #### [MODIFY] [main.go](file://../../cmd/pw-mcp-viral/main.go)
+
 - Add `viral_stitch_slideshow` to the exposed tools in `setupServer`.
 - Define JSON input schema:
   - `slides`: Array of objects, each containing:
@@ -28,6 +29,7 @@ Extend the `pw-mcp-viral` toolset with a slideshow generator tool that compiles 
 ### Video Stitching Logic
 
 #### [MODIFY] [viral.go](file://../../internal/plugins/viral/viral.go)
+
 - Add method `StitchSlideshow(ctx context.Context, slides []Slide, backgroundAudioPath, outputName string) (string, error)` to `ViralService`.
 - For each slide:
   1. Render a temporary MP4 video segment from the static image looped over the audio track's duration:
@@ -45,8 +47,10 @@ Extend the `pw-mcp-viral` toolset with a slideshow generator tool that compiles 
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./internal/plugins/viral/...`
 - Test that the slideshow generation tool correctly parses inputs, handles errors, and executes the expected ffmpeg commands (using mock exec wrappers).
 
 ### Manual Verification
+
 - Execute `pw-mcp-viral` and call the `viral_stitch_slideshow` tool with a list of test images and audio clips. Verify that the output is a fully synchronized slideshow video with narration.

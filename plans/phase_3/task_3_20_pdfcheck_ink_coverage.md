@@ -18,11 +18,13 @@ Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to c
 ### MCP Server Tool Definition
 
 #### [MODIFY] [main.go](file://../../cmd/pw-mcp-pdfcheck/main.go)
+
 - Add optional input parameter `max_ink_coverage` (integer, optional, default: 240) to `validate_pdf` tool.
 
 ### Ink Coverage Analysis Logic
 
 #### [MODIFY] [validator.go](file://../../internal/plugins/pdfcheck/validator.go)
+
 - In `ValidatePDFInput` struct, add field `MaxInkCoverage *int` mapping to `max_ink_coverage`.
 - Implement function `checkInkDensity(ctx context.Context, pdfPath string, limit int, res *ValidatePDFResult)`:
   - Verify Ghostscript is present: `exec.LookPath("gs")`.
@@ -36,10 +38,12 @@ Implement Total Area Coverage (TAC) ink limit auditing in `pw-mcp-pdfcheck` to c
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./internal/plugins/pdfcheck/...` and verify code coverage is $\ge 91\%$.
 - Test cases validating ink limits:
   - Simulated high density values parse correctly and return errors.
   - Fallback logic checks when `gs` is missing.
 
 ### Manual Verification
+
 - Run `./bin/powerword` and execute `validate_pdf` with `max_ink_coverage = 240` on a PDF containing dark, saturated color images to verify detection.

@@ -14,16 +14,18 @@ Implement `pw-mcp-typst`, a native Go MCP server that invokes a local Typst bina
 
 > [!IMPORTANT]
 > **Typst must be installed on the host system.** Document the installation requirement: `brew install typst` on macOS, `apt install typst` on Linux. Provide a clear error if `typst` binary is not on PATH.
-
+>
 > [!NOTE]
 > **Typst vs LaTeX.** Typst is chosen over LaTeX because:
+>
 > - Compile time: Typst compiles a 32-page illustrated book in <2s; LaTeX takes 30–90s.
 > - Dependency footprint: Typst is a single binary; LaTeX requires a TexLive installation (~4GB).
 > - Error messages: Typst errors are human-readable; LaTeX errors are arcane.
 > - KDP spec compliance: Typst's paper size and margin controls are explicit and predictable.
-
+>
 > [!NOTE]
 > **KDP Interior Specs (Paperback, 8.5×8.5", as of 2026):**
+>
 > - Page size: 8.5×8.5 inches
 > - Inside margins: 0.375" (pages ≤ 150) or 0.5" (pages 151–300)
 > - Outside margins: 0.25" minimum
@@ -35,14 +37,17 @@ Implement `pw-mcp-typst`, a native Go MCP server that invokes a local Typst bina
 ### New Binary: `cmd/pw-mcp-typst/`
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-typst/main.go)
+
 Standard MCP server entry point registering two tools: `compile_interior` and `compile_cover`.
 
 ### MCP Tools
 
 #### Tool: `compile_interior`
+
 Compiles a multi-page illustrated book interior.
 
 **Input schema:**
+
 ```json
 {
     "manuscript_path": "string (path to .typ or .md source file)",
@@ -57,15 +62,18 @@ Compiles a multi-page illustrated book interior.
 ```
 
 **Implementation:**
+
 1. Generate a Typst template file (`.typ`) from the input parameters, embedding image paths from `images_dir`.
 2. Run `typst compile <template.typ> <output_path>` as a subprocess with `exec.CommandContext`.
 3. Validate the output PDF exists and is non-empty.
 4. Return `{"output_pdf": "<output_path>", "page_count": N}`.
 
 #### Tool: `compile_cover`
+
 Compiles a single-page book cover with spine.
 
 **Input schema:**
+
 ```json
 {
     "front_image_path": "string",
@@ -82,9 +90,11 @@ Compiles a single-page book cover with spine.
 ### Typst Template Generation
 
 #### [NEW] [template.go](file://../../internal/plugins/typst/template.go)
+
 Go `text/template` templates embedded via `go:embed` for both interior and cover layouts.
 
 #### [NEW] [compiler.go](file://../../internal/plugins/typst/compiler.go)
+
 ```go
 type Compiler struct {
     typstBin string
@@ -96,6 +106,7 @@ func (c *Compiler) Compile(ctx context.Context, templatePath, outputPath string)
 ### Tests
 
 #### [NEW] [typst_test.go](file://../../internal/plugins/typst/typst_test.go)
+
 - Template generation produces valid `.typ` syntax.
 - Compiler integration test (`//go:build integration`) requires real `typst` binary.
 - Unit tests mock subprocess execution.
@@ -106,12 +117,14 @@ func (c *Compiler) Compile(ctx context.Context, templatePath, outputPath string)
 ## Verification Plan
 
 ### Automated Tests
+
 - `go test ./internal/plugins/typst/...` (unit, subprocess mocked)
 - `go test ./cmd/pw-mcp-typst/...` (unit, subprocess mocked)
 - `RUN_INTEGRATION_TESTS=true go test ./internal/plugins/typst/...` (unit + integration tests, requires typst binary)
 - `RUN_INTEGRATION_TESTS=true go test ./cmd/pw-mcp-typst/...` (unit + MCP integration tests calling actual typst compiler)
 
 ### Manual Verification
+
 1. `./bin/pw-mcp-typst` — starts and awaits input.
 2. Send `compile_interior` tool call with a 32-page manuscript; verify output PDF.
 3. Open PDF in Preview; confirm margins, bleed marks, and image placement.

@@ -23,6 +23,7 @@ Written entirely in Go, Powerword prioritizes execution speed, straightforward s
 ## Bundled Plugins (Native Go MCP Servers)
 
 Powerword comes packaged with a suite of built-in, lightweight MCP servers compiled directly into the toolchain:
+
 - **System Tools (Core Utilities):**
   - `pw-mcp-fs` — Secure local filesystem read/write access.
   - `pw-mcp-git` — Repository introspection, branch management, and diffing.
@@ -43,6 +44,7 @@ Powerword comes packaged with a suite of built-in, lightweight MCP servers compi
 *(Note: Powerword is actively in development. See the Roadmap for current phase status).*
 
 ### Prerequisites
+
 - Go 1.26.4
 - Node.js (for testing standard MCP servers like `@modelcontextprotocol/server-everything`)
 

@@ -21,6 +21,7 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-youtube` to abstra
 ### Sibling: Powerword (`cmd/pw-mcp-youtube`)
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-youtube/main.go)
+
 * Initializes the MCP server using `github.com/modelcontextprotocol/go-sdk`.
 * OAuth2 Credentials & Secret Management:
   * Sourced via environment variables (e.g., `POWERWORD_YOUTUBE_CLIENT_ID`, `POWERWORD_YOUTUBE_CLIENT_SECRET`, `POWERWORD_YOUTUBE_REFRESH_TOKEN`) rather than interactive login prompts.
@@ -41,16 +42,22 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-youtube` to abstra
 ## Verification Plan
 
 ### Automated Tests
+
 * Create unit tests in `cmd/pw-mcp-youtube/main_test.go` asserting JSON schemas are valid and check parameters are parsed correctly from incoming MCP stdio tool calls.
 
 ### Manual Verification
+
 1. Build the binary locally:
+
    ```bash
    go build -o bin/pw-mcp-youtube cmd/pw-mcp-youtube/main.go
    ```
+
 2. Interact with the server via stdio:
+
    ```bash
    # Send a valid JSON-RPC tool call payload (assuming initialization handshake is completed or mocked in test/debug execution)
    echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"youtube_get_metrics","arguments":{"video_id":"123","metrics":["views"]}}}' | ./bin/pw-mcp-youtube
    ```
+
 3. Assert it returns a graceful error indicating missing OAuth credentials or correct API payloads.

@@ -11,7 +11,7 @@ Implement `pw-mcp-trends`, a native Go MCP server that provides market demand in
 
 > [!IMPORTANT]
 > **This task does NOT replace Kiln's Phase 2 implementation.** Kiln Phase 2 (Tasks 2.1–2.5) implements the adapters directly as library code for speed-to-value. This plugin is the Phase 6 target that Kiln will eventually migrate to, making the intelligence layer reusable by any tool in the ecosystem (including Lamplighter and future agents). Build this after Kiln Phase 2 is working and validated.
-
+>
 > [!NOTE]
 > **Defines the `TrendSource` interface.** The plugin must be designed so additional backends (Reddit Trends API, TikTok For Business API) can be added without changing the MCP tool interface. Backends implement a Go interface; the MCP server calls them via a router.
 
@@ -20,7 +20,9 @@ Implement `pw-mcp-trends`, a native Go MCP server that provides market demand in
 ### New Binary: `cmd/pw-mcp-trends/`
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-trends/main.go)
+
 Standard MCP server entry point:
+
 ```go
 func main() {
     srv := mcp.NewServer(&mcp.Implementation{
@@ -38,7 +40,9 @@ func main() {
 ### MCP Tools
 
 #### Tool: `score_niche`
+
 **Input schema:**
+
 ```json
 {
     "keyword": "string",
@@ -46,27 +50,33 @@ func main() {
     "sources": ["amazon", "serp"]
 }
 ```
+
 **Output:** Array of `ScoredCandidate` objects with `keyword`, `anxiety_score`, `trend_score`, `completions`.
 
 #### Tool: `get_trend_velocity`
+
 **Input schema:**
+
 ```json
 {
     "keyword": "string",
     "period": "string (default: '3-m')"
 }
 ```
+
 **Output:** `{ "trend_score": 0.87, "direction": "rising" }`
 
 ### `TrendSource` Interface
 
 #### [NEW] [source.go](file://../../internal/plugins/trends/source.go)
+
 ```go
 type TrendSource interface {
     Score(ctx context.Context, keyword string, limit int) ([]Candidate, error)
     Name() string
 }
 ```
+
 Implementations: `AmazonAutocomplete`, `SerpAPITrends`.
 
 Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
@@ -74,6 +84,7 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 ### Tests
 
 #### [NEW] [source_test.go](file://../../internal/plugins/trends/source_test.go)
+
 - Mock HTTP servers for Amazon and SerpAPI.
 - MCP tool handler tests with mock sources.
 - 91%+ coverage.
@@ -83,10 +94,12 @@ Mirror and then supersede the equivalent code in `kiln/internal/scout/`.
 ## Verification Plan
 
 ### Automated Tests
+
 - `go test -race ./cmd/pw-mcp-trends/... ./internal/plugins/trends/...`
 - `make check-coverage` — ≥91%
 
 ### Manual Verification
+
 1. `./bin/pw-mcp-trends` — starts and waits for MCP input on stdin.
 2. Send a `score_niche` tool call via MCP JSON; verify response contains ranked candidates.
 3. Test against Kiln: configure `powerword.mcp_trends_bin` in `.kiln.toml` and migrate Kiln scout to use the MCP tool.

@@ -17,6 +17,7 @@ Implement an interactive security barrier in the CLI core routing loop. Intercep
 ### Interceptors & Terminal Guards
 
 #### [NEW] [guard.go](file://../../internal/loop/guard.go)
+
 - Defines security profiles:
   - `ReadOnly` (allow reads, block modifications/scripts).
   - `Interactive` (default; prompt for modifying actions).
@@ -26,6 +27,7 @@ Implement an interactive security barrier in the CLI core routing loop. Intercep
   - Renders styled interactive terminal prompts (using color prompts and raw stdin reads).
 
 #### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
+
 - Intercepts tool execution requests within the reasoning loop.
 - Calls `guard.Authorize(...)`. If declined, returns a permission error message back to the LLM (so the LLM can try an alternative approach).
 
@@ -34,10 +36,12 @@ Implement an interactive security barrier in the CLI core routing loop. Intercep
 ## Verification Plan
 
 ### Automated Tests
+
 - Test permission interceptor in mock non-interactive terminal configurations to verify executions fail-closed securely.
 - Mock consent inputs (pressing `y` vs `n` in stdin reader) and check corresponding routing returns.
 
 ### Manual Verification
+
 - **Interactive Mode (Mutating Action):** Ask the model: `"Write 'hello world' to the file ./temp.txt"`. Verify that the CLI intercepts the FS plugin `write_file` call and prompts in the terminal: `[?] Allow tool filesystem_write_file? (y/N)`. Declining should write a standard error response to the model, allowing it to realize it couldn't write the file.
 - **Interactive Mode (Read-Only Action):** Ask the model to `"List the files in the current directory"`. Verify that the tool executes immediately without prompting the user.
 - **Bypass Mode:** Run the CLI with the `--accept-all` flag and ask it to `"Create a file named temp2.txt"`. Verify that the file is created automatically without any interactive prompt appearing.

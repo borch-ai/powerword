@@ -14,9 +14,11 @@ This task implements a dry-run policy for modifying commands inside database, cl
 ### Operations Plugins
 
 #### [NEW] [k8s.go](file://../../internal/plugins/k8s/k8s.go)
+
 - [ ] If dry-run mode is enabled, intercept cluster-modifying calls and mock the response metadata.
 
 #### [NEW] [db.go](file://../../internal/plugins/db/db.go)
+
 - [ ] Parse query syntax to block statements containing updates, deletions, or schema alterations if dry-run mode is toggled on.
 
 ---
@@ -24,7 +26,9 @@ This task implements a dry-run policy for modifying commands inside database, cl
 ## Verification Plan
 
 ### Automated Tests
+
 - [ ] Run `go test ./internal/plugins/...` checks on dry-run SQL parses.
 
 ### Manual Verification
+
 - [ ] Enable dry-run mode in database inspector config and run a query targeting modifications, verifying it gets mocked safely.

@@ -17,6 +17,7 @@ Implement cover wrap geometry checking and back cover barcode detection in `pw-m
 ### MCP Server Tool Definition
 
 #### [MODIFY] [main.go](file://../../cmd/pw-mcp-pdfcheck/main.go)
+
 - Register tool `validate_cover_pdf` with input schema:
   - `pdf_path` (string, required)
   - `expected_width_inches` (number, required): Trim width of a single page (e.g. 6.0).
@@ -28,6 +29,7 @@ Implement cover wrap geometry checking and back cover barcode detection in `pw-m
 ### Cover Auditing Logic
 
 #### [MODIFY] [validator.go](file://../../internal/plugins/pdfcheck/validator.go)
+
 - Implement `ValidateCoverPDF(ctx context.Context, input ValidateCoverInput) (*ValidatePDFResult, error)`:
   - Calculate spine width: `spine = page_count * thickness_per_page`.
   - Calculate total expected cover width: `total_width = expected_width_inches * 2 + spine + bleed_inches * 2`.
@@ -41,10 +43,12 @@ Implement cover wrap geometry checking and back cover barcode detection in `pw-m
 ## Verification Plan
 
 ### Automated Tests
+
 - Run `go test -v ./internal/plugins/pdfcheck/...` and verify code coverage is $\ge 91\%$.
 - Test cases validating covers:
   - Valid cover geometries for a 200-page white paper book.
   - Geometry mismatch warnings when spine thickness or margins are incorrect.
 
 ### Manual Verification
+
 - Compile a cover PDF using Typst for a 150-page manuscript, run `validate_cover_pdf`, and verify dimensions match calculations.

@@ -16,7 +16,7 @@ permissions:
 jobs:
   analyze-go:
     name: Analyze (Go)
-    uses: borch-ai/.github/.github/workflows/codeql.yml@main
+    uses: borch-ai/.github/.github/workflows/codeql.yml@v0.2.2
     with:
       language: go
       build-mode: manual
@@ -25,7 +25,7 @@ jobs:
 
   analyze-python:
     name: Analyze (Python)
-    uses: borch-ai/.github/.github/workflows/codeql.yml@main
+    uses: borch-ai/.github/.github/workflows/codeql.yml@v0.2.2
     with:
       language: python
       build-mode: none

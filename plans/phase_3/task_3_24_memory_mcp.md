@@ -25,18 +25,25 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-memory` exposing s
 ### Sibling: Powerword (`pkg/llm`)
 
 #### [MODIFY] [client.go](file://../../pkg/llm/client.go)
-* Add `Embed(ctx context.Context, texts []string) ([][]float32, error)` to `LLMClient` interface.
-#### [MODIFY] [gemini.go](file://../../pkg/llm/gemini.go)
-* Implement `Embed` using `text-embedding-004`.
-#### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
-* Implement `Embed` using `text-embedding-3-small`.
-#### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
-* Implement `Embed` (returns error as Anthropic does not support generic embeddings here).
 
+* Add `Embed(ctx context.Context, texts []string) ([][]float32, error)` to `LLMClient` interface.
+
+#### [MODIFY] [gemini.go](file://../../pkg/llm/gemini.go)
+
+* Implement `Embed` using `text-embedding-004`.
+
+#### [MODIFY] [openai.go](file://../../pkg/llm/openai.go)
+
+* Implement `Embed` using `text-embedding-3-small`.
+
+#### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
+
+* Implement `Embed` (returns error as Anthropic does not support generic embeddings here).
 
 ### Sibling: Powerword (`cmd/pw-mcp-memory`)
 
 #### [NEW] [main.go](file://../../cmd/pw-mcp-memory/main.go)
+
 * Initializes the MCP server using the Go SDK.
 * Implements tools:
   * `memory_add`:
@@ -47,22 +54,26 @@ Build a native Go Model Context Protocol (MCP) server `pw-mcp-memory` exposing s
     * Implementation: Generates embedding for query, computes cosine similarity against all stored vector embeddings, and returns the top matches sorted by similarity score.
 
 #### [NEW] [main_integration_test.go](file://../../cmd/pw-mcp-memory/main_integration_test.go)
-* Runs an integration test using the MCP StdioTransport to ensure tools are properly exposed.
 
+* Runs an integration test using the MCP StdioTransport to ensure tools are properly exposed.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
+
 * Create unit tests in `cmd/pw-mcp-memory/main_test.go`:
   * Mock the LLM embedding provider client.
   * Verify that `memory_add` writes records to local storage.
   * Verify that `memory_search` computes correct cosine similarity scores and returns sorted results.
 
 ### Manual Verification
+
 1. Build the binary:
+
    ```bash
    go build -o bin/pw-mcp-memory cmd/pw-mcp-memory/main.go
    ```
+
 2. Test calling `memory_add` with text and query it via `memory_search` to verify top matches are returned.

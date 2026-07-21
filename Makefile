@@ -38,7 +38,7 @@ DB_PLUGIN=pw-mcp-db
 
 # Version parameter (can be overridden via: make build VERSION=v1.2.3)
 VERSION?=dev
-LDFLAGS=-ldflags "-X github.com/borch-ai/powerword/internal/config.Version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=$(VERSION)"
 
 all: markdown-lint lint vuln check-coverage build
 
