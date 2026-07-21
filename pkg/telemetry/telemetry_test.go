@@ -67,7 +67,7 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 		t.Errorf("Expected cost 0 for empty tracker, got %f", cost)
 	}
 
-	// Exact match
+	// Exact match with CachedTokens == InputTokens
 	tracker.RecordUsage("test-model", TokenUsage{
 		InputTokens:  1_000_000,
 		OutputTokens: 1_000_000,
@@ -76,6 +76,20 @@ func TestUsageTracker_EstimatedCost(t *testing.T) {
 	// Expected cost: 0.0 + 2.0 + 0.5 = 2.5
 	if cost := tracker.EstimatedCost(pricing); !almostEqual(cost, 2.5) {
 		t.Errorf("Expected cost 2.5, got %f", cost)
+	}
+
+	// Case where CachedTokens > InputTokens (triggers billedInput = 0 branch)
+	{
+		clampedTracker := NewUsageTracker()
+		clampedTracker.RecordUsage("test-model", TokenUsage{
+			InputTokens:  1_000_000,
+			OutputTokens: 1_000_000,
+			CachedTokens: 2_000_000,
+		})
+		// Expected cost: 0.0 (clamped to 0) + 2.0 (output) + 1.0 (cached) = 3.0
+		if cost := clampedTracker.EstimatedCost(pricing); !almostEqual(cost, 3.0) {
+			t.Errorf("Expected cost 3.0 for CachedTokens > InputTokens, got %f", cost)
+		}
 	}
 
 	// Prefix match

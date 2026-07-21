@@ -3,7 +3,7 @@
 When reviewing pull requests in this repository, please enforce the following architectural principles, error handling patterns, and testing standards:
 
 ## 1. Strict Decoupling via Interfaces
-* LLM provider implementations (Gemini, Claude, OpenAI) must implement the common provider interfaces. 
+* LLM provider implementations (Gemini, Claude, OpenAI) must implement the common provider interfaces.
 * Never couple the core execution or reasoning loop to specific provider SDK client types.
 
 ## 2. Error Handling & Resilience

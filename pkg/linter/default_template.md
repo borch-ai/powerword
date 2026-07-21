@@ -15,7 +15,7 @@ Document anything that requires user review or feedback, for example, breaking c
 
 > [!IMPORTANT]
 > Important context that impacts architectural decisions.
-
+>
 > [!WARNING]
 > Warn the user about breaking changes or process shifts.
 
@@ -28,9 +28,11 @@ Detail the changes grouped by package, module, or component layer. List modified
 Detailed summary of changes. For specific files, use formatting:
 
 #### [MODIFY] [file_basename](file://../relative/path/to/modifiedfile)
+
 - [ ] Describe the exact changes to be made.
 
 #### [NEW] [file_basename](file://../relative/path/to/newfile)
+
 - [ ] Describe the structure and functionality of the new file.
 
 ---
@@ -40,8 +42,10 @@ Detailed summary of changes. For specific files, use formatting:
 Outline the verification strategy to ensure correct behavior and avoid regressions.
 
 ### Automated Tests
+
 - [ ] Run command: `go test ./...`
 - [ ] Details of unit, mock, and package tests added or executed.
 
 ### Manual Verification
+
 - [ ] Steps to execute, commands to run, and expected outcomes to check.

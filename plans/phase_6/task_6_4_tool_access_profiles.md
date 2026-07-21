@@ -14,9 +14,11 @@ This task implements fine-grained security profiles to control tool execution sc
 ### Security Controls
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [ ] Add config structure for tool execution profiles, allowing configuration of path whitelist patterns.
 
 #### [MODIFY] [guard.go](file://../../internal/loop/guard.go)
+
 - [ ] Implement path resolution and security matching functions to validate directory boundaries.
 - [ ] Implement shell command token validators to match whitelist regexes.
 
@@ -25,7 +27,9 @@ This task implements fine-grained security profiles to control tool execution sc
 ## Verification Plan
 
 ### Automated Tests
+
 - [ ] Run `go test ./internal/loop/...` checking directory escape blockages and disallowed command blocks.
 
 ### Manual Verification
+
 - [ ] Configure `powerword.toml` to restrict edits to a specific folder. Ask the agent to edit a file outside that folder, verifying it gets blocked.

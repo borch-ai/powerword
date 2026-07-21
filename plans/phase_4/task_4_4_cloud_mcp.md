@@ -16,7 +16,9 @@ This task implements a lightweight native Go-based MCP server (`pw-mcp-cloud`) t
 ### Configuration & Manifest Integration
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 - [x] Add the `CloudConfig` schema mapping to `config.Config`:
+
   ```go
   type CloudConfig struct {
       Provider        string `mapstructure:"provider"`         // "gcs", "s3", or "noop"/"mock"
@@ -25,14 +27,17 @@ This task implements a lightweight native Go-based MCP server (`pw-mcp-cloud`) t
       Region          string `mapstructure:"region"`           // AWS Region (e.g. us-east-1)
   }
   ```
-- [x] Add `Cloud CloudConfig `mapstructure:"cloud"`` field to `PluginsConfig` struct.
+
+- [x] Add `` Cloud CloudConfig `mapstructure:"cloud"` `` field to `PluginsConfig` struct.
 - [x] Set sensible defaults in `LoadConfig` for `plugins.cloud.provider` ("noop").
 - [x] Register the `pw-mcp-cloud` server within the native plugin registry under the config key `[plugins.cloud]`.
 
 ### Cloud Plugin Component
+
 Create a new directory `internal/plugins/cloud/` to contain the cloud orchestrator clients.
 
 #### [NEW] [cloud.go](file://../../internal/plugins/cloud/cloud.go)
+
 - [x] Initialize AWS/GCP clients using standard SDK credential configuration or paths defined in `CloudConfig`.
 - [x] Expose the following MCP tools:
   - `cloud_list_instances`: Retrieves the state of VM instances (EC2/GCE) filtered by tags or status.
@@ -40,6 +45,7 @@ Create a new directory `internal/plugins/cloud/` to contain the cloud orchestrat
   - `cloud_check_bucket`: Verifies bucket configuration and checks basic object metadata.
 
 #### [NEW] [cloud_test.go](file://../../internal/plugins/cloud/cloud_test.go)
+
 - [x] Mock AWS/GCP service client interfaces to verify parameter routing and metadata serialization without live cloud calls.
 
 ---
@@ -47,10 +53,12 @@ Create a new directory `internal/plugins/cloud/` to contain the cloud orchestrat
 ## Verification Plan
 
 ### Automated Tests
+
 - [x] Run unit tests (`go test ./internal/plugins/cloud/...`) to assert mock client outputs and config bindings.
 - [x] Run stdio-based integration tests (`make test-integration`) to assert process launching and tool call responses.
 - [x] Enforce the 91% unit test coverage requirement (currently at 91.0%).
 - [x] Ensure Go version `1.26.4` is utilized.
 
 ### Manual Verification
+
 - [x] Setup and check schema response manually: `./bin/pw-mcp-cloud`

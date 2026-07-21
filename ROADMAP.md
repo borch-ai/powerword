@@ -192,7 +192,7 @@ Focus: Enhancing coordinator routing, telemetry, cloud integration, and non-inte
 *   [x] **Task 4.16: Lighthouse Telemetry HTTP Adapter (`pkg/telemetry`)**
     *   Extend `pkg/telemetry` with an optional HTTP adapter that submits session metrics (project, command, stage, duration\_ms, cost\_usd, tokens\_in, tokens\_out, tokens\_cached) to a Lighthouse `POST /api/telemetry` endpoint on command exit. Enabled via `LIGHTHOUSE_URL` environment variable — no-ops silently if unset so no existing callers break. The adapter runs in a goroutine with a short deadline to avoid blocking the CLI exit. All sibling tools (Pithos, Aeolian, Kiln) that import `pkg/telemetry` get this capability for free once the adapter is merged. Blocked on Lighthouse Task 1.4.
     *   [Implementation Plan](plans/phase_4/task_4_16_lighthouse_telemetry_adapter.md)
-*   [ ] **Task 4.17: Client-Side Offline Telemetry Cache (`pkg/telemetry`)**
+*   [x] **Task 4.17: Client-Side Offline Telemetry Cache (`pkg/telemetry`)**
     *   Extend `pkg/telemetry` to locally spool telemetry events when the Lighthouse server is unreachable, and synchronize them as a batch on the next successful run.
     *   [Implementation Plan](plans/phase_4/task_4_17_telemetry_cache.md)
 

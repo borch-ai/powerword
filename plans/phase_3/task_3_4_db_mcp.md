@@ -12,6 +12,7 @@ Postgres, MySQL, SQLite, DuckDB (deliberate CGO exception), and BigQuery.
 
 > [!WARNING]
 > Database operations pose security risks. The implementation enforces read-only safety via:
+>
 > 1. Session-level driver settings (`_query_only` for SQLite, `SET default_transaction_read_only` for Postgres, `SET SESSION TRANSACTION READ ONLY` for MySQL).
 > 2. `validateReadOnly()` keyword allowlist that also deep-scans `WITH`/`EXPLAIN` for downstream DML.
 > 3. `validateIdentifier()` that restricts table names to `[a-zA-Z0-9_.]` before PRAGMA interpolation.
@@ -28,6 +29,7 @@ Added `DBConfig` struct with `Backend`, `DSN`, `MaxRows` (default 200), and `Que
 ### Core Plugin (`internal/plugins/db/`) [NEW]
 
 #### [NEW] [db.go](../../internal/plugins/db/db.go)
+
 - `Backend` interface: `ListTables`, `DescribeTable`, `QueryRead`, `ShowLocks`
 - `DBService` orchestrates calls; enforces row limits and query timeouts
 - `validateReadOnly()` — keyword allowlist + secondary DML scan for `WITH`/`EXPLAIN`
@@ -36,16 +38,19 @@ Added `DBConfig` struct with `Backend`, `DSN`, `MaxRows` (default 200), and `Que
 - `NewDBService()` — bounded 30s init context for `PingContext`/`applyReadOnlySession`
 
 #### [NEW] [sql_backend.go](../../internal/plugins/db/sql_backend.go)
+
 - `sqlBackend` wraps `database/sql` for Postgres, MySQL, SQLite, DuckDB
 - `resolveDriver()` maps dialect → driver + session-level read-only DSN modifications
 - `applyReadOnlySession()` sets dialect-specific read-only pragmas/modes on connection open
 - DuckDB is the deliberate CGO exception; CGO_ENABLED=1 and `cgo && integration` build constraints are always required for this package
 
 #### [NEW] [bigquery_backend.go](../../internal/plugins/db/bigquery_backend.go)
+
 - `bigQueryBackend` wraps BQ client behind interfaces for full testability
 - `realBQRowIterator` adapter exposes schema from BQ's concrete `RowIterator`
 
 #### [NEW] [db_test.go](../../internal/plugins/db/db_test.go)
+
 - Mock backend unit tests; `validateReadOnly` table-driven tests (allowed + rejected)
 - `TestValidateReadOnly_WithDML_Rejected` — 7 cases for WITH/EXPLAIN + DML bypass
 - `TestValidateIdentifier` — safe and unsafe table name cases
@@ -54,11 +59,13 @@ Added `DBConfig` struct with `Backend`, `DSN`, `MaxRows` (default 200), and `Que
 ---
 
 ### MCP Server (`cmd/pw-mcp-db/main.go`) [NEW]
+
 Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_locks` MCP tools.
 
 ---
 
 ### Build (`Makefile`) [MODIFIED]
+
 - `test` target: unmodified fast unit test cycle; CGO is enabled by default so the race detector works, but the CGO-dependent `db` package is gated by `cgo && integration` build constraints to avoid compiler toolchain requirements during normal test runs.
 - `build` target: compiles `pw-mcp-db` plugin under CGO and using the `integration` tag when requested.
 
@@ -67,6 +74,7 @@ Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_l
 ## Verification Plan
 
 ### Automated Tests
+
 - `make test` — standard unit tests run cleanly without compiling `internal/plugins/db/...` or requiring CGO toolchains.
 - `make check-coverage` — 91.2% ✅ (threshold maintained above 91.0% after gating the db package).
 - `make test-db` — explicitly runs the CGO-dependent `db` plugin tests using CGO_ENABLED=1 and the `integration` tag.
@@ -74,10 +82,12 @@ Registers `db_list_tables`, `db_describe_table`, `db_query_read`, and `db_show_l
 - Pre-push hook (`make all`) passes cleanly.
 
 ### Manual Verification
+
 - Smoke test with `sqlite://file::memory:?cache=shared` — `db_list_tables`, `db_describe_table`, `db_query_read`, `db_show_locks` all succeed
 - Write queries (`INSERT`, `WITH ... DELETE`) rejected with clear error message
 
 ### PR Review
+
 - PR [#127](https://github.com/borch-ai/powerword/pull/127) opened on `feat/task-3.4-db-inspector-plugin`
 - All Copilot findings addressed across iterative review rounds:
   - PRAGMA injection, `WITH`/`EXPLAIN` DML bypass, comments, and bounded init context handled.

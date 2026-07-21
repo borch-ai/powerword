@@ -3,6 +3,7 @@
 Integrate the Model Context Protocol (MCP) Go SDK (`github.com/modelcontextprotocol/go-sdk`) into the Powerword binary. Establish client abstractions to initialize sessions, query capabilities, and translate schemas between LLM tools and MCP definitions.
 
 ## Status: Completed (Library Only - Not yet wired to CLI) (Issue #44)
+
 **Go Version:** 1.26
 **Date Completed:** 2026-06-11
 **Unit Test Coverage:** 91%
@@ -12,6 +13,7 @@ Integrate the Model Context Protocol (MCP) Go SDK (`github.com/modelcontextproto
 > We are using `github.com/modelcontextprotocol/go-sdk` version `v1.6.1` with `go 1.26.4`.
 
 ## User Review Required
+
 None.
 
 ## Proposed Changes
@@ -19,6 +21,7 @@ None.
 ### MCP Client Core Integration
 
 #### [NEW] [client.go](file://../../pkg/llm/client.go)
+
 - Defines a wrapper struct `MCPClient` representing an active session with an MCP server.
 - Integrates the SDK's initialization protocol (version handshake, declaration of client capabilities, and server initialization sequence).
 - Implements capability fetching:
@@ -26,6 +29,7 @@ None.
   - `CallTool(ctx context.Context, name string, arguments map[string]interface{}) (*mcpsdk.CallToolResult, error)`
 
 #### [NEW] [registry.go](file://../../internal/mcp/registry.go)
+
 - Orchestrates multiple `MCPClient` connections.
 - Serves as the single repository of active plugins, providing tools aggregated across all spawned MCP servers to the core execution loop.
 - Aggregated tool names use the format `<client>__<tool>` to gracefully handle name collisions.
@@ -33,6 +37,7 @@ None.
 ## Verification Plan
 
 ### Automated Tests
+
 - Implemented `client_test.go` and `registry_test.go` utilizing `mcp.NewInMemoryTransports()`.
 - Test coverage for `internal/mcp` is **92.1%**, exceeding the 91% requirement.
 - Mock MCP server handshakes verified standard version negotiation.

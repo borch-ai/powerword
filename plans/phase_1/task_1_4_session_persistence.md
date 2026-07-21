@@ -16,6 +16,7 @@ Implement local session management and persistence schemas to store chat transcr
 ### Local Storage & Context Serializers
 
 #### [NEW] [session.go](file://../../internal/loop/session.go)
+
 - Defines structures:
   - `Session` mapping session ID, timestamp, model config, and history.
   - `HistoryStore` managing session lookup, save, and listing.
@@ -25,6 +26,7 @@ Implement local session management and persistence schemas to store chat transcr
   - `ListSessions() ([]Session, error)`
 
 #### [MODIFY] [root.go](file://../../pkg/config/root.go)
+
 - Adds CLI flags:
   - `--session <id>` (creates or resumes a conversation with the specified ID).
   - `--list-sessions` (lists recent conversations, dates, and token sizing).
@@ -34,10 +36,12 @@ Implement local session management and persistence schemas to store chat transcr
 ## Verification Plan
 
 ### Automated Tests
+
 - Test serialization and deserialization of message chains (including tool calls and results) to ensure JSON streams preserve structures.
 - Verify listing empty directory states handles directories gracefully.
 
 ### Manual Verification
+
 - Execute a prompt: `$ powerword --session="test-convo" "Hi, remember the code word 'xyz'"`
 - Run follow-up prompt: `$ powerword --session="test-convo" "What was the code word?"`
 - Confirm model successfully retrieves context.
@@ -45,7 +49,8 @@ Implement local session management and persistence schemas to store chat transcr
 ---
 
 ## Final Implementation Details
-- **Final Configurations:** 
+
+- **Final Configurations:**
   - Sessions are saved as JSON files in `~/.local/share/powerword/sessions/<id>.json`.
   - Added CLI flags `--session <id>` (to resume or create a named session) and `--list-sessions` (to view all sessions).
   - If `--session` is omitted, the session is ephemeral and not persisted to disk.

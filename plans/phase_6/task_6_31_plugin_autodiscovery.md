@@ -25,6 +25,7 @@ Introduce dynamic plugin auto-discovery and config hot-reloading. Powerword will
 ### Configuration Component (`pkg/config`)
 
 #### [MODIFY] [config.go](file://../../pkg/config/config.go)
+
 * Implement `WatchConfig(ctx context.Context, onChange func(*Config))` using Viper's config watcher, executing the callback in a safe goroutine.
 * Add auto-discovery scan helper:
   * Scans directory `~/.config/powerword/plugins.d/` for `.json` / `.toml` plugin definitions.
@@ -33,6 +34,7 @@ Introduce dynamic plugin auto-discovery and config hot-reloading. Powerword will
 ### Process Lifecycle Component (`internal/mcp`)
 
 #### [MODIFY] [process.go](file://../../internal/mcp/process.go)
+
 * Implement `ProcessManager.Reload(name string, srvCfg ServerConfig)`:
   * Gracefully shuts down the existing server connection.
   * Spawns the new process configuration.
@@ -43,10 +45,12 @@ Introduce dynamic plugin auto-discovery and config hot-reloading. Powerword will
 ## Verification Plan
 
 ### Automated Tests
+
 * Create unit tests in `pkg/config/config_test.go` and `internal/mcp/process_test.go`:
   * Mock file modifications and verify that configuration reload callbacks are executed.
   * Verify `Reload` terminates existing subprocesses and successfully restarts target processes with new configurations.
 
 ### Manual Verification
+
 1. Create a dummy plugin config file in `~/.config/powerword/plugins.d/`.
 2. Start Powerword, update `powerword.toml` in another terminal, and observe hot-reload log messages confirming process re-creation.
