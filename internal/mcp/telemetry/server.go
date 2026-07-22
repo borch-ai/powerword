@@ -166,7 +166,9 @@ func handleGetModelPricing(defaultPricing map[string]telemetry.ModelPricing) fun
 			Model string `json:"model,omitempty"`
 		}
 		if len(req.Params.Arguments) > 0 {
-			_ = json.Unmarshal(req.Params.Arguments, &args)
+			if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+				return nil, err
+			}
 		}
 
 		if args.Model != "" {

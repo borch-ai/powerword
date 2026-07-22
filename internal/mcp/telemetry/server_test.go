@@ -372,4 +372,13 @@ func TestTelemetryServer_ErrorsAndEdgeCases(t *testing.T) {
 	if !almostEqual(calculated.EstimatedCost, expected) {
 		t.Errorf("Expected cost %f, got %f", expected, calculated.EstimatedCost)
 	}
+
+	// 3. Invalid Arguments for get_model_pricing (should fail)
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "get_model_pricing",
+		Arguments: map[string]interface{}{"model": 123}, // invalid model type (expects string)
+	})
+	if err == nil {
+		t.Errorf("Expected error for invalid get_model_pricing arguments, got nil")
+	}
 }

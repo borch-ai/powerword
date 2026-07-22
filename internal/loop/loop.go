@@ -285,7 +285,7 @@ func handleSessionSaveAndOutput(ctx context.Context, cfg *config.Config, registr
 }
 
 func printMetricsSummary(ctx context.Context, cfg *config.Config, registry *mcp.Registry, tracker *telemetry.UsageTracker) {
-	_, _, _, cost, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, cfg.MaxTokens)
+	_, _, _, cost, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
 	if registry == nil || !registry.HasClient("telemetry") {
 		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg.Pricing))
 		return
@@ -644,7 +644,7 @@ func (e *BudgetExceededError) Error() string {
 // checkBudget checks if the accumulated usage has exceeded any configured budgets.
 func checkBudget(ctx context.Context, cfg *config.Config, registry *mcp.Registry, tracker *telemetry.UsageTracker) error {
 	if cfg.MaxCost > 0 {
-		_, _, _, currentCost, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, cfg.MaxTokens)
+		_, _, _, currentCost, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
 		if currentCost >= cfg.MaxCost {
 			return &BudgetExceededError{
 				Reason: fmt.Sprintf("estimated cost $%.5f exceeded maximum budget of $%.5f", currentCost, cfg.MaxCost),
