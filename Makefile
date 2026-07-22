@@ -33,6 +33,7 @@ PITHOS_PLUGIN=pw-mcp-pithos
 MEMORY_PLUGIN=pw-mcp-memory
 GDOC_PLUGIN=pw-mcp-gdoc
 AMAZON_PLUGIN=pw-mcp-amazon
+TELEMETRY_PLUGIN=pw-mcp-telemetry
 # pw-mcp-db requires CGO_ENABLED=1 (DuckDB driver) — deliberate exception; all other plugins use CGO_ENABLED=0.
 DB_PLUGIN=pw-mcp-db
 
@@ -66,6 +67,7 @@ build:
 	@if [ -d cmd/$(MEMORY_PLUGIN) ]; then $(GOBUILD) -o bin/$(MEMORY_PLUGIN) ./cmd/$(MEMORY_PLUGIN); fi
 	@if [ -d cmd/$(GDOC_PLUGIN) ]; then $(GOBUILD) -o bin/$(GDOC_PLUGIN) ./cmd/$(GDOC_PLUGIN); fi
 	@if [ -d cmd/$(AMAZON_PLUGIN) ]; then $(GOBUILD) -o bin/$(AMAZON_PLUGIN) ./cmd/$(AMAZON_PLUGIN); fi
+	@if [ -d cmd/$(TELEMETRY_PLUGIN) ]; then $(GOBUILD) -o bin/$(TELEMETRY_PLUGIN) ./cmd/$(TELEMETRY_PLUGIN); fi
 	# pw-mcp-db uses CGO_ENABLED=1 for the DuckDB driver (deliberate exception).
 	# Gated by POWERWORD_BUILD_DB=1 to avoid CGO compiler toolchain requirements by default.
 	@if [ -d cmd/$(DB_PLUGIN) ] && [ "$(POWERWORD_BUILD_DB)" = "1" ]; then CGO_ENABLED=1 $(GOBUILD) -tags=integration -o bin/$(DB_PLUGIN) ./cmd/$(DB_PLUGIN); fi
@@ -93,6 +95,7 @@ install:
 	@if [ -d cmd/$(MEMORY_PLUGIN) ]; then $(GOCMD) install ./cmd/$(MEMORY_PLUGIN); fi
 	@if [ -d cmd/$(GDOC_PLUGIN) ]; then $(GOCMD) install ./cmd/$(GDOC_PLUGIN); fi
 	@if [ -d cmd/$(AMAZON_PLUGIN) ]; then $(GOCMD) install ./cmd/$(AMAZON_PLUGIN); fi
+	@if [ -d cmd/$(TELEMETRY_PLUGIN) ]; then $(GOCMD) install ./cmd/$(TELEMETRY_PLUGIN); fi
 	# pw-mcp-db uses CGO_ENABLED=1 for the DuckDB driver (deliberate exception).
 	# Gated by POWERWORD_BUILD_DB=1 to avoid CGO compiler toolchain requirements by default.
 	@if [ -d cmd/$(DB_PLUGIN) ] && [ "$(POWERWORD_BUILD_DB)" = "1" ]; then CGO_ENABLED=1 $(GOCMD) install -tags=integration ./cmd/$(DB_PLUGIN); fi
