@@ -381,4 +381,21 @@ func TestTelemetryServer_ErrorsAndEdgeCases(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error for invalid get_model_pricing arguments, got nil")
 	}
+
+	// 4. Negative token count should fail
+	_, err = session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "calculate_tokens_cost",
+		Arguments: map[string]interface{}{
+			"model_usages": map[string]interface{}{
+				"gemini-1.5-pro": map[string]interface{}{
+					"input_tokens":  -50,
+					"output_tokens": 10,
+					"cached_tokens": 0,
+				},
+			},
+		},
+	})
+	if err == nil {
+		t.Errorf("Expected error for negative token counts, got nil")
+	}
 }

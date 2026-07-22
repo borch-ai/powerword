@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +17,10 @@ import (
 	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
+func almostEqual(a, b float64) bool {
+	return math.Abs(a-b) < 1e-9
+}
+
 func TestGetCostAndUsage_Fallback(t *testing.T) {
 	tracker := telemetry.NewUsageTracker()
 	tracker.RecordUsage("model-a", telemetry.TokenUsage{InputTokens: 100000, OutputTokens: 200000})
@@ -25,21 +30,22 @@ func TestGetCostAndUsage_Fallback(t *testing.T) {
 	}
 
 	// 1. Registry is nil
-	in, out, cached, cost, qCap := getCostAndUsage(context.Background(), nil, tracker, pricing, 500000)
-	if in != 100000 || out != 200000 || cached != 0 || cost != 0.5 || qCap != 500000 {
-		t.Errorf("Expected fallback cost 0.5 and qCap 500000, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d", in, out, cached, cost, qCap)
+	in, out, cached, cost, qCap, success := getCostAndUsage(context.Background(), nil, tracker, pricing, 500000)
+	if in != 100000 || out != 200000 || cached != 0 || !almostEqual(cost, 0.5) || qCap != 500000 || success {
+		t.Errorf("Expected fallback cost 0.5, qCap 500000, success=false, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d, success=%v", in, out, cached, cost, qCap, success)
 	}
 
 	// 2. Registry exists but has no telemetry client
 	registry := internalmcp.NewRegistry()
-	in, out, cached, cost, qCap = getCostAndUsage(context.Background(), registry, tracker, pricing, 500000)
-	if in != 100000 || out != 200000 || cached != 0 || cost != 0.5 || qCap != 500000 {
-		t.Errorf("Expected fallback cost 0.5 and qCap 500000, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d", in, out, cached, cost, qCap)
+	in, out, cached, cost, qCap, success = getCostAndUsage(context.Background(), registry, tracker, pricing, 500000)
+	if in != 100000 || out != 200000 || cached != 0 || !almostEqual(cost, 0.5) || qCap != 500000 || success {
+		t.Errorf("Expected fallback cost 0.5, qCap 500000, success=false, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d, success=%v", in, out, cached, cost, qCap, success)
 	}
 }
 
 func TestGetCostAndUsage_ViaServer(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Setup mock server responding to calculate_tokens_cost
 	srv := mcp.NewServer(&mcp.Implementation{Name: "test-telemetry", Version: "1.0"}, nil)
@@ -86,15 +92,16 @@ func TestGetCostAndUsage_ViaServer(t *testing.T) {
 	}
 
 	tracker := telemetry.NewUsageTracker()
-	in, out, cached, cost, qCap := getCostAndUsage(ctx, registry, tracker, nil, 1000)
+	in, out, cached, cost, qCap, success := getCostAndUsage(ctx, registry, tracker, nil, 1000)
 
-	if in != 999 || out != 888 || cached != 777 || cost != 12.345 || qCap != 999999 {
-		t.Errorf("Expected values from server, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d", in, out, cached, cost, qCap)
+	if in != 999 || out != 888 || cached != 777 || !almostEqual(cost, 12.345) || qCap != 999999 || !success {
+		t.Errorf("Expected values from server, success=true, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d, success=%v", in, out, cached, cost, qCap, success)
 	}
 }
 
 func TestGetCostAndUsage_ServerErrorFallback(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Setup mock server that returns error
 	srv := mcp.NewServer(&mcp.Implementation{Name: "test-telemetry", Version: "1.0"}, nil)
@@ -132,9 +139,9 @@ func TestGetCostAndUsage_ServerErrorFallback(t *testing.T) {
 	}
 
 	// Should fallback to local calculation because server returned error
-	in, out, cached, cost, qCap := getCostAndUsage(ctx, registry, tracker, pricing, 500000)
-	if in != 100000 || out != 200000 || cached != 0 || cost != 0.5 || qCap != 500000 {
-		t.Errorf("Expected fallback cost 0.5 and qCap 500000, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d", in, out, cached, cost, qCap)
+	in, out, cached, cost, qCap, success := getCostAndUsage(ctx, registry, tracker, pricing, 500000)
+	if in != 100000 || out != 200000 || cached != 0 || !almostEqual(cost, 0.5) || qCap != 500000 || success {
+		t.Errorf("Expected fallback cost 0.5, qCap 500000, success=false, got: in=%d, out=%d, cached=%d, cost=%f, qCap=%d, success=%v", in, out, cached, cost, qCap, success)
 	}
 }
 

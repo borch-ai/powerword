@@ -4,15 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/borch-ai/powerword/pkg/telemetry"
 )
 
-// DefaultPricing specifies the fallback pricing configuration for common models.
-var DefaultPricing = map[string]telemetry.ModelPricing{
+// defaultPricing specifies the fallback pricing configuration for common models.
+var defaultPricing = map[string]telemetry.ModelPricing{
 	"gemini-1.5-pro":    {Input: 1.25, Output: 3.75, Cached: 0.3125},
 	"gemini-1.5-flash":  {Input: 0.075, Output: 0.30, Cached: 0.01875},
 	"gemini-2.5-flash":  {Input: 0.075, Output: 0.30, Cached: 0.01875},
@@ -31,9 +30,9 @@ const calculateTokensCostSchema = `{
 			"additionalProperties": {
 				"type": "object",
 				"properties": {
-					"input_tokens": { "type": "integer" },
-					"output_tokens": { "type": "integer" },
-					"cached_tokens": { "type": "integer" }
+					"input_tokens": { "type": "integer", "minimum": 0 },
+					"output_tokens": { "type": "integer", "minimum": 0 },
+					"cached_tokens": { "type": "integer", "minimum": 0 }
 				}
 			}
 		},
@@ -78,15 +77,35 @@ func SetupServer() (*mcp.Server, error) {
 		Name:        "calculate_tokens_cost",
 		Description: "Aggregates token usage across models and calculates the estimated cost.",
 		InputSchema: json.RawMessage(calculateTokensCostSchema),
-	}, handleCalculateTokensCost(DefaultPricing))
+	}, handleCalculateTokensCost(defaultPricing))
 
 	srv.AddTool(&mcp.Tool{
 		Name:        "get_model_pricing",
 		Description: "Retrieves the active pricing database or details for a specific model.",
 		InputSchema: json.RawMessage(getModelPricingSchema),
-	}, handleGetModelPricing(DefaultPricing))
+	}, handleGetModelPricing(defaultPricing))
 
 	return srv, nil
+}
+
+func calculateModelCost(model string, usage telemetry.ModelUsage, pricing map[string]telemetry.ModelPricing) (float64, error) {
+	if usage.InputTokens < 0 || usage.OutputTokens < 0 || usage.CachedTokens < 0 {
+		return 0, fmt.Errorf("negative token counts are not allowed: model=%s, input=%d, output=%d, cached=%d", model, usage.InputTokens, usage.OutputTokens, usage.CachedTokens)
+	}
+
+	p, ok := telemetry.GetPricingForModel(model, pricing)
+	if !ok {
+		return 0, nil
+	}
+
+	billedInput := int64(usage.InputTokens) - int64(usage.CachedTokens)
+	if billedInput < 0 {
+		billedInput = 0
+	}
+	costInput := float64(billedInput) * (p.Input / 1_000_000.0)
+	costOutput := float64(usage.OutputTokens) * (p.Output / 1_000_000.0)
+	costCached := float64(usage.CachedTokens) * (p.Cached / 1_000_000.0)
+	return costInput + costOutput + costCached, nil
 }
 
 func handleCalculateTokensCost(defaultPricing map[string]telemetry.ModelPricing) func(context.Context, *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -101,33 +120,23 @@ func handleCalculateTokensCost(defaultPricing map[string]telemetry.ModelPricing)
 		}
 
 		// Resolve pricing map
-		pricing := make(map[string]telemetry.ModelPricing)
-		for k, v := range defaultPricing {
-			pricing[k] = v
-		}
-		for k, v := range args.PricingOverrides {
-			pricing[k] = v
+		pricing := defaultPricing
+		if args.PricingOverrides != nil {
+			pricing = args.PricingOverrides
 		}
 
 		var totalInput, totalOutput, totalCached int64
 		var estimatedCost float64
 
 		for model, usage := range args.ModelUsages {
+			cost, err := calculateModelCost(model, usage, pricing)
+			if err != nil {
+				return nil, err
+			}
+			estimatedCost += cost
 			totalInput += int64(usage.InputTokens)
 			totalOutput += int64(usage.OutputTokens)
 			totalCached += int64(usage.CachedTokens)
-
-			p, ok := getPricingForModel(model, pricing)
-			if ok {
-				billedInput := int64(usage.InputTokens) - int64(usage.CachedTokens)
-				if billedInput < 0 {
-					billedInput = 0
-				}
-				costInput := float64(billedInput) * (p.Input / 1_000_000.0)
-				costOutput := float64(usage.OutputTokens) * (p.Output / 1_000_000.0)
-				costCached := float64(usage.CachedTokens) * (p.Cached / 1_000_000.0)
-				estimatedCost += costInput + costOutput + costCached
-			}
 		}
 
 		capVal := int64(1000000)
@@ -172,7 +181,7 @@ func handleGetModelPricing(defaultPricing map[string]telemetry.ModelPricing) fun
 		}
 
 		if args.Model != "" {
-			p, ok := getPricingForModel(args.Model, defaultPricing)
+			p, ok := telemetry.GetPricingForModel(args.Model, defaultPricing)
 			if !ok {
 				return &mcp.CallToolResult{
 					IsError: true,
@@ -196,20 +205,4 @@ func handleGetModelPricing(defaultPricing map[string]telemetry.ModelPricing) fun
 			Content: []mcp.Content{&mcp.TextContent{Text: string(respBytes)}},
 		}, nil
 	}
-}
-
-func getPricingForModel(model string, pricing map[string]telemetry.ModelPricing) (telemetry.ModelPricing, bool) {
-	if p, ok := pricing[model]; ok {
-		return p, true
-	}
-	var bestPrefix string
-	for prefix := range pricing {
-		if strings.HasPrefix(model, prefix) && len(prefix) > len(bestPrefix) {
-			bestPrefix = prefix
-		}
-	}
-	if bestPrefix != "" {
-		return pricing[bestPrefix], true
-	}
-	return telemetry.ModelPricing{}, false
 }

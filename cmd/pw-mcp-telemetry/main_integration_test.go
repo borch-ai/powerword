@@ -29,8 +29,8 @@ func TestMain(m *testing.M) {
 
 	pluginPath = filepath.Join(tmpDir, "pw-mcp-telemetry")
 	cmd := exec.Command("go", "build", "-o", pluginPath, ".")
-	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to build pw-mcp-telemetry: %v\n", err)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to build pw-mcp-telemetry: %v\noutput:\n%s\n", err, string(out))
 		os.RemoveAll(tmpDir)
 		os.Exit(1)
 	}

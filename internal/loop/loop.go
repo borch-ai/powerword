@@ -228,7 +228,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 }
 
 func submitTelemetry(ctx context.Context, startTime time.Time, tracker *telemetry.UsageTracker, registry *mcp.Registry, pricing map[string]telemetry.ModelPricing, model, sessionID string, err error) {
-	_, _, _, cost, _ := getCostAndUsage(ctx, registry, tracker, pricing, 1000000)
+	_, _, _, cost, _, _ := getCostAndUsage(ctx, registry, tracker, pricing, 1000000)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	var errMsg string
@@ -285,20 +285,12 @@ func handleSessionSaveAndOutput(ctx context.Context, cfg *config.Config, registr
 }
 
 func printMetricsSummary(ctx context.Context, cfg *config.Config, registry *mcp.Registry, tracker *telemetry.UsageTracker) {
-	_, _, _, cost, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
-	if registry == nil || !registry.HasClient("telemetry") {
+	totalInput, totalOutput, totalCached, cost, _, success := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
+	if !success {
 		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg.Pricing))
 		return
 	}
 
-	var totalInput, totalOutput, totalCached int
-	for _, usage := range tracker.ModelUsages {
-		if usage != nil {
-			totalInput += usage.InputTokens
-			totalOutput += usage.OutputTokens
-			totalCached += usage.CachedTokens
-		}
-	}
 	total := totalInput + totalOutput
 	var sb strings.Builder
 	sb.WriteString("Session Metrics:\n")
@@ -375,20 +367,25 @@ func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen i
 	fmt.Println(string(b))
 }
 
-func getCostAndUsage(ctx context.Context, registry *mcp.Registry, tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing, dailyQuotaCap int) (input int, output int, cached int, cost float64, qCap int) {
+func getCostAndUsage(ctx context.Context, registry *mcp.Registry, tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing, dailyQuotaCap int) (input int, output int, cached int, cost float64, qCap int, success bool) {
 	input = tracker.TotalInputTokens()
 	output = tracker.TotalOutputTokens()
 	cached = tracker.TotalCachedTokens()
 	cost = tracker.EstimatedCost(pricing)
 	qCap = dailyQuotaCap
+	success = false
 
 	if registry == nil || !registry.HasClient("telemetry") {
 		return
 	}
 
-	res, err := registry.CallTool(ctx, "telemetry__calculate_tokens_cost", map[string]interface{}{
-		"model_usages":    tracker.ModelUsages,
-		"daily_quota_cap": dailyQuotaCap,
+	callCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	res, err := registry.CallTool(callCtx, "telemetry__calculate_tokens_cost", map[string]interface{}{
+		"model_usages":      tracker.ModelUsages,
+		"daily_quota_cap":   dailyQuotaCap,
+		"pricing_overrides": pricing,
 	})
 	if err != nil {
 		return
@@ -409,6 +406,7 @@ func getCostAndUsage(ctx context.Context, registry *mcp.Registry, tracker *telem
 				cached = int(resp.CachedTokens)
 				cost = resp.EstimatedCost
 				qCap = int(resp.DailyQuotaCap)
+				success = true
 			}
 		}
 	}
@@ -644,7 +642,7 @@ func (e *BudgetExceededError) Error() string {
 // checkBudget checks if the accumulated usage has exceeded any configured budgets.
 func checkBudget(ctx context.Context, cfg *config.Config, registry *mcp.Registry, tracker *telemetry.UsageTracker) error {
 	if cfg.MaxCost > 0 {
-		_, _, _, currentCost, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
+		_, _, _, currentCost, _, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
 		if currentCost >= cfg.MaxCost {
 			return &BudgetExceededError{
 				Reason: fmt.Sprintf("estimated cost $%.5f exceeded maximum budget of $%.5f", currentCost, cfg.MaxCost),
