@@ -150,10 +150,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 	startTime := time.Now()
 	tracker := telemetry.NewUsageTracker()
 	var sessionID string
+	var registry *mcp.Registry
 
 	defer func() {
 		if !cfg.ListSessions {
-			submitTelemetry(startTime, tracker, cfg.Pricing, cfg.Model, sessionID, err)
+			submitTelemetry(ctx, startTime, tracker, registry, cfg.Pricing, cfg.Model, sessionID, err)
 		}
 	}()
 
@@ -176,7 +177,7 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 
 	// Initialize MCP servers and registry
 	manager := mcp.NewProcessManager()
-	registry := mcp.NewRegistry()
+	registry = mcp.NewRegistry()
 
 	loopCtx, cancel := context.WithCancel(ctx)
 	stopSignal := manager.StartSignalListener(cancel, 5*time.Second)
@@ -223,11 +224,11 @@ func RunLoop(ctx context.Context, cfg *config.Config, prompt string) (err error)
 		sessionID = session.ID
 	}
 
-	return handleSessionSaveAndOutput(cfg, session, targetModel, updatedMessages, isPaused, &loopFailed, loopErr, initialLen, tracker)
+	return handleSessionSaveAndOutput(ctx, cfg, registry, session, targetModel, updatedMessages, isPaused, &loopFailed, loopErr, initialLen, tracker)
 }
 
-func submitTelemetry(startTime time.Time, tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing, model, sessionID string, err error) {
-	cost := tracker.EstimatedCost(pricing)
+func submitTelemetry(ctx context.Context, startTime time.Time, tracker *telemetry.UsageTracker, registry *mcp.Registry, pricing map[string]telemetry.ModelPricing, model, sessionID string, err error) {
+	_, _, _, cost, _, _ := getCostAndUsage(ctx, registry, tracker, pricing, 1000000)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	var errMsg string
@@ -265,7 +266,7 @@ func submitTelemetry(startTime time.Time, tracker *telemetry.UsageTracker, prici
 	telemetry.SubmitToLighthouse(event)
 }
 
-func handleSessionSaveAndOutput(cfg *config.Config, session *Session, targetModel string, updatedMessages []llm.Message, isPaused bool, loopFailed *bool, loopErr error, initialLen int, tracker *telemetry.UsageTracker) error {
+func handleSessionSaveAndOutput(ctx context.Context, cfg *config.Config, registry *mcp.Registry, session *Session, targetModel string, updatedMessages []llm.Message, isPaused bool, loopFailed *bool, loopErr error, initialLen int, tracker *telemetry.UsageTracker) error {
 	if session != nil && (loopErr == nil || isPaused) {
 		if saveErr := handleSaveSession(session, targetModel, updatedMessages, isPaused, loopFailed); saveErr != nil {
 			loopErr = saveErr
@@ -277,10 +278,35 @@ func handleSessionSaveAndOutput(cfg *config.Config, session *Session, targetMode
 	if cfg.JSONOutput {
 		printJSONPayload(loopErr, updatedMessages, initialLen, tracker)
 	} else if len(tracker.ModelUsages) > 0 {
-		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg.Pricing))
+		printMetricsSummary(ctx, cfg, registry, tracker)
 	}
 
 	return loopErr
+}
+
+func printMetricsSummary(ctx context.Context, cfg *config.Config, registry *mcp.Registry, tracker *telemetry.UsageTracker) {
+	totalInput, totalOutput, totalCached, cost, _, success := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
+	if !success {
+		fmt.Fprintln(os.Stderr, "\n"+tracker.FormatSummary(cfg.Pricing))
+		return
+	}
+
+	total := totalInput + totalOutput
+	var sb strings.Builder
+	sb.WriteString("Session Metrics:\n")
+	fmt.Fprintf(&sb, "- Total Tokens: %d (%d In, %d Out)\n", total, totalInput, totalOutput)
+	if totalCached > 0 {
+		fmt.Fprintf(&sb, "- Cached Tokens: %d\n", totalCached)
+	}
+	if total > 0 {
+		if cost > 0 {
+			fmt.Fprintf(&sb, "- Estimated Cost: $%.5f\n", cost)
+		} else {
+			fmt.Fprintf(&sb, "- Estimated Cost: $0.00000\n")
+		}
+	}
+	fmt.Fprintf(&sb, "- Turns: %d\n", tracker.Turns)
+	fmt.Fprintln(os.Stderr, "\n"+sb.String())
 }
 
 func startServers(ctx context.Context, cfg *config.Config, manager *mcp.ProcessManager, registry *mcp.Registry) {
@@ -339,6 +365,52 @@ func printJSONPayload(loopErr error, updatedMessages []llm.Message, initialLen i
 
 	b, _ := json.MarshalIndent(payload, "", "  ")
 	fmt.Println(string(b))
+}
+
+func getCostAndUsage(ctx context.Context, registry *mcp.Registry, tracker *telemetry.UsageTracker, pricing map[string]telemetry.ModelPricing, dailyQuotaCap int) (input int, output int, cached int, cost float64, qCap int, success bool) {
+	input = tracker.TotalInputTokens()
+	output = tracker.TotalOutputTokens()
+	cached = tracker.TotalCachedTokens()
+	cost = tracker.EstimatedCost(pricing)
+	qCap = dailyQuotaCap
+	success = false
+
+	if registry == nil || !registry.HasClient("telemetry") {
+		return
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	res, err := registry.CallTool(callCtx, "telemetry__calculate_tokens_cost", map[string]interface{}{
+		"model_usages":      tracker.ModelUsages,
+		"daily_quota_cap":   dailyQuotaCap,
+		"pricing_overrides": pricing,
+	})
+	if err != nil {
+		return
+	}
+
+	if len(res.Content) > 0 {
+		if txt, ok := res.Content[0].(*mcpsdk.TextContent); ok {
+			var resp struct {
+				InputTokens   int64   `json:"input_tokens"`
+				OutputTokens  int64   `json:"output_tokens"`
+				CachedTokens  int64   `json:"cached_tokens"`
+				EstimatedCost float64 `json:"estimated_cost"`
+				DailyQuotaCap int64   `json:"daily_quota_cap"`
+			}
+			if err := json.Unmarshal([]byte(txt.Text), &resp); err == nil {
+				input = int(resp.InputTokens)
+				output = int(resp.OutputTokens)
+				cached = int(resp.CachedTokens)
+				cost = resp.EstimatedCost
+				qCap = int(resp.DailyQuotaCap)
+				success = true
+			}
+		}
+	}
+	return
 }
 
 func resolveClientAndRoute(ctx context.Context, cfg *config.Config, prompt string) (llm.LLMClient, string, string, error) {
@@ -413,7 +485,7 @@ func runReActLoop(ctx context.Context, cfg *config.Config, client llm.LLMClient,
 }
 
 func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LLMClient, registry *mcp.Registry, formatter *TerminalFormatter, messages []llm.Message, tracker *telemetry.UsageTracker, modelName string, i int) ([]llm.Message, bool, error) {
-	if err := checkBudget(cfg, tracker); err != nil {
+	if err := checkBudget(ctx, cfg, registry, tracker); err != nil {
 		return messages, false, err
 	}
 
@@ -446,7 +518,7 @@ func executeLoopIteration(ctx context.Context, cfg *config.Config, client llm.LL
 
 	messages = append(messages, *assistantMsg)
 
-	if err := checkBudget(cfg, tracker); err != nil {
+	if err := checkBudget(ctx, cfg, registry, tracker); err != nil {
 		return messages, false, err
 	}
 
@@ -568,9 +640,9 @@ func (e *BudgetExceededError) Error() string {
 }
 
 // checkBudget checks if the accumulated usage has exceeded any configured budgets.
-func checkBudget(cfg *config.Config, tracker *telemetry.UsageTracker) error {
+func checkBudget(ctx context.Context, cfg *config.Config, registry *mcp.Registry, tracker *telemetry.UsageTracker) error {
 	if cfg.MaxCost > 0 {
-		currentCost := tracker.EstimatedCost(cfg.Pricing)
+		_, _, _, currentCost, _, _ := getCostAndUsage(ctx, registry, tracker, cfg.Pricing, 1000000)
 		if currentCost >= cfg.MaxCost {
 			return &BudgetExceededError{
 				Reason: fmt.Sprintf("estimated cost $%.5f exceeded maximum budget of $%.5f", currentCost, cfg.MaxCost),

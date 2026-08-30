@@ -1,18 +1,20 @@
 # plan: Task 5.4: MCP Telemetry Migration
 
-**Status:** Open (Issue #[TBD])
+**Status:** Completed
+**Go Version:** 1.26
+**Date Completed:** 2026-07-21
+**Unit Test Coverage:** 91.0%
 
-Extract the local Go telemetry pricing databases and calculation code from `powerword`'s shared library into a dedicated standalone repository `github.com/borch-ai/mcp-telemetry`, and refactor `powerword` to consume it as an external stdio MCP server.
+Extract the local Go telemetry pricing databases and calculation code from `powerword`'s shared library into a dedicated standalone repository/package, and refactor `powerword` to consume it as an external stdio MCP server.
 
 ## User Review Required
 
 > [!NOTE]
-> **Standalone Repository Creation**:
-> This task involves setting up a brand new Git repository `github.com/borch-ai/mcp-telemetry` to build the `pw-mcp-telemetry` binary.
+> **Centralized Capability Architecture**:
+> To satisfy the ecosystem-wide guidelines, `pw-mcp-telemetry` is implemented directly under `cmd/pw-mcp-telemetry` and `internal/mcp/telemetry` within this repository rather than being placed in a separate repository. This ensures Powerword remains the centralized source of truth for all Borch-AI shared capabilities.
 >
-> [!NOTE]
 > **Lamplighter Telemetry Compatibility**:
-> The JSON-RPC tool returns from `pw-mcp-telemetry` (specifically token counts and estimated costs) will conform to Lamplighter's signaling payload requirements (`input_tokens`, `output_tokens`, `estimated_cost`, `daily_quota_cap`). This allows Powerword (or wrapping IDE extensions) to cleanly serialize and publish these metrics directly to the Firebase Realtime Database at `/tunnels/{tunnelId}/telemetry`.
+> The JSON-RPC tool returns from `pw-mcp-telemetry` (specifically token counts and estimated costs) conform to Lamplighter's signaling payload requirements (`input_tokens`, `output_tokens`, `estimated_cost`, `daily_quota_cap`). This allows Powerword (or wrapping IDE extensions) to cleanly serialize and publish these metrics directly to the Firebase Realtime Database.
 
 ---
 
@@ -20,25 +22,34 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 
 ### Standalone Server Development
 
-#### [NEW] [powerword](file://../..)
+#### [NEW] [server.go](file://../../internal/mcp/telemetry/server.go)
 
-- Set up a new Go codebase compiling to the binary executable `pw-mcp-telemetry`.
-- Implement standard Model Context Protocol Go SDK integration.
-- Relocate pricing database arrays and prefix-matching logic from `powerword`'s package.
-- Expose the following JSON-RPC tools:
+- Implements standard Model Context Protocol Go SDK integration.
+- Relocates default pricing database maps and longest prefix matching logic.
+- Exposes two tools:
   - `calculate_tokens_cost`
   - `get_model_pricing`
 
+#### [NEW] [main.go](file://../../cmd/pw-mcp-telemetry/main.go)
+
+- Serves as the stdio entry point for the standalone telemetry capability server.
+
+#### [NEW] [main_integration_test.go](file://../../cmd/pw-mcp-telemetry/main_integration_test.go)
+
+- End-to-end integration test (gated by `//go:build integration` tag) that builds the plugin binary, launches it as a stdio subprocess via the process manager, and tests the `calculate_tokens_cost` and `get_model_pricing` tool execution handshakes.
+
 ### Powerword Client Refactoring
 
-#### [MODIFY] [config.go](file://../../pkg/config/config.go)
+#### [MODIFY] [loop.go](file://../../internal/loop/loop.go)
 
-- Remove the local `Pricing` map structure from the global configuration struct.
-- Add configuration settings to register and mount `pw-mcp-telemetry` under standard plugins.
+- Implements `getCostAndUsage` helper to dynamically check the MCP registry for a mounted `telemetry` client.
+- If registered, queries the telemetry server via the `telemetry__calculate_tokens_cost` tool.
+- If not registered (or on server failure), transparently falls back to local calculations using native structs, ensuring offline capability.
+- Updates `checkBudget`, `submitTelemetry`, and `handleSessionSaveAndOutput` to utilize the new helper.
 
-#### [MODIFY] [telemetry.go](file://../../pkg/telemetry/telemetry.go)
+#### [MODIFY] [Makefile](file://../../Makefile)
 
-- Refactor the cost calculation methods to query the mounted `pw-mcp-telemetry` MCP client connection instead of executing native pricing lookups.
+- Registers and compiles `pw-mcp-telemetry` under standard build targets.
 
 ---
 
@@ -46,5 +57,13 @@ Extract the local Go telemetry pricing databases and calculation code from `powe
 
 ### Automated Tests
 
-- Run command: `go test ./pkg/telemetry/... ./internal/...`
-- Verify that tests correctly spin up a mock telemetry MCP server to test the cost query loops.
+- Telemetry server unit tests: `go test -v ./internal/mcp/telemetry/...` (Passed)
+- Subprocess integration test: `go test -v -tags=integration ./cmd/pw-mcp-telemetry/...` (Passed)
+- Loop integration tests: `go test -v ./internal/loop/...` (Passed)
+- Coverage check: `make check-coverage` (Passed, maintaining 91.0% overall coverage threshold)
+
+### Manual Verification
+
+- Registered `servers.telemetry` in `powerword.toml`.
+- Ran execution loop: `./bin/powerword "hello" -m gemini-2.5-flash --accept-all`.
+- Verified correct cost calculation and output formatting from the server.

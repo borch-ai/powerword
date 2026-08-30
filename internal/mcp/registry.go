@@ -115,3 +115,11 @@ func (r *Registry) CallTool(ctx context.Context, aggregatedName string, args map
 
 	return client.CallTool(ctx, originalToolName, args)
 }
+
+// HasClient checks if a client with the given name is registered.
+func (r *Registry) HasClient(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, exists := r.clients[name]
+	return exists
+}
