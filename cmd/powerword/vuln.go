@@ -21,6 +21,8 @@ var allowedVulns = map[string]string{
 	"GO-2026-5781": "rsc.io/pdf: uncatchable stack overflow on recursive dictionaries; mitigated by newSafeReaderAt in codebase",
 }
 
+const govulncheckVersion = "v1.3.0"
+
 var vulnIDPattern = regexp.MustCompile(`Vulnerability #\d+:\s+(GO-\d{4}-\d+)`)
 
 type vulnScannerFunc func(ctx context.Context) (output string, exitErr error)
@@ -126,14 +128,26 @@ func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnSca
 	return nil
 }
 
+func getGoEnv(ctx context.Context, key string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	//nolint:gosec // G204: key is trusted Go toolchain environment variable name
+	out, err := exec.CommandContext(ctx, "go", "env", key).Output()
+	if err == nil {
+		return strings.TrimSpace(string(out))
+	}
+	return ""
+}
+
 func ensureGovulncheck(ctx context.Context) (string, error) {
 	if binPath, err := lookPath("govulncheck"); err == nil {
 		return binPath, nil
 	}
 
-	gobin := os.Getenv("GOBIN")
+	gobin := getGoEnv(ctx, "GOBIN")
 	if gobin == "" {
-		gopath := os.Getenv("GOPATH")
+		gopath := getGoEnv(ctx, "GOPATH")
 		if gopath == "" {
 			home, err := os.UserHomeDir()
 			if err != nil {
@@ -150,19 +164,23 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 		return binPath, nil
 	}
 
-	cmd := exec.CommandContext(ctx, "go", "install", "golang.org/x/vuln/cmd/govulncheck@latest")
+	installTarget := "golang.org/x/vuln/cmd/govulncheck@" + govulncheckVersion
+	cmd := exec.CommandContext(ctx, "go", "install", installTarget)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to install govulncheck: %w", err)
+		return "", fmt.Errorf("failed to install %s: %w", installTarget, err)
 	}
 
+	if p, err := lookPath("govulncheck"); err == nil {
+		return p, nil
+	}
 	//nolint:gosec // G703,G304: binPath is verified after installation
-	if _, err := os.Stat(binPath); err != nil {
-		return "", fmt.Errorf("installed govulncheck but binary not found at %s: %w", binPath, err)
+	if _, err := os.Stat(binPath); err == nil {
+		return binPath, nil
 	}
 
-	return binPath, nil
+	return "", fmt.Errorf("installed %s successfully but binary could not be found via PATH or at %s", installTarget, binPath)
 }
 
 func runGovulncheck(ctx context.Context) (string, error) {

@@ -215,6 +215,7 @@ func TestNewVulnCmdIntegration(t *testing.T) {
 	}
 
 	cmd := newVulnCmd()
+	cmd.SetArgs([]string{})
 	var outBuf bytes.Buffer
 	cmd.SetOut(&outBuf)
 	err := cmd.Execute()
