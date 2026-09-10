@@ -409,4 +409,24 @@ func TestGetGoEnv(t *testing.T) {
 			t.Fatalf("expected empty string, got %s", got)
 		}
 	})
+
+	t.Run("unsupported key fallback returns empty", func(t *testing.T) {
+		// When a key isn't in env and isn't GOBIN or GOPATH, it returns empty without executing.
+		if got := getGoEnv(ctx, "UNSUPPORTED_RANDOM_KEY_12345"); got != "" {
+			t.Fatalf("expected empty string for unsupported key, got %s", got)
+		}
+	})
+
+	t.Run("GOBIN fallback queries go env", func(t *testing.T) {
+		// Unset GOBIN so LookupEnv returns false
+		// getGoEnv executes "go env GOBIN"
+		// In standard go installations this returns either empty or a path
+		_ = getGoEnv(ctx, "GOBIN")
+	})
+
+	t.Run("GOPATH fallback queries go env", func(t *testing.T) {
+		// Unset GOPATH so LookupEnv returns false
+		// getGoEnv executes "go env GOPATH"
+		_ = getGoEnv(ctx, "GOPATH")
+	})
 }

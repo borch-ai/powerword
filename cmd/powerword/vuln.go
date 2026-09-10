@@ -133,8 +133,16 @@ func getGoEnv(ctx context.Context, key string) string {
 	if v, ok := os.LookupEnv(key); ok {
 		return v
 	}
-	//nolint:gosec // G204: key is trusted Go toolchain environment variable name
-	out, err := exec.CommandContext(ctx, "go", "env", key).Output()
+	var cmd *exec.Cmd
+	switch key {
+	case "GOBIN":
+		cmd = exec.CommandContext(ctx, "go", "env", "GOBIN")
+	case "GOPATH":
+		cmd = exec.CommandContext(ctx, "go", "env", "GOPATH")
+	default:
+		return ""
+	}
+	out, err := cmd.Output()
 	if err == nil {
 		return strings.TrimSpace(string(out))
 	}
