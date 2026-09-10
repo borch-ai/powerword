@@ -136,14 +136,7 @@ lint:
 	$(GOCMD) run ./cmd/powerword lint-go
 
 vuln:
-	@GOBIN=$$(go env GOBIN); \
-	GOPATH=$$(go env GOPATH); \
-	if [ -z "$$GOBIN" ]; then GOBIN=$$GOPATH/bin; fi; \
-	if [ ! -f "$$GOBIN/govulncheck" ]; then \
-		echo "Installing govulncheck..."; \
-		$(GOCMD) install golang.org/x/vuln/cmd/govulncheck@latest; \
-	fi; \
-	$$GOBIN/govulncheck ./...
+	$(GOCMD) run ./cmd/powerword vuln
 
 fmt:
 	$(GOFMT) -w -s .
