@@ -141,18 +141,27 @@ func getGoEnv(ctx context.Context, key string) string {
 	return ""
 }
 
+func getFirstGopath(ctx context.Context) (string, error) {
+	for _, p := range filepath.SplitList(getGoEnv(ctx, "GOPATH")) {
+		if p != "" {
+			return p, nil
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine user home dir: %w", err)
+	}
+	return filepath.Join(home, "go"), nil
+}
+
 func getGovulncheckPath(ctx context.Context) (string, error) {
 	gobin := getGoEnv(ctx, "GOBIN")
 	if gobin == "" {
-		gopath := getGoEnv(ctx, "GOPATH")
-		if gopath == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return "", fmt.Errorf("cannot determine user home dir: %w", err)
-			}
-			gopath = filepath.Join(home, "go")
+		firstGopath, err := getFirstGopath(ctx)
+		if err != nil {
+			return "", err
 		}
-		gobin = filepath.Join(gopath, "bin")
+		gobin = filepath.Join(firstGopath, "bin")
 	}
 	return filepath.Clean(filepath.Join(gobin, "govulncheck")), nil
 }

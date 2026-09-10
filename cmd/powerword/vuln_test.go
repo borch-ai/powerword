@@ -348,4 +348,18 @@ func TestGetGovulncheckPath(t *testing.T) {
 			t.Fatalf("expected %s, got %s", expected, path)
 		}
 	})
+
+	t.Run("with multi-entry GOPATH uses first entry", func(t *testing.T) {
+		t.Setenv("GOBIN", "")
+		gopath := strings.Join([]string{"/first/gopath", "/second/gopath"}, string(filepath.ListSeparator))
+		t.Setenv("GOPATH", gopath)
+		path, err := getGovulncheckPath(ctx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := filepath.Clean("/first/gopath/bin/govulncheck")
+		if path != expected {
+			t.Fatalf("expected %s, got %s", expected, path)
+		}
+	})
 }
