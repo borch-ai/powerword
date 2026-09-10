@@ -130,7 +130,7 @@ func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnSca
 }
 
 func getGoEnv(ctx context.Context, key string) string {
-	if v := os.Getenv(key); v != "" {
+	if v, ok := os.LookupEnv(key); ok {
 		return v
 	}
 	//nolint:gosec // G204: key is trusted Go toolchain environment variable name

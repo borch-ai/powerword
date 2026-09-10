@@ -392,3 +392,21 @@ func TestGetGovulncheckPath(t *testing.T) {
 		}
 	})
 }
+
+func TestGetGoEnv(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("explicit non-empty value", func(t *testing.T) {
+		t.Setenv("TEST_GO_ENV_KEY", "custom_val")
+		if got := getGoEnv(ctx, "TEST_GO_ENV_KEY"); got != "custom_val" {
+			t.Fatalf("expected custom_val, got %s", got)
+		}
+	})
+
+	t.Run("explicit empty value is preserved without shelling out", func(t *testing.T) {
+		t.Setenv("TEST_GO_ENV_KEY", "")
+		if got := getGoEnv(ctx, "TEST_GO_ENV_KEY"); got != "" {
+			t.Fatalf("expected empty string, got %s", got)
+		}
+	})
+}
