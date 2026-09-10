@@ -207,6 +207,8 @@ func TestExecuteVulnCommand_Errors(t *testing.T) {
 
 	t.Run("no vulnerabilities parsed but scanner returned error", func(t *testing.T) {
 		cmd := newVulnCmd()
+		var errBuf bytes.Buffer
+		cmd.SetErr(&errBuf)
 		scanner := func(ctx context.Context) (string, error) {
 			return "syntax error in package", errors.New("exit status 1")
 		}
