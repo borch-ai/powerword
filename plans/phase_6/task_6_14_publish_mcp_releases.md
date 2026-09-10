@@ -1,8 +1,11 @@
 # plan: Task 6.14: Publish Automated Binary Releases of MCP Plugins
 
-**Status:** Open
+**Status:** Completed
+**Go Version:** 1.26.6
+**Date Completed:** 2026-09-10
+**Unit Test Coverage:** 91.00%
 
-Extend the GitHub Actions release workflow in Powerword to compile, package, and publish the suite of native Go MCP servers (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`, `pw-mcp-epub`, `pw-mcp-pdfcheck`) along with the core `powerword` binary.
+Extend the GitHub Actions release workflow in Powerword to compile, package, and publish the suite of native Go MCP servers (`pw-mcp-*`) along with the core `powerword` binary.
 
 ## User Review Required
 
@@ -11,18 +14,23 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
 ## Proposed Changes
 
-### GitHub Actions Workflow
+### Release Scripts & Automation
+
+#### [NEW] [build_release_binaries.sh](file://../../scripts/build_release_binaries.sh)
+
+- Introduce standalone executable bash script `scripts/build_release_binaries.sh` with strict error handling (`set -euo pipefail`).
+- Dynamically tests package buildability via `CGO_ENABLED=0 go list "./$dir"` across `cmd/powerword` and `cmd/pw-mcp-*` without maintaining hardcoded exclusions.
+- Cross-compiles each buildable package across target platforms (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`), injecting release version flags for `powerword` while plugins maintain their server protocol implementation versioning, and outputs to `dist/`.
 
 #### [MODIFY] [release.yml](file://../../.github/workflows/release.yml)
 
-- Update the build step to loop over all plugins under `cmd/` and cross-compile them.
-- Output compiled binaries to the `dist` folder:
-  - `${plugin}-darwin-amd64`
-  - `${plugin}-darwin-arm64`
-  - `${plugin}-linux-amd64`
-  - `${plugin}-linux-arm64`
-  - `${plugin}-windows-amd64.exe`
-- The upload step `gh release upload` will automatically pick up and publish these new files.
+- Invoke `make dist VERSION="$VERSION"` in the release workflow, keeping all CI build/lint steps uniform behind Makefile targets.
+- The upload step `gh release upload` automatically picks up and publishes all files in `dist/*` as GitHub release assets.
+
+#### [MODIFY] [Makefile](file://../../Makefile)
+
+- Add `dist` target to invoke `./scripts/build_release_binaries.sh $(VERSION)`.
+- Update `clean` target to clean `dist/`.
 
 ---
 
@@ -34,8 +42,11 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
   ```bash
   make build
+  make check-coverage
+  make markdown-lint
+  make lint
   ```
 
 ### Manual Verification
 
-- Check CI output of a release push to verify all binaries are built successfully and attached as release assets.
+- Verify that CI build scripts correctly find all pure-Go commands and that the release pipeline YAML passes linting and formatting standards.

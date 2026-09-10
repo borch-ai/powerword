@@ -279,8 +279,8 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [ ] **Task 6.13: Isolated Execution via Git Worktrees**
     *   Introduce support for running agent loops in a completely isolated Git worktree, including copying/mounting uncommitted changes and selectively symlinking caches/dependencies to speed up builds.
     *   [Implementation Plan](plans/phase_6/task_6_13_isolated_worktrees.md)
-*   [ ] **Task 6.14: Publish Automated Binary Releases of MCP Plugins**
-    *   Extend the release CI workflow to compile and attach all MCP plugin binaries (`pw-mcp-fs`, `pw-mcp-git`, `pw-mcp-shell`, `pw-mcp-imagegen`, `pw-mcp-kdp-math`, `pw-mcp-seo`, `pw-mcp-viral`, `pw-mcp-critic`, `pw-mcp-epub`, `pw-mcp-pdfcheck`, `pw-mcp-linter`) to GitHub Releases.
+*   [x] **Task 6.14: Publish Automated Binary Releases of MCP Plugins**
+    *   Extend the release CI workflow to dynamically discover, cross-compile, and attach all native pure-Go MCP plugin binaries (`pw-mcp-*`) along with the core `powerword` binary to GitHub Releases.
     *   [Implementation Plan](plans/phase_6/task_6_14_publish_mcp_releases.md)
 *   [x] **Task 6.15: End-to-End Pipeline & MCP Integration Testing Suite**
     *   Implement a dedicated integration test suite using build tags (`//go:build integration`) to test the compiled binary CLI workflows, session file operations, and native stdio MCP plugin transport handshakes.
