@@ -31,8 +31,19 @@ TARGETS=(
 
 PKGS=()
 for dir in cmd/powerword cmd/pw-mcp-*; do
-  if [ -d "$dir" ] && CGO_ENABLED=0 go list "./$dir" >/dev/null 2>&1; then
+  if [ ! -d "$dir" ]; then
+    continue
+  fi
+  if out=$(CGO_ENABLED=0 go list "./$dir" 2>&1); then
     PKGS+=("./$dir")
+  else
+    # Distinguish expected build-constraint exclusions (e.g., CGO-dependent packages) from unexpected errors.
+    if echo "$out" | grep -q "build constraints exclude all Go files"; then
+      echo "Skipping ./${dir} (build constraints exclude pure-Go/CGO_ENABLED=0 compilation)."
+    else
+      echo "Error inspecting package ./${dir}: ${out}" >&2
+      exit 1
+    fi
   fi
 done
 
