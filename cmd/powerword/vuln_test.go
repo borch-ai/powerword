@@ -276,6 +276,7 @@ func TestEnsureGovulncheckPath_FoundAtBinPath(t *testing.T) {
 	origLookPath := lookPath
 	defer func() { lookPath = origLookPath }()
 
+	t.Setenv("GOBIN", "/fake/bin")
 	lookPath = func(file string) (string, error) {
 		return "/fake/bin/govulncheck", nil
 	}
@@ -285,6 +286,32 @@ func TestEnsureGovulncheckPath_FoundAtBinPath(t *testing.T) {
 	}
 	if found != "/fake/bin/govulncheck" {
 		t.Fatalf("expected /fake/bin/govulncheck, got %s", found)
+	}
+}
+
+func TestEnsureGovulncheckPath_FoundOnPATHWhenGOBINNotFound(t *testing.T) {
+	ctx := context.Background()
+
+	origLookPath := lookPath
+	defer func() { lookPath = origLookPath }()
+
+	t.Setenv("GOBIN", "/empty/gobin")
+	lookPath = func(file string) (string, error) {
+		if file == "/empty/gobin/govulncheck" {
+			return "", exec.ErrNotFound
+		}
+		if file == "govulncheck" {
+			return "/system/bin/govulncheck", nil
+		}
+		return "", exec.ErrNotFound
+	}
+
+	found, err := ensureGovulncheck(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found != "/system/bin/govulncheck" {
+		t.Fatalf("expected /system/bin/govulncheck, got %s", found)
 	}
 }
 

@@ -175,6 +175,9 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 	if p, err := lookPath(binPath); err == nil {
 		return p, nil
 	}
+	if p, err := lookPath("govulncheck"); err == nil {
+		return p, nil
+	}
 
 	installTarget := "golang.org/x/vuln/cmd/govulncheck@" + govulncheckVersion
 	cmd := exec.CommandContext(ctx, "go", "install", installTarget)
