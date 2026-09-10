@@ -24,7 +24,7 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
 #### [MODIFY] [release.yml](file://../../.github/workflows/release.yml)
 
-- Invoke `./scripts/build_release_binaries.sh "$VERSION"` in the release workflow.
+- Invoke `make dist VERSION="$VERSION"` in the release workflow, keeping all CI build/lint steps uniform behind Makefile targets.
 - The upload step `gh release upload` automatically picks up and publishes all files in `dist/*` as GitHub release assets.
 
 #### [MODIFY] [Makefile](file://../../Makefile)

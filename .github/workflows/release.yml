@@ -69,7 +69,7 @@ jobs:
         if: steps.semrel.outputs.version != ''
         env:
           VERSION: ${{ steps.semrel.outputs.version }}
-        run: bash ./scripts/build_release_binaries.sh "$VERSION"
+        run: make dist VERSION="$VERSION"
 
       - name: Upload Binaries to GitHub Release
         if: steps.semrel.outputs.version != ''
