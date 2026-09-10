@@ -393,7 +393,7 @@ func TestGetGovulncheckPath(t *testing.T) {
 	})
 }
 
-func TestGetGoEnv(t *testing.T) {
+func TestGetGoEnv_ExplicitValues(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("explicit non-empty value", func(t *testing.T) {
@@ -411,22 +411,51 @@ func TestGetGoEnv(t *testing.T) {
 	})
 
 	t.Run("unsupported key fallback returns empty", func(t *testing.T) {
-		// When a key isn't in env and isn't GOBIN or GOPATH, it returns empty without executing.
 		if got := getGoEnv(ctx, "UNSUPPORTED_RANDOM_KEY_12345"); got != "" {
 			t.Fatalf("expected empty string for unsupported key, got %s", got)
 		}
 	})
+}
 
-	t.Run("GOBIN fallback queries go env", func(t *testing.T) {
-		// Unset GOBIN so LookupEnv returns false
-		// getGoEnv executes "go env GOBIN"
-		// In standard go installations this returns either empty or a path
-		_ = getGoEnv(ctx, "GOBIN")
-	})
+func TestGetGoEnv_FallbackGOBIN(t *testing.T) {
+	ctx := context.Background()
 
-	t.Run("GOPATH fallback queries go env", func(t *testing.T) {
-		// Unset GOPATH so LookupEnv returns false
-		// getGoEnv executes "go env GOPATH"
-		_ = getGoEnv(ctx, "GOPATH")
+	orig, ok := os.LookupEnv("GOBIN")
+	_ = os.Unsetenv("GOBIN")
+	t.Cleanup(func() {
+		if ok {
+			_ = os.Setenv("GOBIN", orig)
+		}
 	})
+	out, err := exec.CommandContext(ctx, "go", "env", "GOBIN").Output()
+	if err != nil {
+		t.Fatalf("failed to query go env GOBIN: %v", err)
+	}
+	expected := strings.TrimSpace(string(out))
+	if got := getGoEnv(ctx, "GOBIN"); got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestGetGoEnv_FallbackGOPATH(t *testing.T) {
+	ctx := context.Background()
+
+	orig, ok := os.LookupEnv("GOPATH")
+	_ = os.Unsetenv("GOPATH")
+	t.Cleanup(func() {
+		if ok {
+			_ = os.Setenv("GOPATH", orig)
+		}
+	})
+	out, err := exec.CommandContext(ctx, "go", "env", "GOPATH").Output()
+	if err != nil {
+		t.Fatalf("failed to query go env GOPATH: %v", err)
+	}
+	expected := strings.TrimSpace(string(out))
+	if expected == "" {
+		t.Fatal("expected non-empty go env GOPATH")
+	}
+	if got := getGoEnv(ctx, "GOPATH"); got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
 }
