@@ -141,11 +141,7 @@ func getGoEnv(ctx context.Context, key string) string {
 	return ""
 }
 
-func ensureGovulncheck(ctx context.Context) (string, error) {
-	if binPath, err := lookPath("govulncheck"); err == nil {
-		return binPath, nil
-	}
-
+func getGovulncheckPath(ctx context.Context) (string, error) {
 	gobin := getGoEnv(ctx, "GOBIN")
 	if gobin == "" {
 		gopath := getGoEnv(ctx, "GOPATH")
@@ -158,8 +154,15 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 		}
 		gobin = filepath.Join(gopath, "bin")
 	}
+	return filepath.Clean(filepath.Join(gobin, "govulncheck")), nil
+}
 
-	binPath := filepath.Clean(filepath.Join(gobin, "govulncheck"))
+func ensureGovulncheck(ctx context.Context) (string, error) {
+	binPath, err := getGovulncheckPath(ctx)
+	if err != nil {
+		return "", err
+	}
+
 	if p, err := lookPath(binPath); err == nil {
 		return p, nil
 	}
@@ -172,14 +175,14 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to install %s: %w", installTarget, err)
 	}
 
-	if p, err := lookPath("govulncheck"); err == nil {
-		return p, nil
-	}
 	if p, err := lookPath(binPath); err == nil {
 		return p, nil
 	}
+	if p, err := lookPath("govulncheck"); err == nil {
+		return p, nil
+	}
 
-	return "", fmt.Errorf("installed %s successfully but binary could not be found via PATH or at %s", installTarget, binPath)
+	return "", fmt.Errorf("installed %s successfully but binary could not be found at %s or via PATH", installTarget, binPath)
 }
 
 func runGovulncheck(ctx context.Context) (string, error) {

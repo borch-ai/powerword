@@ -270,47 +270,82 @@ func TestNewVulnCmdIntegration(t *testing.T) {
 	}
 }
 
-func TestEnsureGovulncheckPath(t *testing.T) {
+func TestEnsureGovulncheckPath_FoundAtBinPath(t *testing.T) {
 	ctx := context.Background()
 
 	origLookPath := lookPath
 	defer func() { lookPath = origLookPath }()
 
-	t.Run("found via LookPath", func(t *testing.T) {
-		lookPath = func(file string) (string, error) {
-			return "/fake/bin/govulncheck", nil
+	lookPath = func(file string) (string, error) {
+		return "/fake/bin/govulncheck", nil
+	}
+	found, err := ensureGovulncheck(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found != "/fake/bin/govulncheck" {
+		t.Fatalf("expected /fake/bin/govulncheck, got %s", found)
+	}
+}
+
+func TestEnsureGovulncheckPath_PrefersGOBIN(t *testing.T) {
+	ctx := context.Background()
+
+	origLookPath := lookPath
+	defer func() { lookPath = origLookPath }()
+
+	tmpDir := t.TempDir()
+	t.Setenv("GOBIN", tmpDir)
+	fakeBin := filepath.Join(tmpDir, "govulncheck")
+	//nolint:gosec // G302: test helper script must be executable for lookPath validation
+	if wErr := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0"), 0700); wErr != nil {
+		t.Fatalf("failed to create fake bin: %v", wErr)
+	}
+
+	lookPath = func(file string) (string, error) {
+		if file == fakeBin {
+			return fakeBin, nil
 		}
-		found, err := ensureGovulncheck(ctx)
+		if file == "govulncheck" {
+			return "/system/bin/govulncheck", nil
+		}
+		return exec.LookPath(file)
+	}
+
+	found, err := ensureGovulncheck(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found != fakeBin {
+		t.Fatalf("expected %s from GOBIN to take precedence, got %s", fakeBin, found)
+	}
+}
+
+func TestGetGovulncheckPath(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("with explicit GOBIN", func(t *testing.T) {
+		t.Setenv("GOBIN", "/custom/gobin")
+		path, err := getGovulncheckPath(ctx)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if found != "/fake/bin/govulncheck" {
-			t.Fatalf("expected /fake/bin/govulncheck, got %s", found)
+		expected := filepath.Clean("/custom/gobin/govulncheck")
+		if path != expected {
+			t.Fatalf("expected %s, got %s", expected, path)
 		}
 	})
 
-	t.Run("fallback to GOBIN when LookPath fails", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		t.Setenv("GOBIN", tmpDir)
-		fakeBin := filepath.Join(tmpDir, "govulncheck")
-		//nolint:gosec // G302: test helper script must be executable for lookPath validation
-		if wErr := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0"), 0700); wErr != nil {
-			t.Fatalf("failed to create fake bin: %v", wErr)
-		}
-
-		lookPath = func(file string) (string, error) {
-			if file == "govulncheck" {
-				return "", exec.ErrNotFound
-			}
-			return exec.LookPath(file)
-		}
-
-		found, err := ensureGovulncheck(ctx)
+	t.Run("with empty GOBIN uses GOPATH", func(t *testing.T) {
+		t.Setenv("GOBIN", "")
+		t.Setenv("GOPATH", "/custom/gopath")
+		path, err := getGovulncheckPath(ctx)
 		if err != nil {
-			t.Fatalf("unexpected error with GOBIN fallback: %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if found != fakeBin {
-			t.Fatalf("expected %s, got %s", fakeBin, found)
+		expected := filepath.Clean("/custom/gopath/bin/govulncheck")
+		if path != expected {
+			t.Fatalf("expected %s, got %s", expected, path)
 		}
 	})
 }
