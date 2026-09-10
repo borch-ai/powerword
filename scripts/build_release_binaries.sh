@@ -4,6 +4,10 @@ set -euo pipefail
 # build_release_binaries.sh compiles powerword and all pure-Go MCP plugins
 # across all supported release architectures.
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${REPO_ROOT}"
+
 VERSION="${1:-${VERSION:-dev}}"
 VERSION_NUM="${VERSION#v}"
 VERSION_TAG="v${VERSION_NUM}"
@@ -26,6 +30,13 @@ for dir in cmd/powerword cmd/pw-mcp-*; do
     PKGS+=("./$dir")
   fi
 done
+
+if [ "${#PKGS[@]}" -eq 0 ]; then
+  echo "Error: No buildable packages found under cmd/." >&2
+  exit 1
+fi
+
+echo "Discovered ${#PKGS[@]} buildable packages."
 
 for pkg in "${PKGS[@]}"; do
   bin_name=$(basename "$pkg")
