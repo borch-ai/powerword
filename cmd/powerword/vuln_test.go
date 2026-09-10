@@ -127,7 +127,7 @@ func TestExecuteVulnCommand_Success(t *testing.T) {
 		}
 	})
 
-	t.Run("only exempted vulnerabilities detected with clean exit or exit 3", func(t *testing.T) {
+	t.Run("only exempted vulnerabilities detected with clean exit", func(t *testing.T) {
 		cmd := newVulnCmd()
 		var outBuf bytes.Buffer
 		cmd.SetOut(&outBuf)
@@ -146,6 +146,49 @@ func TestExecuteVulnCommand_Success(t *testing.T) {
 			t.Fatalf("expected all covered message, got %q", output)
 		}
 	})
+
+	t.Run("only exempted vulnerabilities detected with exit code 3", func(t *testing.T) {
+		cmd := newVulnCmd()
+		var outBuf bytes.Buffer
+		cmd.SetOut(&outBuf)
+		exit3Err := exec.CommandContext(ctx, "sh", "-c", "exit 3").Run()
+		scanner := func(ctx context.Context) (string, error) {
+			return "Vulnerability #1: GO-2026-5781\nDetails...", exit3Err
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err != nil {
+			t.Fatalf("expected nil error for exempted vuln with exit code 3, got %v", err)
+		}
+		output := outBuf.String()
+		if !strings.Contains(output, "Accepted exemption for GO-2026-5781") {
+			t.Fatalf("expected exemption notice, got %q", output)
+		}
+		if !strings.Contains(output, "All detected vulnerabilities are covered by audited exemptions.") {
+			t.Fatalf("expected all covered message, got %q", output)
+		}
+	})
+}
+
+func TestIsVulnExitError(t *testing.T) {
+	ctx := context.Background()
+
+	if isVulnExitError(nil) {
+		t.Error("expected false for nil error")
+	}
+
+	if isVulnExitError(errors.New("generic error")) {
+		t.Error("expected false for non-exit error")
+	}
+
+	exit1Err := exec.CommandContext(ctx, "sh", "-c", "exit 1").Run()
+	if isVulnExitError(exit1Err) {
+		t.Error("expected false for exit code 1")
+	}
+
+	exit3Err := exec.CommandContext(ctx, "sh", "-c", "exit 3").Run()
+	if !isVulnExitError(exit3Err) {
+		t.Error("expected true for exit code 3")
+	}
 }
 
 func TestExecuteVulnCommand_Errors(t *testing.T) {
