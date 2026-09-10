@@ -18,7 +18,7 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
 #### [MODIFY] [release.yml](file://../../.github/workflows/release.yml)
 
-- Update the build step to loop over all plugins under `cmd/` and cross-compile them across target architectures (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`), dynamically including pure-Go MCP servers while skipping `pw-mcp-db` (which requires CGO).
+- Update the build step to loop over all plugins under `cmd/` and cross-compile them across target architectures (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`), dynamically testing buildability via `go list` under `CGO_ENABLED=0` to include all pure-Go commands without maintaining hardcoded exclusions.
 - Output compiled binaries to the `dist` folder:
   - `${plugin}-darwin-amd64`
   - `${plugin}-darwin-arm64`

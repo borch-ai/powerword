@@ -83,9 +83,9 @@ jobs:
             "windows/amd64"
           )
 
-          PKGS=("./cmd/powerword")
-          for dir in cmd/pw-mcp-*; do
-            if [ -d "$dir" ] && [ "$(basename "$dir")" != "pw-mcp-db" ]; then
+          PKGS=()
+          for dir in cmd/powerword cmd/pw-mcp-*; do
+            if [ -d "$dir" ] && CGO_ENABLED=0 go list "./$dir" >/dev/null 2>&1; then
               PKGS+=("./$dir")
             fi
           done
