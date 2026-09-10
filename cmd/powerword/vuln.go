@@ -103,7 +103,8 @@ func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnSca
 	vulnIDs := parseVulnerabilities(output)
 	if len(vulnIDs) == 0 {
 		if err != nil {
-			return fmt.Errorf("govulncheck failed: %w\n%s", err, output)
+			cmd.PrintErrln(output)
+			return fmt.Errorf("govulncheck failed: %w", err)
 		}
 		cmd.Println("No vulnerabilities detected.")
 		return nil
@@ -118,7 +119,7 @@ func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnSca
 	// If vulnerabilities were reported but all were exempted, verify the scanner didn't fail with a non-vuln error.
 	if err != nil && !isVulnExitError(err) {
 		cmd.PrintErrln(output)
-		return fmt.Errorf("govulncheck encountered non-vuln failure: %w\n%s", err, output)
+		return fmt.Errorf("govulncheck encountered non-vuln failure: %w", err)
 	}
 
 	for _, id := range eval.exempted {
@@ -159,9 +160,8 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 	}
 
 	binPath := filepath.Clean(filepath.Join(gobin, "govulncheck"))
-	//nolint:gosec // G703,G304: binPath is constructed from trusted system environment variables
-	if _, err := os.Stat(binPath); err == nil {
-		return binPath, nil
+	if p, err := lookPath(binPath); err == nil {
+		return p, nil
 	}
 
 	installTarget := "golang.org/x/vuln/cmd/govulncheck@" + govulncheckVersion
@@ -175,9 +175,8 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 	if p, err := lookPath("govulncheck"); err == nil {
 		return p, nil
 	}
-	//nolint:gosec // G703,G304: binPath is verified after installation
-	if _, err := os.Stat(binPath); err == nil {
-		return binPath, nil
+	if p, err := lookPath(binPath); err == nil {
+		return p, nil
 	}
 
 	return "", fmt.Errorf("installed %s successfully but binary could not be found via PATH or at %s", installTarget, binPath)
