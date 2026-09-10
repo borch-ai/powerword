@@ -65,7 +65,7 @@ jobs:
             git push origin "${VERSION_TAG}"
           fi
 
-      - name: Build powerword Binaries
+      - name: Build powerword and MCP Plugin Binaries
         if: steps.semrel.outputs.version != ''
         env:
           VERSION: ${{ steps.semrel.outputs.version }}
@@ -74,11 +74,38 @@ jobs:
           VERSION_NUM="${VERSION#v}"
           VERSION_TAG="v${VERSION_NUM}"
           echo "Building version ${VERSION_TAG}..."
-          GOOS=darwin GOARCH=amd64 go build -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" -o dist/powerword-darwin-amd64 ./cmd/powerword
-          GOOS=darwin GOARCH=arm64 go build -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" -o dist/powerword-darwin-arm64 ./cmd/powerword
-          GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" -o dist/powerword-linux-amd64 ./cmd/powerword
-          GOOS=linux GOARCH=arm64 go build -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" -o dist/powerword-linux-arm64 ./cmd/powerword
-          GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" -o dist/powerword-windows-amd64.exe ./cmd/powerword
+
+          TARGETS=(
+            "darwin/amd64"
+            "darwin/arm64"
+            "linux/amd64"
+            "linux/arm64"
+            "windows/amd64"
+          )
+
+          PKGS=("./cmd/powerword")
+          for dir in cmd/pw-mcp-*; do
+            if [ -d "$dir" ] && [ "$(basename "$dir")" != "pw-mcp-db" ]; then
+              PKGS+=("./$dir")
+            fi
+          done
+
+          for pkg in "${PKGS[@]}"; do
+            bin_name=$(basename "$pkg")
+            echo "Compiling ${bin_name}..."
+            for target in "${TARGETS[@]}"; do
+              os="${target%%/*}"
+              arch="${target##*/}"
+              ext=""
+              if [ "$os" = "windows" ]; then
+                ext=".exe"
+              fi
+              out="dist/${bin_name}-${os}-${arch}${ext}"
+              CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build \
+                -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" \
+                -o "$out" "$pkg"
+            done
+          done
 
       - name: Upload Binaries to GitHub Release
         if: steps.semrel.outputs.version != ''
