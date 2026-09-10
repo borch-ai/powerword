@@ -21,6 +21,7 @@ func main() {
 	rootCmd.AddCommand(newLintGoCmd())
 	rootCmd.AddCommand(newLinkIssueCmd())
 	rootCmd.AddCommand(newAuditCmd())
+	rootCmd.AddCommand(newVulnCmd())
 
 	err := rootCmd.Execute()
 

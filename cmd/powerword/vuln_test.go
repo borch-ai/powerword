@@ -1,0 +1,234 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+func TestParseVulnerabilities(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		expected []string
+	}{
+		{
+			name:     "empty output",
+			output:   "",
+			expected: nil,
+		},
+		{
+			name:     "no vulnerabilities",
+			output:   "No vulnerabilities found in your code.",
+			expected: nil,
+		},
+		{
+			name: "single vulnerability",
+			output: `=== Symbol Results ===
+
+Vulnerability #1: GO-2026-5781
+    Uncatchable stack-overflow denial of service in rsc.io/pdf`,
+			expected: []string{"GO-2026-5781"},
+		},
+		{
+			name: "multiple vulnerabilities with duplicates",
+			output: `=== Symbol Results ===
+
+Vulnerability #1: GO-2026-5781
+    Uncatchable stack-overflow denial of service in rsc.io/pdf
+
+Vulnerability #2: GO-2026-6218
+    Avoid quadratic complexity in resolvePath in net/url
+
+Vulnerability #3: GO-2026-5781
+    Repeated trace for rsc.io/pdf`,
+			expected: []string{"GO-2026-5781", "GO-2026-6218"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseVulnerabilities(tc.output)
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Fatalf("expected %v, got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestEvaluateVulnerabilities(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          []string
+		wantExempted   []string
+		wantUnexempted []string
+	}{
+		{
+			name:           "empty slice",
+			input:          nil,
+			wantExempted:   nil,
+			wantUnexempted: nil,
+		},
+		{
+			name:           "only exempted",
+			input:          []string{"GO-2026-5781"},
+			wantExempted:   []string{"GO-2026-5781"},
+			wantUnexempted: nil,
+		},
+		{
+			name:           "only unexempted",
+			input:          []string{"GO-2026-9999"},
+			wantExempted:   nil,
+			wantUnexempted: []string{"GO-2026-9999"},
+		},
+		{
+			name:           "mixed",
+			input:          []string{"GO-2026-5781", "GO-2026-9999"},
+			wantExempted:   []string{"GO-2026-5781"},
+			wantUnexempted: []string{"GO-2026-9999"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res := evaluateVulnerabilities(tc.input)
+			if !reflect.DeepEqual(res.exempted, tc.wantExempted) {
+				t.Errorf("exempted mismatch: expected %v, got %v", tc.wantExempted, res.exempted)
+			}
+			if !reflect.DeepEqual(res.unexempted, tc.wantUnexempted) {
+				t.Errorf("unexempted mismatch: expected %v, got %v", tc.wantUnexempted, res.unexempted)
+			}
+		})
+	}
+}
+
+func TestExecuteVulnCommand(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("scanner execution failure with no output", func(t *testing.T) {
+		cmd := newVulnCmd()
+		scanner := func(ctx context.Context) (string, error) {
+			return "", errors.New("command not found")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err == nil || !strings.Contains(err.Error(), "failed to run govulncheck") {
+			t.Fatalf("expected failed to run govulncheck error, got %v", err)
+		}
+	})
+
+	t.Run("no vulnerabilities found with exit 0", func(t *testing.T) {
+		cmd := newVulnCmd()
+		var outBuf bytes.Buffer
+		cmd.SetOut(&outBuf)
+		scanner := func(ctx context.Context) (string, error) {
+			return "No vulnerabilities found.", nil
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if !strings.Contains(outBuf.String(), "No vulnerabilities detected.") {
+			t.Fatalf("expected 'No vulnerabilities detected.', got %q", outBuf.String())
+		}
+	})
+
+	t.Run("no vulnerabilities parsed but scanner returned error", func(t *testing.T) {
+		cmd := newVulnCmd()
+		scanner := func(ctx context.Context) (string, error) {
+			return "syntax error in package", errors.New("exit status 1")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err == nil || !strings.Contains(err.Error(), "govulncheck failed") {
+			t.Fatalf("expected govulncheck failed error, got %v", err)
+		}
+	})
+
+	t.Run("only exempted vulnerabilities detected", func(t *testing.T) {
+		cmd := newVulnCmd()
+		var outBuf bytes.Buffer
+		cmd.SetOut(&outBuf)
+		scanner := func(ctx context.Context) (string, error) {
+			return "Vulnerability #1: GO-2026-5781\nDetails...", errors.New("exit status 3")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err != nil {
+			t.Fatalf("expected nil error for exempted vuln, got %v", err)
+		}
+		output := outBuf.String()
+		if !strings.Contains(output, "Accepted exemption for GO-2026-5781") {
+			t.Fatalf("expected exemption notice, got %q", output)
+		}
+		if !strings.Contains(output, "All detected vulnerabilities are covered by audited exemptions.") {
+			t.Fatalf("expected all covered message, got %q", output)
+		}
+	})
+
+	t.Run("unexempted vulnerabilities detected", func(t *testing.T) {
+		cmd := newVulnCmd()
+		var errBuf bytes.Buffer
+		cmd.SetErr(&errBuf)
+		scanner := func(ctx context.Context) (string, error) {
+			return "Vulnerability #1: GO-2026-9999\nUnfixable something", errors.New("exit status 3")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err == nil {
+			t.Fatal("expected error for unexempted vuln, got nil")
+		}
+		if !strings.Contains(err.Error(), "unexempted vulnerabilities detected: GO-2026-9999") {
+			t.Fatalf("expected unexempted vulnerabilities error, got %v", err)
+		}
+	})
+}
+
+func TestNewVulnCmdIntegration(t *testing.T) {
+	origScanner := defaultScanner
+	defer func() { defaultScanner = origScanner }()
+
+	defaultScanner = func(ctx context.Context) (string, error) {
+		return "No vulnerabilities found.", nil
+	}
+
+	cmd := newVulnCmd()
+	var outBuf bytes.Buffer
+	cmd.SetOut(&outBuf)
+	err := cmd.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error executing vuln command: %v", err)
+	}
+	if !strings.Contains(outBuf.String(), "No vulnerabilities detected.") {
+		t.Fatalf("expected success message, got %q", outBuf.String())
+	}
+}
+
+func TestEnsureGovulncheckPath(t *testing.T) {
+	ctx := context.Background()
+
+	// If govulncheck exists on system, ensureGovulncheck returns it
+	path, err := ensureGovulncheck(ctx)
+	if err == nil {
+		if !strings.Contains(path, "govulncheck") {
+			t.Fatalf("expected path to contain govulncheck, got %s", path)
+		}
+	}
+
+	// Test fallback directory detection
+	tmpDir := t.TempDir()
+	t.Setenv("GOBIN", tmpDir)
+	fakeBin := filepath.Join(tmpDir, "govulncheck")
+	if wErr := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0"), 0600); wErr != nil {
+		t.Fatalf("failed to create fake bin: %v", wErr)
+	}
+
+	found, err := ensureGovulncheck(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error with GOBIN set: %v", err)
+	}
+	if found != fakeBin && !strings.Contains(found, "govulncheck") {
+		t.Fatalf("expected %s or standard govulncheck, got %s", fakeBin, found)
+	}
+}
