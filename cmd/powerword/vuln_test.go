@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -107,19 +108,8 @@ func TestEvaluateVulnerabilities(t *testing.T) {
 	}
 }
 
-func TestExecuteVulnCommand(t *testing.T) {
+func TestExecuteVulnCommand_Success(t *testing.T) {
 	ctx := context.Background()
-
-	t.Run("scanner execution failure with no output", func(t *testing.T) {
-		cmd := newVulnCmd()
-		scanner := func(ctx context.Context) (string, error) {
-			return "", errors.New("command not found")
-		}
-		err := executeVulnCommand(ctx, cmd, scanner)
-		if err == nil || !strings.Contains(err.Error(), "failed to run govulncheck") {
-			t.Fatalf("expected failed to run govulncheck error, got %v", err)
-		}
-	})
 
 	t.Run("no vulnerabilities found with exit 0", func(t *testing.T) {
 		cmd := newVulnCmd()
@@ -137,23 +127,12 @@ func TestExecuteVulnCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("no vulnerabilities parsed but scanner returned error", func(t *testing.T) {
-		cmd := newVulnCmd()
-		scanner := func(ctx context.Context) (string, error) {
-			return "syntax error in package", errors.New("exit status 1")
-		}
-		err := executeVulnCommand(ctx, cmd, scanner)
-		if err == nil || !strings.Contains(err.Error(), "govulncheck failed") {
-			t.Fatalf("expected govulncheck failed error, got %v", err)
-		}
-	})
-
-	t.Run("only exempted vulnerabilities detected", func(t *testing.T) {
+	t.Run("only exempted vulnerabilities detected with clean exit or exit 3", func(t *testing.T) {
 		cmd := newVulnCmd()
 		var outBuf bytes.Buffer
 		cmd.SetOut(&outBuf)
 		scanner := func(ctx context.Context) (string, error) {
-			return "Vulnerability #1: GO-2026-5781\nDetails...", errors.New("exit status 3")
+			return "Vulnerability #1: GO-2026-5781\nDetails...", nil
 		}
 		err := executeVulnCommand(ctx, cmd, scanner)
 		if err != nil {
@@ -165,6 +144,48 @@ func TestExecuteVulnCommand(t *testing.T) {
 		}
 		if !strings.Contains(output, "All detected vulnerabilities are covered by audited exemptions.") {
 			t.Fatalf("expected all covered message, got %q", output)
+		}
+	})
+}
+
+func TestExecuteVulnCommand_Errors(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("scanner execution failure with no output", func(t *testing.T) {
+		cmd := newVulnCmd()
+		scanner := func(ctx context.Context) (string, error) {
+			return "", errors.New("command not found")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err == nil || !strings.Contains(err.Error(), "failed to run govulncheck") {
+			t.Fatalf("expected failed to run govulncheck error, got %v", err)
+		}
+	})
+
+	t.Run("no vulnerabilities parsed but scanner returned error", func(t *testing.T) {
+		cmd := newVulnCmd()
+		scanner := func(ctx context.Context) (string, error) {
+			return "syntax error in package", errors.New("exit status 1")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err == nil || !strings.Contains(err.Error(), "govulncheck failed") {
+			t.Fatalf("expected govulncheck failed error, got %v", err)
+		}
+	})
+
+	t.Run("exempted vulnerabilities detected but scanner returned non-vuln failure", func(t *testing.T) {
+		cmd := newVulnCmd()
+		var errBuf bytes.Buffer
+		cmd.SetErr(&errBuf)
+		scanner := func(ctx context.Context) (string, error) {
+			return "Vulnerability #1: GO-2026-5781\nCrash occurred...", errors.New("exit status 1")
+		}
+		err := executeVulnCommand(ctx, cmd, scanner)
+		if err == nil {
+			t.Fatal("expected error when scanner fails with non-vuln exit, got nil")
+		}
+		if !strings.Contains(err.Error(), "govulncheck encountered non-vuln failure") {
+			t.Fatalf("expected non-vuln failure error, got %v", err)
 		}
 	})
 
@@ -208,27 +229,40 @@ func TestNewVulnCmdIntegration(t *testing.T) {
 func TestEnsureGovulncheckPath(t *testing.T) {
 	ctx := context.Background()
 
-	// If govulncheck exists on system, ensureGovulncheck returns it
-	path, err := ensureGovulncheck(ctx)
-	if err == nil {
-		if !strings.Contains(path, "govulncheck") {
-			t.Fatalf("expected path to contain govulncheck, got %s", path)
+	origLookPath := lookPath
+	defer func() { lookPath = origLookPath }()
+
+	t.Run("found via LookPath", func(t *testing.T) {
+		lookPath = func(file string) (string, error) {
+			return "/fake/bin/govulncheck", nil
 		}
-	}
+		found, err := ensureGovulncheck(ctx)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if found != "/fake/bin/govulncheck" {
+			t.Fatalf("expected /fake/bin/govulncheck, got %s", found)
+		}
+	})
 
-	// Test fallback directory detection
-	tmpDir := t.TempDir()
-	t.Setenv("GOBIN", tmpDir)
-	fakeBin := filepath.Join(tmpDir, "govulncheck")
-	if wErr := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0"), 0600); wErr != nil {
-		t.Fatalf("failed to create fake bin: %v", wErr)
-	}
+	t.Run("fallback to GOBIN when LookPath fails", func(t *testing.T) {
+		lookPath = func(file string) (string, error) {
+			return "", exec.ErrNotFound
+		}
 
-	found, err := ensureGovulncheck(ctx)
-	if err != nil {
-		t.Fatalf("unexpected error with GOBIN set: %v", err)
-	}
-	if found != fakeBin && !strings.Contains(found, "govulncheck") {
-		t.Fatalf("expected %s or standard govulncheck, got %s", fakeBin, found)
-	}
+		tmpDir := t.TempDir()
+		t.Setenv("GOBIN", tmpDir)
+		fakeBin := filepath.Join(tmpDir, "govulncheck")
+		if wErr := os.WriteFile(fakeBin, []byte("#!/bin/sh\nexit 0"), 0600); wErr != nil {
+			t.Fatalf("failed to create fake bin: %v", wErr)
+		}
+
+		found, err := ensureGovulncheck(ctx)
+		if err != nil {
+			t.Fatalf("unexpected error with GOBIN fallback: %v", err)
+		}
+		if found != fakeBin {
+			t.Fatalf("expected %s, got %s", fakeBin, found)
+		}
+	})
 }

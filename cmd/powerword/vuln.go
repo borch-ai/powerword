@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,7 +25,10 @@ var vulnIDPattern = regexp.MustCompile(`Vulnerability #\d+:\s+(GO-\d{4}-\d+)`)
 
 type vulnScannerFunc func(ctx context.Context) (output string, exitErr error)
 
-var defaultScanner vulnScannerFunc = runGovulncheck
+var (
+	defaultScanner vulnScannerFunc                   = runGovulncheck
+	lookPath       func(file string) (string, error) = exec.LookPath
+)
 
 func newVulnCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -77,6 +81,17 @@ func evaluateVulnerabilities(vulnIDs []string) evalResult {
 	return res
 }
 
+func isVulnExitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode() == 3
+	}
+	return false
+}
+
 func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnScannerFunc) error {
 	output, err := scanner(ctx)
 	if err != nil && output == "" {
@@ -98,6 +113,12 @@ func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnSca
 		return fmt.Errorf("unexempted vulnerabilities detected: %s", strings.Join(eval.unexempted, ", "))
 	}
 
+	// If vulnerabilities were reported but all were exempted, verify the scanner didn't fail with a non-vuln error.
+	if err != nil && !isVulnExitError(err) {
+		cmd.PrintErrln(output)
+		return fmt.Errorf("govulncheck encountered non-vuln failure: %w\n%s", err, output)
+	}
+
 	for _, id := range eval.exempted {
 		cmd.Printf("Notice: Accepted exemption for %s (%s)\n", id, allowedVulns[id])
 	}
@@ -106,7 +127,7 @@ func executeVulnCommand(ctx context.Context, cmd *cobra.Command, scanner vulnSca
 }
 
 func ensureGovulncheck(ctx context.Context) (string, error) {
-	if binPath, err := exec.LookPath("govulncheck"); err == nil {
+	if binPath, err := lookPath("govulncheck"); err == nil {
 		return binPath, nil
 	}
 
@@ -124,7 +145,7 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 	}
 
 	binPath := filepath.Clean(filepath.Join(gobin, "govulncheck"))
-	//nolint:gosec // G703: binPath is clean and derived from system GOPATH/GOBIN environment variables
+	//nolint:gosec // G703,G304: binPath is constructed from trusted system environment variables
 	if _, err := os.Stat(binPath); err == nil {
 		return binPath, nil
 	}
@@ -134,6 +155,11 @@ func ensureGovulncheck(ctx context.Context) (string, error) {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to install govulncheck: %w", err)
+	}
+
+	//nolint:gosec // G703,G304: binPath is verified after installation
+	if _, err := os.Stat(binPath); err != nil {
+		return "", fmt.Errorf("installed govulncheck but binary not found at %s: %w", binPath, err)
 	}
 
 	return binPath, nil
