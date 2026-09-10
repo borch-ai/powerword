@@ -18,6 +18,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 func TestSlugify(t *testing.T) {
@@ -2050,5 +2051,203 @@ func TestGenerateImage_ImagenCrefValidation(t *testing.T) {
 	_, err = serviceForce.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
 	if err != nil {
 		t.Errorf("expected ForceCref generate to succeed with mock server, got: %v", err)
+	}
+}
+
+func TestOpenAIBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"message":"Rate limit exceeded","code":"rate_limit_exceeded"}}`))
+			return
+		}
+		resp := openai.ImageResponse{
+			Data: []openai.ImageResponseDataInner{
+				{URL: "http://example.com/success_retry.png"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("OPENAI_BASE_URL", server.URL)
+	backend := NewOpenAIBackendWithTimeout("dummy", 10*time.Second)
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	url, err := backend.GenerateImage(context.Background(), "prompt", "1024x1024")
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if url != "http://example.com/success_retry.png" {
+		t.Errorf("unexpected image URL: %s", url)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestGoogleBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	b64 := base64.StdEncoding.EncodeToString([]byte("fake-png-data"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{"bytesBase64Encoded": b64, "mimeType": "image/png"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend := NewGoogleBackend("dummy-key", "imagen-3.0-generate-002")
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	bytes, mime, err := backend.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if string(bytes) != "fake-png-data" || mime != "image/png" {
+		t.Errorf("unexpected output: bytes=%s, mime=%s", string(bytes), mime)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestVeoBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		// Second attempt succeeds
+		resp := map[string]string{
+			"name": "operations/test_op_123",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend, err := NewVeoBackend("dummy-key", "veo-2.0-generate-001", "100ms", "5s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	opName, err := backend.initiateVeo(context.Background(), "prompt", "16:9", "", nil)
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if opName != "operations/test_op_123" {
+		t.Errorf("unexpected operation name: %s", opName)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestMidjourneyBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte("502 Bad Gateway"))
+			return
+		}
+		resp := map[string]string{
+			"task_id": "mj_task_456",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	backend, err := NewMidjourneyBackend(server.URL, "dummy-key", "100ms", "5s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	statusURL, err := backend.initiateGeneration(context.Background(), "prompt", "1:1")
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if !strings.Contains(statusURL, "mj_task_456") {
+		t.Errorf("unexpected status URL: %s", statusURL)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestDownloadImage_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("fake-downloaded-bytes"))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	path, err := downloadImage(context.Background(), server.URL, tmpDir, "retry-prompt", 10*time.Second)
+	if err != nil {
+		t.Fatalf("expected downloadImage to succeed after retry, got: %v", err)
+	}
+	if path == "" {
+		t.Error("expected non-empty file path")
+	}
+	//nolint:gosec // G304: path is created inside test temp directory
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	if string(data) != "fake-downloaded-bytes" {
+		t.Errorf("unexpected file content: %s", string(data))
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
 	}
 }

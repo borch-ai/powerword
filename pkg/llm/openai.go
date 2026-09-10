@@ -13,8 +13,9 @@ import (
 )
 
 type OpenAIClient struct {
-	client    *openai.Client
-	modelName string
+	client      *openai.Client
+	modelName   string
+	retryConfig RetryConfig
 }
 
 // NewOpenAIClient creates a new OpenAI client.
@@ -34,8 +35,9 @@ func NewCustomOpenAIClient(apiKey string, modelName string, baseURL string) (*Op
 	}
 	client := openai.NewClientWithConfig(cfg)
 	return &OpenAIClient{
-		client:    client,
-		modelName: modelName,
+		client:      client,
+		modelName:   modelName,
+		retryConfig: DefaultRetryConfig(),
 	}, nil
 }
 
@@ -43,9 +45,15 @@ func NewCustomOpenAIClient(apiKey string, modelName string, baseURL string) (*Op
 func NewOpenAIClientWithConfig(cfg openai.ClientConfig, modelName string) *OpenAIClient {
 	client := openai.NewClientWithConfig(cfg)
 	return &OpenAIClient{
-		client:    client,
-		modelName: modelName,
+		client:      client,
+		modelName:   modelName,
+		retryConfig: DefaultRetryConfig(),
 	}
+}
+
+// SetRetryConfig configures custom retry behavior for the OpenAI client.
+func (o *OpenAIClient) SetRetryConfig(cfg RetryConfig) {
+	o.retryConfig = cfg
 }
 
 func (o *OpenAIClient) prepareRequest(messages []Message, tools []ToolDefinition) (openai.ChatCompletionRequest, error) {
@@ -145,7 +153,12 @@ func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools [
 		}
 	}
 
-	resp, err := o.client.CreateChatCompletion(ctx, req)
+	var resp openai.ChatCompletionResponse
+	err = Retry(ctx, o.retryConfig, func() error {
+		var callErr error
+		resp, callErr = o.client.CreateChatCompletion(ctx, req)
+		return callErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("openai chat completion error: %w", err)
 	}
@@ -187,7 +200,12 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 		IncludeUsage: true,
 	}
 
-	stream, err := o.client.CreateChatCompletionStream(ctx, req)
+	var stream *openai.ChatCompletionStream
+	err = Retry(ctx, o.retryConfig, func() error {
+		var callErr error
+		stream, callErr = o.client.CreateChatCompletionStream(ctx, req)
+		return callErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("openai chat completion stream error: %w", err)
 	}

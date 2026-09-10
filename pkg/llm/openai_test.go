@@ -478,3 +478,94 @@ func TestOpenAIClient_Embed(t *testing.T) {
 		}
 	})
 }
+
+func TestOpenAIClient_Generate_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"message":"Rate limit exceeded","type":"requests","code":"rate_limit_exceeded"}}`))
+			return
+		}
+		resp := openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    "assistant",
+						Content: "Success after retry",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  IsRetryableError,
+	})
+
+	msg, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hi"}}, nil)
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if msg.Content != "Success after retry" {
+		t.Errorf("unexpected content: %s", msg.Content)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestOpenAIClient_Stream_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"content":"Retried stream"}}]}`)
+		w.(http.Flusher).Flush()
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  IsRetryableError,
+	})
+
+	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream error: %v", err)
+	}
+
+	var results []string
+	for chunk := range ch {
+		if chunk.Error != nil {
+			t.Fatalf("unexpected chunk error: %v", chunk.Error)
+		}
+		results = append(results, chunk.Content)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+	if len(results) == 0 || results[0] != "Retried stream" {
+		t.Errorf("unexpected results: %+v", results)
+	}
+}

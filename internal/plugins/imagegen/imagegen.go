@@ -18,6 +18,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 // StyleProfile stores style definitions.
@@ -133,7 +134,8 @@ func (s *StyleStore) List() ([]StyleProfile, error) {
 
 // OpenAIBackend implements DALL-E 3 image generation.
 type OpenAIBackend struct {
-	client *openai.Client
+	client      *openai.Client
+	retryConfig llm.RetryConfig
 }
 
 // NewOpenAIBackend creates a new OpenAI image generator wrapper with the default timeout of 120 seconds.
@@ -149,8 +151,14 @@ func NewOpenAIBackendWithTimeout(apiKey string, timeout time.Duration) *OpenAIBa
 	}
 	cfg.HTTPClient = &http.Client{Timeout: timeout}
 	return &OpenAIBackend{
-		client: openai.NewClientWithConfig(cfg),
+		client:      openai.NewClientWithConfig(cfg),
+		retryConfig: llm.DefaultRetryConfig(),
 	}
+}
+
+// SetRetryConfig sets custom retry behavior for the OpenAI backend.
+func (b *OpenAIBackend) SetRetryConfig(cfg llm.RetryConfig) {
+	b.retryConfig = cfg
 }
 
 // GenerateImage requests image URL from DALL-E 3.
@@ -165,7 +173,12 @@ func (b *OpenAIBackend) GenerateImage(ctx context.Context, prompt string, size s
 		Model:  openai.CreateImageModelDallE3,
 	}
 
-	resp, err := b.client.CreateImage(ctx, req)
+	var resp openai.ImageResponse
+	err := llm.Retry(ctx, b.retryConfig, func() error {
+		var callErr error
+		resp, callErr = b.client.CreateImage(ctx, req)
+		return callErr
+	})
 	if err != nil {
 		return "", fmt.Errorf("openai error: %w", err)
 	}
@@ -182,10 +195,11 @@ func (b *OpenAIBackend) Capabilities() Capabilities {
 
 // GoogleBackend implements Imagen 3 image generation using Google AI Studio predict REST API.
 type GoogleBackend struct {
-	apiURL string
-	apiKey string
-	model  string
-	client *http.Client
+	apiURL      string
+	apiKey      string
+	model       string
+	client      *http.Client
+	retryConfig llm.RetryConfig
 }
 
 // NewGoogleBackend creates a new Google prediction API client wrapper.
@@ -198,16 +212,22 @@ func NewGoogleBackend(apiKey, model string) *GoogleBackend {
 		apiURL = fmt.Sprintf("%s/v1beta/models/%s:predict", baseURL, model)
 	}
 	return &GoogleBackend{
-		apiURL: apiURL,
-		apiKey: apiKey,
-		model:  model,
-		client: &http.Client{Timeout: 120 * time.Second},
+		apiURL:      apiURL,
+		apiKey:      apiKey,
+		model:       model,
+		client:      &http.Client{Timeout: 120 * time.Second},
+		retryConfig: llm.DefaultRetryConfig(),
 	}
 }
 
 // SetTimeout sets a custom HTTP client timeout.
 func (b *GoogleBackend) SetTimeout(t time.Duration) {
 	b.client.Timeout = t
+}
+
+// SetRetryConfig sets custom retry behavior for the Google backend.
+func (b *GoogleBackend) SetRetryConfig(cfg llm.RetryConfig) {
+	b.retryConfig = cfg
 }
 
 // GenerateImage generates the image via direct predict REST call and returns decoded raw bytes and mimeType.
@@ -250,29 +270,38 @@ func (b *GoogleBackend) GenerateImage(ctx context.Context, prompt string, size s
 	}
 
 	reqURL := fmt.Sprintf("%s?key=%s", b.apiURL, b.apiKey)
-	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(data))
+
+	var respBody []byte
+	err = llm.Retry(ctx, b.retryConfig, func() error {
+		req, reqErr := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(data))
+		if reqErr != nil {
+			return fmt.Errorf("failed to create Google request: %w", reqErr)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, doErr := b.client.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("google predict request failed: %w", doErr)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read response body: %w", readErr)
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return fmt.Errorf("google backend predict returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		respBody = bodyBytes
+		return nil
+	})
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create Google request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("google predict request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, "", fmt.Errorf("google backend predict returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		return nil, "", err
 	}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	return parseGooglePrediction(bodyBytes)
+	return parseGooglePrediction(respBody)
 }
 
 func parseGooglePrediction(bodyBytes []byte) ([]byte, string, error) {
@@ -324,6 +353,7 @@ type VeoBackend struct {
 	pollingInterval time.Duration
 	pollingTimeout  time.Duration
 	client          *http.Client
+	retryConfig     llm.RetryConfig
 }
 
 // NewVeoBackend creates a new Veo API client wrapper.
@@ -356,12 +386,18 @@ func NewVeoBackend(apiKey, model, intervalStr, timeoutStr string) (*VeoBackend, 
 		pollingInterval: interval,
 		pollingTimeout:  timeout,
 		client:          &http.Client{Timeout: 120 * time.Second},
+		retryConfig:     llm.DefaultRetryConfig(),
 	}, nil
 }
 
 // SetTimeout sets a custom HTTP client timeout.
 func (b *VeoBackend) SetTimeout(t time.Duration) {
 	b.client.Timeout = t
+}
+
+// SetRetryConfig sets custom retry behavior for the Veo backend.
+func (b *VeoBackend) SetRetryConfig(cfg llm.RetryConfig) {
+	b.retryConfig = cfg
 }
 
 func (b *VeoBackend) downloadVideo(ctx context.Context, videoURI string) ([]byte, error) {
@@ -372,27 +408,35 @@ func (b *VeoBackend) downloadVideo(ctx context.Context, videoURI string) ([]byte
 		downloadURL = fmt.Sprintf("%s?key=%s&alt=media", videoURI, b.apiKey)
 	}
 
-	//nolint:gosec // downloadURL is verified and retrieved from Google API response
-	dlReq, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create download request: %w", err)
-	}
+	var videoBytes []byte
+	err := llm.Retry(ctx, b.retryConfig, func() error {
+		//nolint:gosec // downloadURL is verified and retrieved from Google API response
+		dlReq, dlErr := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+		if dlErr != nil {
+			return fmt.Errorf("failed to create download request: %w", dlErr)
+		}
 
-	//nolint:gosec // request is sent to trusted Google resource
-	dlResp, err := b.client.Do(dlReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download video content: %w", err)
-	}
-	defer func() { _ = dlResp.Body.Close() }()
+		//nolint:gosec // request is sent to trusted Google resource
+		dlResp, doErr := b.client.Do(dlReq)
+		if doErr != nil {
+			return fmt.Errorf("failed to download video content: %w", doErr)
+		}
+		defer func() { _ = dlResp.Body.Close() }()
 
-	if dlResp.StatusCode != http.StatusOK {
-		dlBytes, _ := io.ReadAll(dlResp.Body)
-		return nil, fmt.Errorf("failed to download video content, status %d: %s", dlResp.StatusCode, string(dlBytes))
-	}
+		if dlResp.StatusCode != http.StatusOK {
+			dlBytes, _ := io.ReadAll(dlResp.Body)
+			return fmt.Errorf("failed to download video content, status %d: %s", dlResp.StatusCode, string(dlBytes))
+		}
 
-	videoBytes, err := io.ReadAll(dlResp.Body)
+		vb, readErr := io.ReadAll(dlResp.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read downloaded video content: %w", readErr)
+		}
+		videoBytes = vb
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to read downloaded video content: %w", err)
+		return nil, err
 	}
 
 	return videoBytes, nil
@@ -419,35 +463,47 @@ func (b *VeoBackend) GenerateImage(ctx context.Context, prompt string, size stri
 }
 
 func (b *VeoBackend) downloadImageBytes(ctx context.Context, urlStr string) ([]byte, string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	var data []byte
+	var contentType string
+
+	err := llm.Retry(ctx, b.retryConfig, func() error {
+		req, reqErr := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+		if reqErr != nil {
+			return reqErr
+		}
+		resp, doErr := b.client.Do(req)
+		if doErr != nil {
+			return doErr
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to download image, status %d", resp.StatusCode)
+		}
+
+		// Limit image download size to 10MB to prevent DoS
+		const maxDownloadSize = 10 * 1024 * 1024
+		limitReader := io.LimitReader(resp.Body, maxDownloadSize+1)
+		d, readErr := io.ReadAll(limitReader)
+		if readErr != nil {
+			return readErr
+		}
+		if len(d) > maxDownloadSize {
+			return fmt.Errorf("image exceeds maximum allowed size of %d bytes", maxDownloadSize)
+		}
+
+		ct := resp.Header.Get("Content-Type")
+		if ct == "" {
+			ct = "image/png"
+		}
+		data = d
+		contentType = ct
+		return nil
+	})
 	if err != nil {
 		return nil, "", err
 	}
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return nil, "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("failed to download image, status %d", resp.StatusCode)
-	}
-
-	// Limit image download size to 10MB to prevent DoS
-	const maxDownloadSize = 10 * 1024 * 1024
-	limitReader := io.LimitReader(resp.Body, maxDownloadSize+1)
-	data, err := io.ReadAll(limitReader)
-	if err != nil {
-		return nil, "", err
-	}
-	if len(data) > maxDownloadSize {
-		return nil, "", fmt.Errorf("image exceeds maximum allowed size of %d bytes", maxDownloadSize)
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "image/png"
-	}
 	return data, contentType, nil
 }
 
@@ -512,42 +568,51 @@ func (b *VeoBackend) initiateVeo(ctx context.Context, prompt, size string, crefU
 	}
 
 	reqURL := fmt.Sprintf("%s?key=%s", b.apiURL, b.apiKey)
-	//nolint:gosec // reqURL is internally validated and constructed from model identifier
-	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(data))
+
+	var opName string
+	err = llm.Retry(ctx, b.retryConfig, func() error {
+		//nolint:gosec // reqURL is internally validated and constructed from model identifier
+		req, reqErr := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewReader(data))
+		if reqErr != nil {
+			return fmt.Errorf("failed to create Veo request: %w", reqErr)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		//nolint:gosec // request goes to trusted Google model API
+		resp, doErr := b.client.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("veo initiate request failed: %w", doErr)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read response body: %w", readErr)
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return fmt.Errorf("veo backend returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		var initResp struct {
+			Name string `json:"name"`
+		}
+		if unmarshalErr := json.Unmarshal(bodyBytes, &initResp); unmarshalErr != nil {
+			return fmt.Errorf("failed to decode Veo response: %w", unmarshalErr)
+		}
+
+		if initResp.Name == "" {
+			return fmt.Errorf("missing operation name in response: %s", string(bodyBytes))
+		}
+
+		opName = initResp.Name
+		return nil
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to create Veo request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	//nolint:gosec // request goes to trusted Google model API
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("veo initiate request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("veo backend returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		return "", err
 	}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	var initResp struct {
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(bodyBytes, &initResp); err != nil {
-		return "", fmt.Errorf("failed to decode Veo response: %w", err)
-	}
-
-	if initResp.Name == "" {
-		return "", fmt.Errorf("missing operation name in response: %s", string(bodyBytes))
-	}
-
-	return initResp.Name, nil
+	return opName, nil
 }
 
 type veoError struct {
@@ -673,6 +738,7 @@ type MidjourneyBackend struct {
 	pollingInterval time.Duration
 	pollingTimeout  time.Duration
 	httpClient      *http.Client
+	retryConfig     llm.RetryConfig
 }
 
 // NewMidjourneyBackend creates a custom API polling client wrapper.
@@ -695,12 +761,18 @@ func NewMidjourneyBackend(apiURL, apiKey, intervalStr, timeoutStr string) (*Midj
 		pollingInterval: interval,
 		pollingTimeout:  timeout,
 		httpClient:      &http.Client{Timeout: 120 * time.Second},
+		retryConfig:     llm.DefaultRetryConfig(),
 	}, nil
 }
 
 // SetTimeout sets a custom HTTP client timeout.
 func (b *MidjourneyBackend) SetTimeout(t time.Duration) {
 	b.httpClient.Timeout = t
+}
+
+// SetRetryConfig sets custom retry behavior for the Midjourney backend.
+func (b *MidjourneyBackend) SetRetryConfig(cfg llm.RetryConfig) {
+	b.retryConfig = cfg
 }
 
 // Capabilities returns the feature set supported by the Midjourney backend.
@@ -824,42 +896,49 @@ func (b *MidjourneyBackend) initiateGeneration(ctx context.Context, prompt, size
 		return "", fmt.Errorf("failed to marshal Midjourney payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", b.apiURL, bytes.NewReader(data))
+	var statusURL string
+	err = llm.Retry(ctx, b.retryConfig, func() error {
+		req, reqErr := http.NewRequestWithContext(ctx, "POST", b.apiURL, bytes.NewReader(data))
+		if reqErr != nil {
+			return fmt.Errorf("failed to create Midjourney request: %w", reqErr)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if b.apiKey != "" {
+			req.Header.Set("Authorization", "Bearer "+b.apiKey)
+		}
+
+		resp, doErr := b.httpClient.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("http POST request failed: %w", doErr)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read response body: %w", readErr)
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return fmt.Errorf("midjourney backend returned status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		var responseMap map[string]interface{}
+		if unmarshalErr := json.Unmarshal(bodyBytes, &responseMap); unmarshalErr != nil {
+			return fmt.Errorf("failed to decode json response: %w", unmarshalErr)
+		}
+
+		taskID := extractTaskID(responseMap)
+		if taskID == "" {
+			return fmt.Errorf("failed to extract task ID from response: %s", string(bodyBytes))
+		}
+
+		statusURL = extractStatusURL(responseMap, b.apiURL, taskID)
+		return nil
+	})
 	if err != nil {
-		return "", fmt.Errorf("failed to create Midjourney request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if b.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+b.apiKey)
+		return "", err
 	}
 
-	resp, err := b.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("http POST request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("midjourney backend returned status %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	var responseMap map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &responseMap); err != nil {
-		return "", fmt.Errorf("failed to decode json response: %w", err)
-	}
-
-	taskID := extractTaskID(responseMap)
-	if taskID == "" {
-		return "", fmt.Errorf("failed to extract task ID from response: %s", string(bodyBytes))
-	}
-
-	statusURL := extractStatusURL(responseMap, b.apiURL, taskID)
 	return statusURL, nil
 }
 
@@ -1171,20 +1250,30 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 	derivedCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(derivedCtx, "GET", urlStr, nil)
+	var resp *http.Response
+	err := llm.Retry(derivedCtx, llm.DefaultRetryConfig(), func() error {
+		req, reqErr := http.NewRequestWithContext(derivedCtx, "GET", urlStr, nil)
+		if reqErr != nil {
+			return reqErr
+		}
+
+		r, doErr := http.DefaultClient.Do(req)
+		if doErr != nil {
+			return fmt.Errorf("failed to request image URL: %w", doErr)
+		}
+
+		if r.StatusCode != http.StatusOK {
+			_ = r.Body.Close()
+			return fmt.Errorf("failed to download image, status %d", r.StatusCode)
+		}
+
+		resp = r
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to request image URL: %w", err)
-	}
 	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download image, status %d", resp.StatusCode)
-	}
 
 	ext := ".png"
 	contentType := resp.Header.Get("Content-Type")

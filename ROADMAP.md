@@ -306,7 +306,7 @@ Focus: Advancing agent safety guardrails, remote transport protocols, robust san
 *   [x] **Task 6.22: Configurable & Generalized Image/Video Generation Timeouts**
     *   Add a configurable `plugins.imagegen.request_timeout` parameter (defaulting to 120s) across all backends (Google Imagen, Google Veo, Midjourney, OpenAI DALL-E) and download helpers to prevent context deadline exceeded issues under high load.
     *   [Implementation Plan](plans/phase_6/task_6_22_configurable_imagegen_timeouts.md)
-*   [ ] **Task 6.23: Standardized Request Retry Engine with Exponential Backoff**
+*   [x] **Task 6.23: Standardized Request Retry Engine with Exponential Backoff**
     *   Implement transient error detection and auto-retries with exponential backoff and jitter for GenAI API requests and image generators.
     *   [Implementation Plan](plans/phase_6/task_6_23_retry_backoff.md)
 *   [ ] **Task 6.24: Active Process Termination & Poll Cleanup on Context Cancellation**
