@@ -20,7 +20,7 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
 - Introduce standalone executable bash script `scripts/build_release_binaries.sh` with strict error handling (`set -euo pipefail`).
 - Dynamically tests package buildability via `CGO_ENABLED=0 go list "./$dir"` across `cmd/powerword` and `cmd/pw-mcp-*` without maintaining hardcoded exclusions.
-- Cross-compiles each buildable package across target platforms (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`) and outputs to `dist/`.
+- Cross-compiles each buildable package across target platforms (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`), injecting release version flags for `powerword` while plugins maintain their server protocol implementation versioning, and outputs to `dist/`.
 
 #### [MODIFY] [release.yml](file://../../.github/workflows/release.yml)
 

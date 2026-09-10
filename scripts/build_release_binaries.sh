@@ -54,6 +54,7 @@ for pkg in "${PKGS[@]}"; do
       ext=".exe"
     fi
     out="dist/${bin_name}-${os}-${arch}${ext}"
+    # Injects version metadata for powerword (pkg/config.Version); plugins maintain their own protocol Implementation.Version.
     CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build \
       -ldflags "-X github.com/borch-ai/powerword/pkg/config.Version=${VERSION_TAG}" \
       -o "$out" "$pkg"
