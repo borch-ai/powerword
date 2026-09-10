@@ -1,4 +1,4 @@
-.PHONY: all build install test test-fast test-integration test-db test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans build-db-plugin
+.PHONY: all build install test test-fast test-integration test-db test-review lint fmt clean tidy vuln check-coverage markdown-lint install-hooks fix-plans build-db-plugin dist
 
 # Go parameters
 GOCMD=go
@@ -147,9 +147,14 @@ tidy:
 clean:
 	$(GOCLEAN)
 	rm -rf bin/
+	rm -rf dist/
 	rm -f coverage.out
 
 # Standalone target to build only pw-mcp-db with CGO enabled.
 build-db-plugin:
 	mkdir -p bin
 	CGO_ENABLED=1 $(GOBUILD) -tags=integration -o bin/$(DB_PLUGIN) ./cmd/$(DB_PLUGIN)
+
+# Cross-compile powerword and pure-Go MCP plugins for release distribution.
+dist:
+	./scripts/build_release_binaries.sh $(VERSION)

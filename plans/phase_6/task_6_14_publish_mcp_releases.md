@@ -14,18 +14,23 @@ Extend the GitHub Actions release workflow in Powerword to compile, package, and
 
 ## Proposed Changes
 
-### GitHub Actions Workflow
+### Release Scripts & Automation
+
+#### [NEW] [build_release_binaries.sh](file://../../scripts/build_release_binaries.sh)
+
+- Introduce standalone executable bash script `scripts/build_release_binaries.sh` with strict error handling (`set -euo pipefail`).
+- Dynamically tests package buildability via `CGO_ENABLED=0 go list "./$dir"` across `cmd/powerword` and `cmd/pw-mcp-*` without maintaining hardcoded exclusions.
+- Cross-compiles each buildable package across target platforms (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`) and outputs to `dist/`.
 
 #### [MODIFY] [release.yml](file://../../.github/workflows/release.yml)
 
-- Update the build step to loop over all plugins under `cmd/` and cross-compile them across target architectures (`darwin/amd64`, `darwin/arm64`, `linux/amd64`, `linux/arm64`, `windows/amd64`), dynamically testing buildability via `go list` under `CGO_ENABLED=0` to include all pure-Go commands without maintaining hardcoded exclusions.
-- Output compiled binaries to the `dist` folder:
-  - `${plugin}-darwin-amd64`
-  - `${plugin}-darwin-arm64`
-  - `${plugin}-linux-amd64`
-  - `${plugin}-linux-arm64`
-  - `${plugin}-windows-amd64.exe`
-- The upload step `gh release upload` automatically picks up and publishes these files as GitHub release assets.
+- Invoke `./scripts/build_release_binaries.sh "$VERSION"` in the release workflow.
+- The upload step `gh release upload` automatically picks up and publishes all files in `dist/*` as GitHub release assets.
+
+#### [MODIFY] [Makefile](file://../../Makefile)
+
+- Add `dist` target to invoke `./scripts/build_release_binaries.sh $(VERSION)`.
+- Update `clean` target to clean `dist/`.
 
 ---
 
