@@ -9,8 +9,12 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 VERSION="${1:-${VERSION:-dev}}"
-VERSION_NUM="${VERSION#v}"
-VERSION_TAG="v${VERSION_NUM}"
+if [ "${VERSION}" = "dev" ]; then
+  VERSION_TAG="dev"
+else
+  VERSION_NUM="${VERSION#v}"
+  VERSION_TAG="v${VERSION_NUM}"
+fi
 
 echo "Building release binaries for version ${VERSION_TAG}..."
 

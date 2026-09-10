@@ -157,4 +157,4 @@ build-db-plugin:
 
 # Cross-compile powerword and pure-Go MCP plugins for release distribution.
 dist:
-	./scripts/build_release_binaries.sh $(VERSION)
+	bash ./scripts/build_release_binaries.sh "$(VERSION)"
