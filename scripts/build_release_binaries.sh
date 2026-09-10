@@ -18,6 +18,7 @@ fi
 
 echo "Building release binaries for version ${VERSION_TAG}..."
 
+rm -rf dist
 mkdir -p dist
 
 TARGETS=(
