@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -151,7 +152,7 @@ func TestExecuteVulnCommand_Success(t *testing.T) {
 		cmd := newVulnCmd()
 		var outBuf bytes.Buffer
 		cmd.SetOut(&outBuf)
-		exit3Err := exec.CommandContext(ctx, "sh", "-c", "exit 3").Run()
+		exit3Err := fakeExitCode(ctx, 3)
 		scanner := func(ctx context.Context) (string, error) {
 			return "Vulnerability #1: GO-2026-5781\nDetails...", exit3Err
 		}
@@ -180,12 +181,12 @@ func TestIsVulnExitError(t *testing.T) {
 		t.Error("expected false for non-exit error")
 	}
 
-	exit1Err := exec.CommandContext(ctx, "sh", "-c", "exit 1").Run()
+	exit1Err := fakeExitCode(ctx, 1)
 	if isVulnExitError(exit1Err) {
 		t.Error("expected false for exit code 1")
 	}
 
-	exit3Err := exec.CommandContext(ctx, "sh", "-c", "exit 3").Run()
+	exit3Err := fakeExitCode(ctx, 3)
 	if !isVulnExitError(exit3Err) {
 		t.Error("expected true for exit code 3")
 	}
@@ -458,4 +459,32 @@ func TestGetGoEnv_FallbackGOPATH(t *testing.T) {
 	if got := getGoEnv(ctx, "GOPATH"); got != expected {
 		t.Fatalf("expected %q, got %q", expected, got)
 	}
+}
+
+func fakeExitCode(ctx context.Context, code int) error {
+	//nolint:gosec // G204: os.Args[0] is the current test binary invoked safely as a subprocess
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcessExit", "--", strconv.Itoa(code))
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+	return cmd.Run()
+}
+
+func TestHelperProcessExit(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
+	}
+	code := 0
+	if len(args) > 0 {
+		if parsed, err := strconv.Atoi(args[0]); err == nil {
+			code = parsed
+		}
+	}
+	os.Exit(code)
 }
