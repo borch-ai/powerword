@@ -750,3 +750,22 @@ service_account_path = "/path/to/sa.json"
 		t.Errorf("expected env override service_account_path to be '/env/sa.json', got '%s'", cfgEnv.Plugins.GDoc.ServiceAccountPath)
 	}
 }
+
+func TestLoadConfig_ImageGenRetryEnvOverrides(t *testing.T) {
+	defer clearEnv()()
+	t.Setenv("POWERWORD_GEMINI_API_KEY", "dummy-key")
+	t.Setenv("POWERWORD_IMAGEGEN_MAX_RETRIES", "4")
+	t.Setenv("POWERWORD_IMAGEGEN_RETRY_BACKOFF", "350ms")
+
+	cfg, err := LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig returned unexpected error: %v", err)
+	}
+
+	if cfg.Plugins.ImageGen.MaxRetries != 4 {
+		t.Errorf("expected ImageGen.MaxRetries to be 4, got %d", cfg.Plugins.ImageGen.MaxRetries)
+	}
+	if cfg.Plugins.ImageGen.RetryBackoff != "350ms" {
+		t.Errorf("expected ImageGen.RetryBackoff to be '350ms', got %q", cfg.Plugins.ImageGen.RetryBackoff)
+	}
+}
