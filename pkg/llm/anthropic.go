@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -175,9 +176,14 @@ func (a *AnthropicClient) initiateStreamWithRetry(ctx context.Context, params an
 		stream = a.client.Messages.NewStreaming(ctx, params)
 		if !stream.Next() {
 			if streamErr := stream.Err(); streamErr != nil {
+				if errors.Is(streamErr, io.EOF) {
+					hasFirst = false
+					return nil
+				}
 				_ = stream.Close()
 				return streamErr
 			}
+			hasFirst = false
 			return nil
 		}
 		hasFirst = true
@@ -205,7 +211,7 @@ func drainAnthropicStream(ctx context.Context, stream *ssestream.Stream[anthropi
 		}
 	}
 
-	if err := stream.Err(); err != nil {
+	if err := stream.Err(); err != nil && !errors.Is(err, io.EOF) {
 		out <- StreamChunk{Error: fmt.Errorf("anthropic stream error: %w", err)}
 	}
 }

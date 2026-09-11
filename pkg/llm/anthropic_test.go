@@ -469,3 +469,70 @@ func TestAnthropicClient_Stream_RetrySuccess(t *testing.T) {
 		t.Errorf("unexpected stream results: %+v", results)
 	}
 }
+
+func TestAnthropicClient_Stream_SetupFailureEmitsError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"authentication_error","message":"invalid api key"}}`))
+	}))
+	defer server.Close()
+
+	client, err := NewAnthropicClientWithOpts("claude-3-5-sonnet",
+		option.WithBaseURL(server.URL),
+		option.WithAPIKey("bad-key"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream error: %v", err)
+	}
+
+	var sawErr bool
+	for chunk := range ch {
+		if chunk.Error != nil {
+			sawErr = true
+		}
+	}
+	if !sawErr {
+		t.Fatal("expected error chunk on stream setup failure, got none")
+	}
+}
+
+func TestAnthropicClient_Stream_ImmediateEOF(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprintf(w, "event: message_stop\ndata: %s\n\n", `{"type":"message_stop"}`)
+		w.(http.Flusher).Flush()
+	}))
+	defer server.Close()
+
+	client, err := NewAnthropicClientWithOpts("claude-3-5-sonnet",
+		option.WithBaseURL(server.URL),
+		option.WithAPIKey("dummy-key"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 2,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  IsRetryableError,
+	})
+
+	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream error: %v", err)
+	}
+
+	for range ch {
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retries on clean stream end), got %d", attempts)
+	}
+}

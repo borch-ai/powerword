@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -727,20 +728,25 @@ func (b *VeoBackend) pollOnceVeo(ctx context.Context, opName string) (bool, []by
 }
 
 func (b *VeoBackend) pollVeo(ctx context.Context, opName string) ([]byte, error) {
+	pollCtx, cancel := context.WithTimeout(ctx, b.pollingTimeout)
+	defer cancel()
+
 	ticker := time.NewTicker(b.pollingInterval)
 	defer ticker.Stop()
 
-	timeoutChan := time.After(b.pollingTimeout)
-
 	for {
 		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-timeoutChan:
-			return nil, fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+		case <-pollCtx.Done():
+			if errors.Is(pollCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+				return nil, fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+			}
+			return nil, pollCtx.Err()
 		case <-ticker.C:
-			done, videoBytes, err := b.pollOnceVeo(ctx, opName)
+			done, videoBytes, err := b.pollOnceVeo(pollCtx, opName)
 			if err != nil {
+				if (errors.Is(err, context.DeadlineExceeded) || errors.Is(pollCtx.Err(), context.DeadlineExceeded)) && ctx.Err() == nil {
+					return nil, fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+				}
 				return nil, err
 			}
 			if done {
@@ -989,20 +995,25 @@ func (b *MidjourneyBackend) GenerateImage(ctx context.Context, prompt string, si
 		return "", err
 	}
 
+	pollCtx, cancel := context.WithTimeout(ctx, b.pollingTimeout)
+	defer cancel()
+
 	ticker := time.NewTicker(b.pollingInterval)
 	defer ticker.Stop()
 
-	timeoutChan := time.After(b.pollingTimeout)
-
 	for {
 		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-timeoutChan:
-			return "", fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+		case <-pollCtx.Done():
+			if errors.Is(pollCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+				return "", fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+			}
+			return "", pollCtx.Err()
 		case <-ticker.C:
-			_, imgURL, err := b.pollOnce(ctx, statusURL)
+			_, imgURL, err := b.pollOnce(pollCtx, statusURL)
 			if err != nil {
+				if (errors.Is(err, context.DeadlineExceeded) || errors.Is(pollCtx.Err(), context.DeadlineExceeded)) && ctx.Err() == nil {
+					return "", fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+				}
 				return "", err
 			}
 
@@ -1273,7 +1284,7 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 	if imageBytes != nil {
 		localPath, err = saveImageBytes(imageBytes, mimeType, s.workspaceRoot, prompt)
 	} else {
-		localPath, err = downloadImage(ctx, imageURL, s.workspaceRoot, prompt, s.getRequestTimeout())
+		localPath, err = downloadImage(ctx, imageURL, s.workspaceRoot, prompt, s.getRequestTimeout(), s.getRetryConfig())
 	}
 	if err != nil {
 		return "", fmt.Errorf("failed to save generated image: %w", err)
@@ -1368,7 +1379,7 @@ func fetchImageToTempFile(ctx context.Context, urlStr, dir string) (string, stri
 	return tmpName, r.Header.Get("Content-Type"), nil
 }
 
-func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, prompt string, timeout time.Duration) (string, error) {
+func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, prompt string, timeout time.Duration, retryCfgs ...llm.RetryConfig) (string, error) {
 	derivedCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -1377,9 +1388,14 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 		return "", fmt.Errorf("failed to create generated_images folder: %w", mkdirErr)
 	}
 
+	retryCfg := llm.DefaultRetryConfig()
+	if len(retryCfgs) > 0 {
+		retryCfg = retryCfgs[0]
+	}
+
 	var tempFilePath string
 	var contentType string
-	err := llm.Retry(derivedCtx, llm.DefaultRetryConfig(), func() error {
+	err := llm.Retry(derivedCtx, retryCfg, func() error {
 		tmpPath, ct, fetchErr := fetchImageToTempFile(derivedCtx, urlStr, dir)
 		if fetchErr != nil {
 			return fetchErr

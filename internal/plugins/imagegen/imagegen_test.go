@@ -2463,3 +2463,66 @@ func TestVeoBackend_PollOnceVeo_ExceedsSizeLimit(t *testing.T) {
 		t.Errorf("expected error mentioning maximum allowed size, got: %v", pollErr)
 	}
 }
+
+func TestDownloadImage_CustomRetryConfig(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("503 Service Unavailable"))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	// When llm.NoRetries() is passed, attempts should be exactly 1
+	_, err := downloadImage(context.Background(), server.URL, tmpDir, "no-retry-prompt", 5*time.Second, llm.NoRetries())
+	if err == nil {
+		t.Fatal("expected downloadImage to fail on 503")
+	}
+	if attempts != 1 {
+		t.Errorf("expected exactly 1 attempt with NoRetries(), got %d", attempts)
+	}
+}
+
+func TestVeoBackend_PollVeo_PollingTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Never done
+		_, _ = w.Write([]byte(`{"done":false}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	b, err := NewVeoBackend("key", "model", "5ms", "25ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, pollErr := b.pollVeo(context.Background(), "test-op")
+	if pollErr == nil || !strings.Contains(pollErr.Error(), "polling timed out after") {
+		t.Errorf("expected error containing 'polling timed out after', got: %v", pollErr)
+	}
+}
+
+func TestMidjourneyBackend_GenerateImage_PollingTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "POST" {
+			_, _ = w.Write([]byte(`{"task_id":"mj_timeout_task"}`))
+			return
+		}
+		// Polling GET: always pending
+		_, _ = w.Write([]byte(`{"status":"pending"}`))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "key", "5ms", "25ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, genErr := b.GenerateImage(context.Background(), "prompt", "1:1")
+	if genErr == nil || !strings.Contains(genErr.Error(), "polling timed out after") {
+		t.Errorf("expected error containing 'polling timed out after', got: %v", genErr)
+	}
+}

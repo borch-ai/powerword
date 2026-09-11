@@ -81,8 +81,8 @@ func defaultSleep(ctx context.Context, d time.Duration) error {
 }
 
 // Retry executes op, automatically retrying transient errors using exponential backoff with full jitter.
-// If op returns an error that IsRetryableError classifies as non-transient, or if retries are exhausted,
-// Retry returns the last encountered error. If ctx is canceled during execution or backoff, ctx.Err() is returned.
+// If op returns an error that the configured Retryable classifier (defaulting to IsRetryableError) classifies as non-transient,
+// or if retries are exhausted, Retry returns the last encountered error. If ctx is canceled during execution or backoff, ctx.Err() is returned.
 func Retry(ctx context.Context, cfg RetryConfig, op func() error) error {
 	cfg = sanitizeConfig(cfg)
 

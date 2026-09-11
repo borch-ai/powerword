@@ -66,7 +66,7 @@ Create a lightweight request retry helper in the `llm` package:
 
 - Default backend constructors (`OpenAIBackend`, `GoogleBackend`, `VeoBackend`, `MidjourneyBackend`) to `llm.NoRetries()` (`Disabled: true`) to ensure non-idempotent image/video generation POST operations are strictly opt-in via `SetRetryConfig`, preventing duplicate jobs or billing on network resets.
 - Expose `RetryConfigFromConfig(cfg config.ImageGenConfig) llm.RetryConfig` helper to share retry configuration logic across plugins.
-- Retain retry capabilities on idempotent GET downloads (`downloadImage`, `downloadVideo`) and polling operations, streaming downloads directly to temporary files with atomic commit and robust error cleanup.
+- Retain retry capabilities on idempotent GET downloads (`downloadImage`, `downloadVideo`) and polling operations, streaming image downloads directly to temporary files with atomic commit and robust error cleanup, while bounding video downloads in memory to 100MB via `io.LimitReader`.
 
 ### `internal/plugins/viral/`
 
