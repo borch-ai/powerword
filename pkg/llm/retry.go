@@ -94,6 +94,9 @@ func Retry(ctx context.Context, cfg RetryConfig, op func() error) error {
 
 		err := op()
 		if err == nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
 			return nil
 		}
 		lastErr = err
@@ -210,7 +213,7 @@ func isRetryableStatusCode(code int) bool {
 }
 
 var (
-	statusCodePattern   = regexp.MustCompile(`(?i)\b(?:status(?:\s*code)?|http|code|error|transient)\s*[:=]?\s*(408|429|500|502|503|504)\b`)
+	statusCodePattern   = regexp.MustCompile(`(?i)\b(?:status(?:\s*code)?|http|code|error|transient)\s*[:=]?\s*(408|429|500|502|503|504)(?:$|[\s:;,\.\]\)])`)
 	statusPhrasePattern = regexp.MustCompile(`(?i)\b(?:408\s+request\s+timeout|429\s+too\s+many\s+requests|500\s+internal\s+server\s+error|502\s+bad\s+gateway|503\s+service\s+unavailable|504\s+gateway\s+timeout)\b`)
 )
 

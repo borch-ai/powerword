@@ -219,14 +219,9 @@ func TestOpenAIClient_Stream_Error(t *testing.T) {
 	cfg.BaseURL = server.URL
 	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
 
-	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
-	if err != nil {
-		t.Fatalf("unexpected Stream() setup error: %v", err)
-	}
-
-	chunk := <-ch
-	if chunk.Error == nil {
-		t.Fatal("expected stream error in chunk, got nil")
+	_, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err == nil {
+		t.Fatal("expected stream error, got nil")
 	}
 }
 

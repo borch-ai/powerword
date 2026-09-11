@@ -191,6 +191,20 @@ func TestRetry_ContextCanceledDuringOperation(t *testing.T) {
 	}
 }
 
+func TestRetry_ContextCanceledDuringOperationReturningNil(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	cfg := DefaultRetryConfig()
+	err := Retry(ctx, cfg, func() error {
+		cancel()
+		return nil
+	})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got: %v", err)
+	}
+}
+
 func TestRetry_DefaultConfigSanitization(t *testing.T) {
 	// Passing completely uninitialized RetryConfig{}
 	var calls int32
@@ -361,6 +375,8 @@ func TestIsRetryableError(t *testing.T) {
 		{"string pattern broken pipe", errors.New("write: broken pipe"), true},
 		{"non-HTTP bare numbers not retryable", errors.New("validation error mentioning a 500-token limit"), false},
 		{"dimension 429 not retryable", errors.New("image dimension 429 is not supported"), false},
+		{"hyphenated token limit after error prefix", errors.New("error 500-token limit exceeded"), false},
+		{"hyphenated dimension after transient prefix", errors.New("transient 429-dimension vector"), false},
 		{"unrelated error", errors.New("file not found: config.yaml"), false},
 	}
 
