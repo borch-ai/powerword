@@ -2,7 +2,7 @@
 
 **Status:** Complete
 **Go Version:** 1.26.6
-**Date Completed:** 2026-09-10
+**Date Completed:** 2026-09-11
 **Unit Test Coverage:** 91.10%
 
 ---
@@ -56,14 +56,15 @@ Create a lightweight request retry helper in the `llm` package:
 
 #### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
 
-- Wrap call-out actions (`Generate` and `Stream`) inside the retry helper.
-- Standardize error mapping to identify transient HTTP status codes (429, 502, 503, 504) as retryable.
+- Wrap call-out actions (`Generate` and `Stream`) inside the retry helper, preserving the synchronous setup contract for `Stream()`.
+- Standardize error mapping to identify transient HTTP status codes (408, 429, 500, 502, 503, 504, 529) as retryable.
 
 ### `internal/plugins/imagegen/`
 
 #### [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
 
-- Wrap `GoogleBackend.GenerateImage`, `VeoBackend.GenerateImage`, `MidjourneyBackend.GenerateImage`, and the `downloadImage` functions with the retry helper.
+- Default backend constructors (`OpenAIBackend`, `GoogleBackend`, `VeoBackend`, `MidjourneyBackend`) to `llm.NoRetries()` (`Disabled: true`) to ensure non-idempotent image/video generation POST operations are strictly opt-in via `SetRetryConfig`, preventing duplicate jobs or billing on network resets.
+- Retain retry capabilities on idempotent GET downloads (`downloadImage`, `downloadVideo`) and polling operations, streaming downloads directly to temporary files with atomic commit and robust error cleanup.
 
 ---
 
