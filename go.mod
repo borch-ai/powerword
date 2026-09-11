@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.329.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.104.0
 	github.com/cyphar/filepath-securejoin v0.7.0
-	github.com/duckdb/duckdb-go/v2 v2.10504.0
+	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/google/generative-ai-go v0.20.1
@@ -70,12 +70,12 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.10504.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10504.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10504.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.10504.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10504.0 // indirect
-	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10504.0 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/darwin-amd64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/darwin-arm64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/linux-amd64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/linux-arm64 v0.10505.0 // indirect
+	github.com/duckdb/duckdb-go-bindings/lib/windows-amd64 v0.10505.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
