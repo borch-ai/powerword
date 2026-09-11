@@ -1250,7 +1250,8 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 	derivedCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	var resp *http.Response
+	var data []byte
+	var contentType string
 	err := llm.Retry(derivedCtx, llm.DefaultRetryConfig(), func() error {
 		req, reqErr := http.NewRequestWithContext(derivedCtx, "GET", urlStr, nil)
 		if reqErr != nil {
@@ -1261,22 +1262,26 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 		if doErr != nil {
 			return fmt.Errorf("failed to request image URL: %w", doErr)
 		}
+		defer func() { _ = r.Body.Close() }()
 
 		if r.StatusCode != http.StatusOK {
-			_ = r.Body.Close()
 			return fmt.Errorf("failed to download image, status %d", r.StatusCode)
 		}
 
-		resp = r
+		bodyBytes, readErr := io.ReadAll(r.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read image body: %w", readErr)
+		}
+
+		data = bodyBytes
+		contentType = r.Header.Get("Content-Type")
 		return nil
 	})
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = resp.Body.Close() }()
 
 	ext := ".png"
-	contentType := resp.Header.Get("Content-Type")
 	switch strings.ToLower(contentType) {
 	case "image/jpeg", "image/jpg":
 		ext = ".jpg"
@@ -1302,9 +1307,9 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 	}
 	defer func() { _ = out.Close() }()
 
-	_, err = io.Copy(out, resp.Body)
+	_, err = out.Write(data)
 	if err != nil {
-		return "", fmt.Errorf("failed to copy image bytes to file: %w", err)
+		return "", fmt.Errorf("failed to write image bytes to file: %w", err)
 	}
 
 	return filePath, nil

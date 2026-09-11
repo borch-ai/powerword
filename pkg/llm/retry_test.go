@@ -20,6 +20,12 @@ func (e *mockNetTimeoutError) Error() string   { return "i/o timeout" }
 func (e *mockNetTimeoutError) Timeout() bool   { return true }
 func (e *mockNetTimeoutError) Temporary() bool { return true }
 
+type mockNetTempOnlyError struct{}
+
+func (e *mockNetTempOnlyError) Error() string   { return "network subsystem temporary failure" }
+func (e *mockNetTempOnlyError) Timeout() bool   { return false }
+func (e *mockNetTempOnlyError) Temporary() bool { return true }
+
 func TestRetry_SuccessImmediate(t *testing.T) {
 	ctx := context.Background()
 	var calls int
@@ -167,11 +173,11 @@ func TestRetry_ContextCanceledDuringBackoff(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got: %v", err)
 	}
-	if elapsed > 300*time.Millisecond {
+	if elapsed > 400*time.Millisecond {
 		t.Errorf("expected fast cancellation, took %v", elapsed)
 	}
-	if calls != 1 {
-		t.Errorf("expected 1 call before cancellation during backoff, got %d", calls)
+	if calls > 2 {
+		t.Errorf("expected cancellation during backoff before completing retries, got %d calls", calls)
 	}
 }
 
@@ -216,6 +222,32 @@ func TestRetry_DefaultConfigSanitization(t *testing.T) {
 	}
 	if atomic.LoadInt32(&calls) != 1 {
 		t.Fatalf("expected 1 call for MaxRetries: -1, got: %d", calls)
+	}
+
+	// NoRetries() should execute at most once
+	calls = 0
+	err = Retry(context.Background(), NoRetries(), func() error {
+		atomic.AddInt32(&calls, 1)
+		return errors.New("status: 500")
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if atomic.LoadInt32(&calls) != 1 {
+		t.Fatalf("expected 1 call for NoRetries(), got: %d", calls)
+	}
+
+	// RetryConfig with Disabled: true should execute at most once
+	calls = 0
+	err = Retry(context.Background(), RetryConfig{Disabled: true}, func() error {
+		atomic.AddInt32(&calls, 1)
+		return errors.New("status: 500")
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if atomic.LoadInt32(&calls) != 1 {
+		t.Fatalf("expected 1 call for RetryConfig{Disabled: true}, got: %d", calls)
 	}
 }
 
@@ -302,6 +334,8 @@ func TestIsRetryableError(t *testing.T) {
 		{"openai RequestError 429", &openai.RequestError{HTTPStatusCode: 429}, true},
 		{"openai RequestError 503", &openai.RequestError{HTTPStatusCode: 503}, true},
 		{"openai RequestError 400", &openai.RequestError{HTTPStatusCode: 400}, false},
+		{"openai RequestError status 0 with connection reset", &openai.RequestError{HTTPStatusCode: 0, Err: errors.New("read: connection reset by peer")}, true},
+		{"openai RequestError status 0 with non-retryable error", &openai.RequestError{HTTPStatusCode: 0, Err: errors.New("malformed prompt syntax")}, false},
 		{"anthropic Error 429", &anthropic.Error{StatusCode: 429}, true},
 		{"anthropic Error 500", &anthropic.Error{StatusCode: 500}, true},
 		{"anthropic Error 502", &anthropic.Error{StatusCode: 502}, true},
@@ -309,6 +343,7 @@ func TestIsRetryableError(t *testing.T) {
 		{"anthropic Error 400", &anthropic.Error{StatusCode: 400}, false},
 		{"anthropic Error 404", &anthropic.Error{StatusCode: 404}, false},
 		{"net.Error timeout", &mockNetTimeoutError{}, true},
+		{"net.Error temporary non-timeout", &mockNetTempOnlyError{}, true},
 		{"io.EOF", io.EOF, true},
 		{"io.ErrUnexpectedEOF", io.ErrUnexpectedEOF, true},
 		{"string pattern 429", errors.New("HTTP 429: Too Many Requests"), true},

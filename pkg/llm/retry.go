@@ -18,6 +18,7 @@ import (
 
 // RetryConfig defines the parameters for the request retry engine.
 type RetryConfig struct {
+	Disabled   bool
 	MaxRetries int
 	MinBackoff time.Duration
 	MaxBackoff time.Duration
@@ -34,11 +35,23 @@ func DefaultRetryConfig() RetryConfig {
 	}
 }
 
-// sanitizeConfig ensures that all fields of RetryConfig have valid, non-zero values.
+// NoRetries returns a RetryConfig that disables retries, executing operations at most once.
+func NoRetries() RetryConfig {
+	return RetryConfig{
+		Disabled:   true,
+		MaxRetries: 0,
+	}
+}
+
+// sanitizeConfig ensures that all fields of RetryConfig have valid values.
 func sanitizeConfig(cfg RetryConfig) RetryConfig {
-	if cfg.MaxRetries < 0 {
+	if cfg.Disabled || cfg.MaxRetries < 0 {
+		cfg.Disabled = true
 		cfg.MaxRetries = 0
-	} else if cfg.MaxRetries == 0 && cfg.MinBackoff == 0 && cfg.MaxBackoff == 0 && cfg.Retryable == nil {
+		return cfg
+	}
+
+	if cfg.MaxRetries == 0 && cfg.MinBackoff == 0 && cfg.MaxBackoff == 0 && cfg.Retryable == nil {
 		return DefaultRetryConfig()
 	}
 
@@ -145,7 +158,7 @@ func IsRetryableError(err error) bool {
 
 	// OpenAI Request Error
 	var reqErr *openai.RequestError
-	if errors.As(err, &reqErr) {
+	if errors.As(err, &reqErr) && reqErr.HTTPStatusCode != 0 {
 		return isRetryableStatusCode(reqErr.HTTPStatusCode)
 	}
 
@@ -157,7 +170,8 @@ func IsRetryableError(err error) bool {
 
 	// Network temporary or timeout errors
 	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
+	//nolint:staticcheck // SA1019: netErr.Temporary() is deprecated in stdlib but necessary for backward compatibility with temporary transport errors
+	if errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary()) {
 		return true
 	}
 

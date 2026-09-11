@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -567,5 +568,87 @@ func TestOpenAIClient_Stream_RetrySuccess(t *testing.T) {
 	}
 	if len(results) == 0 || results[0] != "Retried stream" {
 		t.Errorf("unexpected results: %+v", results)
+	}
+}
+
+func TestOpenAIClient_Stream_FirstRecvErrorRetry(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			hj, ok := w.(http.Hijacker)
+			if ok {
+				conn, _, _ := hj.Hijack()
+				_ = conn.Close()
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"content":"Recovered stream"}}]}`)
+		w.(http.Flusher).Flush()
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 2,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+	})
+
+	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream error: %v", err)
+	}
+
+	var results []string
+	for chunk := range ch {
+		if chunk.Content != "" {
+			results = append(results, chunk.Content)
+		}
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+	if len(results) == 0 || results[0] != "Recovered stream" {
+		t.Errorf("unexpected results: %+v", results)
+	}
+}
+
+func TestOpenAIClient_Stream_ContextCancelDuringDrain(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"content":"first"}}]}`)
+		w.(http.Flusher).Flush()
+		time.Sleep(50 * time.Millisecond)
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", `{"choices":[{"delta":{"content":"second"}}]}`)
+		w.(http.Flusher).Flush()
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+
+	ch, err := client.Stream(ctx, []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	chunk := <-ch
+	if chunk.Content != "first" {
+		t.Errorf("expected 'first', got %q", chunk.Content)
+	}
+	cancel()
+
+	for c := range ch {
+		if errors.Is(c.Error, context.Canceled) {
+			return
+		}
 	}
 }
