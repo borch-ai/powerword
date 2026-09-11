@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"errors"
 	"io"
+	"math"
 	"math/big"
 	"net"
 	"regexp"
@@ -126,9 +127,16 @@ func calculateJitterSleep(backoff time.Duration) time.Duration {
 	if backoff <= 0 {
 		return 0
 	}
-	n, err := crand.Int(crand.Reader, big.NewInt(int64(backoff)+1))
+	maxBound := new(big.Int).SetInt64(int64(backoff))
+	if backoff < math.MaxInt64 {
+		maxBound.Add(maxBound, big.NewInt(1))
+	}
+	n, err := crand.Int(crand.Reader, maxBound)
 	if err != nil {
 		return backoff
+	}
+	if !n.IsInt64() {
+		return math.MaxInt64
 	}
 	return time.Duration(n.Int64())
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -307,6 +308,17 @@ func TestCalculateJitterSleep(t *testing.T) {
 	}
 	if !hasUnderHalf {
 		t.Errorf("expected full jitter to sample across the entire [0, backoff] range including < 50ms")
+	}
+
+	// Boundary tests for MaxInt64 to verify overflow safety
+	maxSleep := calculateJitterSleep(time.Duration(math.MaxInt64))
+	if maxSleep < 0 {
+		t.Errorf("expected non-negative duration for MaxInt64, got %v", maxSleep)
+	}
+
+	maxMinusOneSleep := calculateJitterSleep(time.Duration(math.MaxInt64 - 1))
+	if maxMinusOneSleep < 0 {
+		t.Errorf("expected non-negative duration for MaxInt64-1, got %v", maxMinusOneSleep)
 	}
 }
 
