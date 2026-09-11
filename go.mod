@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.3
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.79.1
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.329.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.104.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.111.0
 	github.com/cyphar/filepath-securejoin v0.7.0
 	github.com/duckdb/duckdb-go/v2 v2.10504.0
 	github.com/go-git/go-git/v5 v5.19.2
@@ -51,15 +51,15 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/apache/arrow-go/v18 v18.5.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.14 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.22 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.29 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.9.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.37.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.42.0 // indirect
