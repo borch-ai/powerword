@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"regexp"
 	"strings"
 	"time"
 
@@ -82,7 +83,7 @@ func Retry(ctx context.Context, cfg RetryConfig, op func() error) error {
 		}
 
 		backoff := calculateBackoff(cfg.MinBackoff, cfg.MaxBackoff, attempt)
-		sleep := calculateJitterSleep(cfg.MinBackoff, backoff)
+		sleep := calculateJitterSleep(backoff)
 
 		timer := time.NewTimer(sleep)
 		select {
@@ -108,20 +109,15 @@ func calculateBackoff(minBackoff, maxBackoff time.Duration, attempt int) time.Du
 	return backoff
 }
 
-func calculateJitterSleep(minBackoff, backoff time.Duration) time.Duration {
+func calculateJitterSleep(backoff time.Duration) time.Duration {
 	if backoff <= 0 {
 		return 0
 	}
-	base := minBackoff / 2
-	if base >= backoff {
+	n, err := crand.Int(crand.Reader, big.NewInt(int64(backoff)+1))
+	if err != nil {
 		return backoff
 	}
-	remaining := backoff - base
-	n, err := crand.Int(crand.Reader, big.NewInt(int64(remaining)+1))
-	if err != nil {
-		return base
-	}
-	return base + time.Duration(n.Int64())
+	return time.Duration(n.Int64())
 }
 
 // IsRetryableError identifies whether an error is transient and should be retried.
@@ -183,22 +179,28 @@ func isRetryableStatusCode(code int) bool {
 	}
 }
 
+var (
+	statusCodePattern   = regexp.MustCompile(`(?i)\b(?:status(?:\s*code)?|http|code|error|transient)\s*[:=]?\s*(408|429|500|502|503|504)\b`)
+	statusPhrasePattern = regexp.MustCompile(`(?i)\b(?:408\s+request\s+timeout|429\s+too\s+many\s+requests|500\s+internal\s+server\s+error|502\s+bad\s+gateway|503\s+service\s+unavailable|504\s+gateway\s+timeout)\b`)
+)
+
 func matchesTransientString(msg string) bool {
+	if statusCodePattern.MatchString(msg) || statusPhrasePattern.MatchString(msg) {
+		return true
+	}
+
 	lower := strings.ToLower(msg)
 	patterns := []string{
-		"429",
 		"too many requests",
 		"resource_exhausted",
 		"resourceexhausted",
-		"quota",
+		"quota exceeded",
+		"quota_exceeded",
 		"rate limit",
-		"500",
+		"ratelimit",
 		"internal server error",
-		"502",
 		"bad gateway",
-		"503",
 		"service unavailable",
-		"504",
 		"gateway timeout",
 		"connection reset",
 		"connection refused",
@@ -206,6 +208,7 @@ func matchesTransientString(msg string) bool {
 		"unexpected eof",
 		"tls: handshake",
 		"server disconnected",
+		"overloaded",
 	}
 	for _, p := range patterns {
 		if strings.Contains(lower, p) {

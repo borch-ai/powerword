@@ -254,6 +254,30 @@ func TestCalculateBackoff(t *testing.T) {
 	}
 }
 
+func TestCalculateJitterSleep(t *testing.T) {
+	if sleep := calculateJitterSleep(0); sleep != 0 {
+		t.Errorf("expected 0 for backoff 0, got %v", sleep)
+	}
+	if sleep := calculateJitterSleep(-10 * time.Millisecond); sleep != 0 {
+		t.Errorf("expected 0 for negative backoff, got %v", sleep)
+	}
+
+	backoff := 100 * time.Millisecond
+	var hasUnderHalf bool
+	for i := 0; i < 100; i++ {
+		sleep := calculateJitterSleep(backoff)
+		if sleep < 0 || sleep > backoff {
+			t.Fatalf("jitter sleep %v out of range [0, %v]", sleep, backoff)
+		}
+		if sleep < 50*time.Millisecond {
+			hasUnderHalf = true
+		}
+	}
+	if !hasUnderHalf {
+		t.Errorf("expected full jitter to sample across the entire [0, backoff] range including < 50ms")
+	}
+}
+
 func TestIsRetryableError(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -293,6 +317,8 @@ func TestIsRetryableError(t *testing.T) {
 		{"string pattern 503 service unavailable", errors.New("503 Service Unavailable"), true},
 		{"string pattern connection reset", errors.New("read: connection reset by peer"), true},
 		{"string pattern broken pipe", errors.New("write: broken pipe"), true},
+		{"non-HTTP bare numbers not retryable", errors.New("validation error mentioning a 500-token limit"), false},
+		{"dimension 429 not retryable", errors.New("image dimension 429 is not supported"), false},
 		{"unrelated error", errors.New("file not found: config.yaml"), false},
 	}
 
@@ -314,6 +340,12 @@ func TestMatchesTransientString(t *testing.T) {
 		"unexpected eof reading response",
 		"tls: handshake timeout",
 		"server disconnected suddenly",
+		"HTTP 429 Too Many Requests",
+		"status code: 500",
+		"status 502",
+		"rpc error: code = 503 desc = service unavailable",
+		"server overloaded",
+		"transient 429 error",
 	}
 
 	for _, msg := range transientMessages {
@@ -322,8 +354,16 @@ func TestMatchesTransientString(t *testing.T) {
 		}
 	}
 
-	if matchesTransientString("unauthorized invalid token") {
-		t.Errorf("did not expect unauthorized to be identified as transient")
+	for _, msg := range []string{
+		"unauthorized invalid token",
+		"validation error mentioning a 500-token limit",
+		"invalid dimension 429",
+		"file size 502 bytes exceeds limit",
+		"user id 504 not found",
+	} {
+		if matchesTransientString(msg) {
+			t.Errorf("did not expect %q to be identified as transient", msg)
+		}
 	}
 }
 
