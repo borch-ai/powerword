@@ -646,9 +646,14 @@ func TestOpenAIClient_Stream_ContextCancelDuringDrain(t *testing.T) {
 	}
 	cancel()
 
+	sawCanceled := false
 	for c := range ch {
 		if errors.Is(c.Error, context.Canceled) {
-			return
+			sawCanceled = true
+			break
 		}
+	}
+	if !sawCanceled {
+		t.Errorf("expected to receive context.Canceled error chunk on canceled context")
 	}
 }

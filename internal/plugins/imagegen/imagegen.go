@@ -152,7 +152,7 @@ func NewOpenAIBackendWithTimeout(apiKey string, timeout time.Duration) *OpenAIBa
 	cfg.HTTPClient = &http.Client{Timeout: timeout}
 	return &OpenAIBackend{
 		client:      openai.NewClientWithConfig(cfg),
-		retryConfig: llm.DefaultRetryConfig(),
+		retryConfig: llm.NoRetries(),
 	}
 }
 
@@ -216,7 +216,7 @@ func NewGoogleBackend(apiKey, model string) *GoogleBackend {
 		apiKey:      apiKey,
 		model:       model,
 		client:      &http.Client{Timeout: 120 * time.Second},
-		retryConfig: llm.DefaultRetryConfig(),
+		retryConfig: llm.NoRetries(),
 	}
 }
 
@@ -386,7 +386,7 @@ func NewVeoBackend(apiKey, model, intervalStr, timeoutStr string) (*VeoBackend, 
 		pollingInterval: interval,
 		pollingTimeout:  timeout,
 		client:          &http.Client{Timeout: 120 * time.Second},
-		retryConfig:     llm.DefaultRetryConfig(),
+		retryConfig:     llm.NoRetries(),
 	}, nil
 }
 
@@ -769,7 +769,7 @@ func NewMidjourneyBackend(apiURL, apiKey, intervalStr, timeoutStr string) (*Midj
 		pollingInterval: interval,
 		pollingTimeout:  timeout,
 		httpClient:      &http.Client{Timeout: 120 * time.Second},
-		retryConfig:     llm.DefaultRetryConfig(),
+		retryConfig:     llm.NoRetries(),
 	}, nil
 }
 
@@ -1222,18 +1222,23 @@ func (s *ImageGenService) GenerateImage(ctx context.Context, prompt string, size
 	return localPath, nil
 }
 
-func saveImageBytes(data []byte, mimeType string, workspaceRoot string, prompt string) (string, error) {
-	ext := ".png"
-	switch strings.ToLower(mimeType) {
+func extensionForContentType(contentType string) string {
+	switch strings.ToLower(contentType) {
 	case "image/jpeg", "image/jpg":
-		ext = ".jpg"
+		return ".jpg"
 	case "image/gif":
-		ext = ".gif"
+		return ".gif"
 	case "image/webp":
-		ext = ".webp"
+		return ".webp"
 	case "video/mp4":
-		ext = ".mp4"
+		return ".mp4"
+	default:
+		return ".png"
 	}
+}
+
+func saveImageBytes(data []byte, mimeType string, workspaceRoot string, prompt string) (string, error) {
+	ext := extensionForContentType(mimeType)
 
 	dir := filepath.Join(workspaceRoot, "generated_images")
 	if mkdirErr := os.MkdirAll(dir, 0750); mkdirErr != nil {
@@ -1241,7 +1246,7 @@ func saveImageBytes(data []byte, mimeType string, workspaceRoot string, prompt s
 	}
 
 	slug := slugify(prompt)
-	filename := fmt.Sprintf("image_%d_%s%s", time.Now().Unix(), slug, ext)
+	filename := fmt.Sprintf("image_%d_%s%s", time.Now().UnixNano(), slug, ext)
 	filePath := filepath.Join(dir, filename)
 
 	//nolint:gosec // path is safely localized inside workspace root directory
@@ -1259,6 +1264,50 @@ func saveImageBytes(data []byte, mimeType string, workspaceRoot string, prompt s
 	return filePath, nil
 }
 
+func fetchImageToTempFile(ctx context.Context, urlStr, dir string) (string, string, error) {
+	req, reqErr := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	if reqErr != nil {
+		return "", "", reqErr
+	}
+
+	r, doErr := http.DefaultClient.Do(req)
+	if doErr != nil {
+		return "", "", fmt.Errorf("failed to request image URL: %w", doErr)
+	}
+	defer func() { _ = r.Body.Close() }()
+
+	if r.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("failed to download image, status %d", r.StatusCode)
+	}
+
+	tmpFile, createErr := os.CreateTemp(dir, "img-download-*.tmp")
+	if createErr != nil {
+		return "", "", fmt.Errorf("failed to create temporary image file: %w", createErr)
+	}
+	tmpName := tmpFile.Name()
+
+	success := false
+	defer func() {
+		_ = tmpFile.Close()
+		if !success {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	const maxDownloadSize = 50 * 1024 * 1024
+	limitReader := io.LimitReader(r.Body, maxDownloadSize+1)
+	written, copyErr := io.Copy(tmpFile, limitReader)
+	if copyErr != nil {
+		return "", "", fmt.Errorf("failed to write image stream to temp file: %w", copyErr)
+	}
+	if written > maxDownloadSize {
+		return "", "", fmt.Errorf("downloaded image exceeds maximum allowed size of %d bytes", maxDownloadSize)
+	}
+
+	success = true
+	return tmpName, r.Header.Get("Content-Type"), nil
+}
+
 func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, prompt string, timeout time.Duration) (string, error) {
 	derivedCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -1271,69 +1320,27 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 	var tempFilePath string
 	var contentType string
 	err := llm.Retry(derivedCtx, llm.DefaultRetryConfig(), func() error {
-		req, reqErr := http.NewRequestWithContext(derivedCtx, "GET", urlStr, nil)
-		if reqErr != nil {
-			return reqErr
+		tmpPath, ct, fetchErr := fetchImageToTempFile(derivedCtx, urlStr, dir)
+		if fetchErr != nil {
+			return fetchErr
 		}
-
-		r, doErr := http.DefaultClient.Do(req)
-		if doErr != nil {
-			return fmt.Errorf("failed to request image URL: %w", doErr)
-		}
-		defer func() { _ = r.Body.Close() }()
-
-		if r.StatusCode != http.StatusOK {
-			return fmt.Errorf("failed to download image, status %d", r.StatusCode)
-		}
-
-		tmpFile, createErr := os.CreateTemp(dir, "img-download-*.tmp")
-		if createErr != nil {
-			return fmt.Errorf("failed to create temporary image file: %w", createErr)
-		}
-		tmpName := tmpFile.Name()
-
-		success := false
-		defer func() {
-			_ = tmpFile.Close()
-			if !success {
-				_ = os.Remove(tmpName)
-			}
-		}()
-
-		// Bound download size to 50MB to prevent unbounded memory or disk DoS
-		const maxDownloadSize = 50 * 1024 * 1024
-		limitReader := io.LimitReader(r.Body, maxDownloadSize+1)
-		written, copyErr := io.Copy(tmpFile, limitReader)
-		if copyErr != nil {
-			return fmt.Errorf("failed to write image stream to temp file: %w", copyErr)
-		}
-		if written > maxDownloadSize {
-			return fmt.Errorf("downloaded image exceeds maximum allowed size of %d bytes", maxDownloadSize)
-		}
-
-		success = true
-		tempFilePath = tmpName
-		contentType = r.Header.Get("Content-Type")
+		tempFilePath = tmpPath
+		contentType = ct
 		return nil
 	})
 	if err != nil {
+		if tempFilePath != "" {
+			_ = os.Remove(tempFilePath)
+		}
 		return "", err
 	}
 
-	ext := ".png"
-	switch strings.ToLower(contentType) {
-	case "image/jpeg", "image/jpg":
-		ext = ".jpg"
-	case "image/gif":
-		ext = ".gif"
-	case "image/webp":
-		ext = ".webp"
-	}
-
+	ext := extensionForContentType(contentType)
 	slug := slugify(prompt)
-	filename := fmt.Sprintf("image_%d_%s%s", time.Now().Unix(), slug, ext)
+	filename := fmt.Sprintf("image_%d_%s%s", time.Now().UnixNano(), slug, ext)
 	finalPath := filepath.Join(dir, filename)
 
+	_ = os.Remove(finalPath)
 	if renameErr := os.Rename(tempFilePath, finalPath); renameErr != nil {
 		_ = os.Remove(tempFilePath)
 		return "", fmt.Errorf("failed to commit downloaded image file: %w", renameErr)

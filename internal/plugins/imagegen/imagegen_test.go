@@ -2339,3 +2339,31 @@ func TestMidjourneyBackend_PollingRetrySuccess(t *testing.T) {
 		t.Errorf("expected 2 poll attempts, got %d", pollAttempts)
 	}
 }
+
+func TestImageGenBackends_DefaultNoRetries(t *testing.T) {
+	oa := NewOpenAIBackendWithTimeout("key", 10*time.Second)
+	if !oa.retryConfig.Disabled {
+		t.Errorf("expected OpenAIBackend to default to NoRetries (Disabled: true)")
+	}
+
+	gb := NewGoogleBackend("key", "model")
+	if !gb.retryConfig.Disabled {
+		t.Errorf("expected GoogleBackend to default to NoRetries (Disabled: true)")
+	}
+
+	vb, err := NewVeoBackend("key", "model", "", "")
+	if err != nil {
+		t.Fatalf("unexpected error creating VeoBackend: %v", err)
+	}
+	if !vb.retryConfig.Disabled {
+		t.Errorf("expected VeoBackend to default to NoRetries (Disabled: true)")
+	}
+
+	mb, err := NewMidjourneyBackend("http://localhost", "key", "", "")
+	if err != nil {
+		t.Fatalf("unexpected error creating MidjourneyBackend: %v", err)
+	}
+	if !mb.retryConfig.Disabled {
+		t.Errorf("expected MidjourneyBackend to default to NoRetries (Disabled: true)")
+	}
+}

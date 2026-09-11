@@ -259,6 +259,23 @@ func TestRetry_DefaultConfigSanitization(t *testing.T) {
 	if atomic.LoadInt32(&calls) != 1 {
 		t.Fatalf("expected 1 call for RetryConfig{Disabled: true}, got: %d", calls)
 	}
+
+	// Custom sleep without other fields should preserve Sleep
+	customSleepCalled := false
+	customSleepCfg := RetryConfig{
+		Sleep: func(ctx context.Context, d time.Duration) error {
+			customSleepCalled = true
+			return nil
+		},
+	}
+	sanitized := sanitizeConfig(customSleepCfg)
+	if sanitized.Sleep == nil {
+		t.Fatal("expected sanitized config to preserve custom Sleep")
+	}
+	_ = sanitized.Sleep(context.Background(), 0)
+	if !customSleepCalled {
+		t.Error("expected custom sleep to be invoked")
+	}
 }
 
 func TestCalculateBackoff(t *testing.T) {
@@ -293,6 +310,18 @@ func TestCalculateBackoff(t *testing.T) {
 	b35 := calculateBackoff(minB, maxB, 35)
 	if b35 != maxB {
 		t.Errorf("expected %v, got %v", maxB, b35)
+	}
+
+	// multiplication overflow protection
+	bOverflow := calculateBackoff(time.Duration(math.MaxInt64/2), time.Duration(math.MaxInt64), 2)
+	if bOverflow != time.Duration(math.MaxInt64) {
+		t.Errorf("expected max backoff on multiplication overflow, got %v", bOverflow)
+	}
+
+	// non-positive minBackoff
+	bNeg := calculateBackoff(-10*time.Millisecond, maxB, 1)
+	if bNeg != maxB {
+		t.Errorf("expected max backoff on negative minBackoff, got %v", bNeg)
 	}
 }
 
@@ -361,6 +390,7 @@ func TestIsRetryableError(t *testing.T) {
 		{"anthropic Error 500", &anthropic.Error{StatusCode: 500}, true},
 		{"anthropic Error 502", &anthropic.Error{StatusCode: 502}, true},
 		{"anthropic Error 503", &anthropic.Error{StatusCode: 503}, true},
+		{"anthropic Error 529", &anthropic.Error{StatusCode: 529}, true},
 		{"anthropic Error 400", &anthropic.Error{StatusCode: 400}, false},
 		{"anthropic Error 404", &anthropic.Error{StatusCode: 404}, false},
 		{"net.Error timeout", &mockNetTimeoutError{}, true},
@@ -368,6 +398,7 @@ func TestIsRetryableError(t *testing.T) {
 		{"io.EOF", io.EOF, true},
 		{"io.ErrUnexpectedEOF", io.ErrUnexpectedEOF, true},
 		{"string pattern 429", errors.New("HTTP 429: Too Many Requests"), true},
+		{"string pattern 529", errors.New("status 529: Overloaded"), true},
 		{"string pattern resource exhausted", errors.New("rpc error: code = ResourceExhausted desc = Quota exceeded"), true},
 		{"string pattern 502 bad gateway", errors.New("502 Bad Gateway"), true},
 		{"string pattern 503 service unavailable", errors.New("503 Service Unavailable"), true},
@@ -426,7 +457,7 @@ func TestMatchesTransientString(t *testing.T) {
 }
 
 func TestIsRetryableStatusCode(t *testing.T) {
-	for _, code := range []int{408, 429, 500, 502, 503, 504} {
+	for _, code := range []int{408, 429, 500, 502, 503, 504, 529} {
 		if !isRetryableStatusCode(code) {
 			t.Errorf("expected code %d to be retryable", code)
 		}

@@ -53,7 +53,7 @@ func sanitizeConfig(cfg RetryConfig) RetryConfig {
 		return cfg
 	}
 
-	if cfg.MaxRetries == 0 && cfg.MinBackoff == 0 && cfg.MaxBackoff == 0 && cfg.Retryable == nil {
+	if cfg.MaxRetries == 0 && cfg.MinBackoff == 0 && cfg.MaxBackoff == 0 && cfg.Retryable == nil && cfg.Sleep == nil {
 		return DefaultRetryConfig()
 	}
 
@@ -126,11 +126,14 @@ func Retry(ctx context.Context, cfg RetryConfig, op func() error) error {
 }
 
 func calculateBackoff(minBackoff, maxBackoff time.Duration, attempt int) time.Duration {
-	if attempt > 30 {
+	if attempt > 30 || minBackoff <= 0 {
 		return maxBackoff
 	}
-	mult := 1 << attempt
-	backoff := minBackoff * time.Duration(mult)
+	mult := time.Duration(1 << attempt)
+	if maxBackoff/mult < minBackoff {
+		return maxBackoff
+	}
+	backoff := minBackoff * mult
 	if backoff > maxBackoff || backoff <= 0 {
 		return maxBackoff
 	}
@@ -154,12 +157,7 @@ func calculateJitterSleep(backoff time.Duration) time.Duration {
 
 // IsRetryableError identifies whether an error is transient and should be retried.
 func IsRetryableError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	// Never retry explicit context cancellation
-	if errors.Is(err, context.Canceled) {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
 
@@ -175,7 +173,7 @@ func IsRetryableError(err error) bool {
 		return isRetryableStatusCode(apiErr.HTTPStatusCode)
 	}
 
-	// OpenAI Request Error
+	// OpenAI Request Error (only match if HTTPStatusCode is nonzero, otherwise fall through to transport checks)
 	var reqErr *openai.RequestError
 	if errors.As(err, &reqErr) && reqErr.HTTPStatusCode != 0 {
 		return isRetryableStatusCode(reqErr.HTTPStatusCode)
@@ -187,25 +185,23 @@ func IsRetryableError(err error) bool {
 		return isRetryableStatusCode(aErr.StatusCode)
 	}
 
-	// Network temporary or timeout errors
+	// Network / Timeout Errors
 	var netErr net.Error
-	//nolint:staticcheck // SA1019: netErr.Temporary() is deprecated in stdlib but necessary for backward compatibility with temporary transport errors
+	//nolint:staticcheck // netErr.Temporary() provides fallback for temporary network errors
 	if errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary()) {
 		return true
 	}
 
-	// Connection resets or premature EOFs
-	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
 
-	// Fallback to error message inspection
 	return matchesTransientString(err.Error())
 }
 
 func isRetryableStatusCode(code int) bool {
 	switch code {
-	case 408, 429, 500, 502, 503, 504:
+	case 408, 429, 500, 502, 503, 504, 529:
 		return true
 	default:
 		return false
@@ -213,7 +209,7 @@ func isRetryableStatusCode(code int) bool {
 }
 
 var (
-	statusCodePattern   = regexp.MustCompile(`(?i)\b(?:status(?:\s*code)?|http|code|error|transient)\s*[:=]?\s*(408|429|500|502|503|504)(?:$|[\s:;,\.\]\)])`)
+	statusCodePattern   = regexp.MustCompile(`(?i)\b(?:status(?:\s*code)?|http|code|error|transient)\s*[:=]?\s*(408|429|500|502|503|504|529)(?:$|[\s:;,\.\]\)])`)
 	statusPhrasePattern = regexp.MustCompile(`(?i)\b(?:408\s+request\s+timeout|429\s+too\s+many\s+requests|500\s+internal\s+server\s+error|502\s+bad\s+gateway|503\s+service\s+unavailable|504\s+gateway\s+timeout)\b`)
 )
 
