@@ -222,6 +222,10 @@ func (o *OpenAIClient) initiateStreamWithRetry(ctx context.Context, req openai.C
 		}
 		resp, recvErr := stream.Recv()
 		if recvErr != nil {
+			if errors.Is(recvErr, io.EOF) {
+				firstResp = nil
+				return nil
+			}
 			_ = stream.Close()
 			return recvErr
 		}

@@ -1035,19 +1035,28 @@ func (s *ImageGenService) SetRetryConfig(cfg llm.RetryConfig) {
 	s.retryConfig = &cfg
 }
 
-func (s *ImageGenService) getRetryConfig() llm.RetryConfig {
-	if s.retryConfig != nil {
-		return *s.retryConfig
-	}
-	if s.cfg != nil && s.cfg.Plugins.ImageGen.MaxRetries > 0 {
+// RetryConfigFromConfig builds an llm.RetryConfig from an ImageGenConfig.
+// Returns llm.NoRetries() if MaxRetries <= 0.
+func RetryConfigFromConfig(cfg config.ImageGenConfig) llm.RetryConfig {
+	if cfg.MaxRetries > 0 {
 		rc := llm.DefaultRetryConfig()
-		rc.MaxRetries = s.cfg.Plugins.ImageGen.MaxRetries
-		if bo := s.cfg.Plugins.ImageGen.RetryBackoff; bo != "" {
-			if d, err := time.ParseDuration(bo); err == nil && d > 0 {
+		rc.MaxRetries = cfg.MaxRetries
+		if cfg.RetryBackoff != "" {
+			if d, err := time.ParseDuration(cfg.RetryBackoff); err == nil && d > 0 {
 				rc.MinBackoff = d
 			}
 		}
 		return rc
+	}
+	return llm.NoRetries()
+}
+
+func (s *ImageGenService) getRetryConfig() llm.RetryConfig {
+	if s.retryConfig != nil {
+		return *s.retryConfig
+	}
+	if s.cfg != nil {
+		return RetryConfigFromConfig(s.cfg.Plugins.ImageGen)
 	}
 	return llm.NoRetries()
 }

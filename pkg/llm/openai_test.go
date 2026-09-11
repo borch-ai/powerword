@@ -657,3 +657,40 @@ func TestOpenAIClient_Stream_ContextCancelDuringDrain(t *testing.T) {
 		t.Errorf("expected to receive context.Canceled error chunk on canceled context")
 	}
 }
+
+func TestOpenAIClient_Stream_ImmediateEOF(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
+		w.(http.Flusher).Flush()
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("dummy")
+	cfg.BaseURL = server.URL
+	client := NewOpenAIClientWithConfig(cfg, "gpt-4")
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 2,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+	})
+
+	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hello"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream error: %v", err)
+	}
+
+	var chunks []StreamChunk
+	for chunk := range ch {
+		chunks = append(chunks, chunk)
+	}
+
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt (no retries on clean empty stream), got %d", attempts)
+	}
+	if len(chunks) != 0 {
+		t.Errorf("expected 0 chunks from empty stream, got %+v", chunks)
+	}
+}

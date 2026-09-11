@@ -11,8 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 func createMockFFmpeg(t *testing.T) string {
@@ -849,5 +851,99 @@ func TestUncoveredBranches(t *testing.T) {
 	err = svcFailed.generateTTSMock(context.Background(), filepath.Join(tmpDir, "out.m4a"))
 	if err == nil {
 		t.Error("expected generateTTSMock ffmpeg command execution failure, got nil")
+	}
+}
+
+func TestViralService_RetryConfig(t *testing.T) {
+	// Default with no config should be NoRetries
+	svc := NewViralService(t.TempDir(), &config.Config{})
+	rc := svc.getRetryConfig()
+	if !rc.Disabled {
+		t.Errorf("expected ViralService to default to NoRetries, got Disabled=%v", rc.Disabled)
+	}
+
+	// Config with MaxRetries and RetryBackoff
+	cfg := &config.Config{}
+	cfg.Plugins.ImageGen.MaxRetries = 2
+	cfg.Plugins.ImageGen.RetryBackoff = "150ms"
+	svcWithCfg := NewViralService(t.TempDir(), cfg)
+	rcCfg := svcWithCfg.getRetryConfig()
+	if rcCfg.Disabled || rcCfg.MaxRetries != 2 || rcCfg.MinBackoff != 150*time.Millisecond {
+		t.Errorf("unexpected retryConfig from config: %+v", rcCfg)
+	}
+
+	// Programmatic override via SetRetryConfig
+	custom := llm.RetryConfig{MaxRetries: 4, MinBackoff: 1 * time.Second}
+	svcWithCfg.SetRetryConfig(custom)
+	rcCustom := svcWithCfg.getRetryConfig()
+	if rcCustom.MaxRetries != 4 || rcCustom.MinBackoff != 1*time.Second {
+		t.Errorf("expected custom retryConfig to override config, got: %+v", rcCustom)
+	}
+}
+
+func TestGenerateVideo_Veo_WithRetry(t *testing.T) {
+	var initiateAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && strings.HasSuffix(r.URL.Path, ":predictLongRunning") {
+			initiateAttempts++
+			if initiateAttempts == 1 {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":{"code":500,"message":"internal error"}}`))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"name":"operations/veo-op-viral-retry"}`))
+			return
+		}
+		if r.Method == "GET" && strings.Contains(r.URL.Path, "operations/veo-op-viral-retry") {
+			w.WriteHeader(http.StatusOK)
+			//nolint:gosec // r.Host is dynamically evaluated for test requests
+			_, _ = fmt.Fprintf(w, `{"done":true,"response":{"generatedVideos":[{"video":{"uri":"http://%s/video/uri-retry"}}]}}`, r.Host)
+			return
+		}
+		if r.Method == "GET" && strings.Contains(r.URL.Path, "video/uri-retry") {
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "video/mp4")
+			_, _ = w.Write([]byte("mock-veo-retry-bytes"))
+			return
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		APIKeys: config.APIKeys{
+			Gemini: "mock-gemini-key",
+		},
+		Plugins: config.PluginsConfig{
+			Viral: config.ViralConfig{
+				VideoBackend: "veo",
+			},
+			ImageGen: config.ImageGenConfig{
+				MaxRetries:   2,
+				RetryBackoff: "1ms",
+			},
+		},
+	}
+	svc := NewViralService(tmpDir, cfg)
+
+	filePath, err := svc.GenerateVideo(context.Background(), "a beautiful landscape", "1024x1792")
+	if err != nil {
+		t.Fatalf("GenerateVideo Veo with retry failed: %v", err)
+	}
+
+	if initiateAttempts != 2 {
+		t.Errorf("expected 2 initiate attempts (1 failure + 1 retry success), got %d", initiateAttempts)
+	}
+
+	//nolint:gosec // filePath is safely constructed in tests
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("failed to read generated video: %v", err)
+	}
+	if string(data) != "mock-veo-retry-bytes" {
+		t.Errorf("expected mock-veo-retry-bytes, got %s", string(data))
 	}
 }

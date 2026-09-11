@@ -2395,6 +2395,34 @@ func TestImageGenService_RetryConfig(t *testing.T) {
 	}
 }
 
+func TestRetryConfigFromConfig(t *testing.T) {
+	// Zero MaxRetries returns NoRetries
+	rcZero := RetryConfigFromConfig(config.ImageGenConfig{})
+	if !rcZero.Disabled {
+		t.Errorf("expected NoRetries for empty config, got Disabled=%v", rcZero.Disabled)
+	}
+
+	// Valid MaxRetries and backoff
+	cfg := config.ImageGenConfig{
+		MaxRetries:   3,
+		RetryBackoff: "500ms",
+	}
+	rc := RetryConfigFromConfig(cfg)
+	if rc.Disabled || rc.MaxRetries != 3 || rc.MinBackoff != 500*time.Millisecond {
+		t.Errorf("unexpected retry config: %+v", rc)
+	}
+
+	// Invalid backoff falls back to default MinBackoff
+	cfgInvalid := config.ImageGenConfig{
+		MaxRetries:   2,
+		RetryBackoff: "invalid-duration",
+	}
+	rcInvalid := RetryConfigFromConfig(cfgInvalid)
+	if rcInvalid.Disabled || rcInvalid.MaxRetries != 2 || rcInvalid.MinBackoff != 100*time.Millisecond {
+		t.Errorf("unexpected fallback retry config: %+v", rcInvalid)
+	}
+}
+
 func TestVeoBackend_DownloadVideo_ExceedsSizeLimit(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

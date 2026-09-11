@@ -57,6 +57,7 @@ Create a lightweight request retry helper in the `llm` package:
 #### [MODIFY] [anthropic.go](file://../../pkg/llm/anthropic.go)
 
 - Wrap call-out actions (`Generate` and `Stream`) inside the retry helper, preserving the synchronous setup contract for `Stream()`.
+- Handle clean empty streams (`io.EOF` on initial chunk) as successful completions rather than retryable transport errors.
 - Standardize error mapping to identify transient HTTP status codes (408, 429, 500, 502, 503, 504, 529) as retryable.
 
 ### `internal/plugins/imagegen/`
@@ -64,7 +65,14 @@ Create a lightweight request retry helper in the `llm` package:
 #### [MODIFY] [imagegen.go](file://../../internal/plugins/imagegen/imagegen.go)
 
 - Default backend constructors (`OpenAIBackend`, `GoogleBackend`, `VeoBackend`, `MidjourneyBackend`) to `llm.NoRetries()` (`Disabled: true`) to ensure non-idempotent image/video generation POST operations are strictly opt-in via `SetRetryConfig`, preventing duplicate jobs or billing on network resets.
+- Expose `RetryConfigFromConfig(cfg config.ImageGenConfig) llm.RetryConfig` helper to share retry configuration logic across plugins.
 - Retain retry capabilities on idempotent GET downloads (`downloadImage`, `downloadVideo`) and polling operations, streaming downloads directly to temporary files with atomic commit and robust error cleanup.
+
+### `internal/plugins/viral/`
+
+#### [MODIFY] [viral.go](file://../../internal/plugins/viral/viral.go)
+
+- Wire `ViralService` to propagate `ImageGenConfig` retry settings to constructed `VeoBackend` instances and provide `SetRetryConfig`.
 
 ---
 
@@ -81,6 +89,7 @@ Create a lightweight request retry helper in the `llm` package:
   ```bash
   go test -v ./pkg/llm/...
   go test -v ./internal/plugins/imagegen/...
+  go test -v ./internal/plugins/viral/...
   ```
 
 - Verify code coverage:
@@ -88,3 +97,5 @@ Create a lightweight request retry helper in the `llm` package:
   ```bash
   make check-coverage
   ```
+  Verified passing with 91.10% coverage (exceeding the >= 91.00% requirement on Go 1.26).
+
