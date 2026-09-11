@@ -71,6 +71,8 @@ type ImageGenConfig struct {
 	RequestTimeout            string `mapstructure:"request_timeout"`
 	ForceCref                 bool   `mapstructure:"force_cref"`
 	ForceSref                 bool   `mapstructure:"force_sref"`
+	MaxRetries                int    `mapstructure:"max_retries"`
+	RetryBackoff              string `mapstructure:"retry_backoff"`
 }
 
 // KDPMathConfig holds parameters for the KDP Math plugin.

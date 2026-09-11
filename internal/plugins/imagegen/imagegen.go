@@ -424,13 +424,19 @@ func (b *VeoBackend) downloadVideo(ctx context.Context, videoURI string) ([]byte
 		defer func() { _ = dlResp.Body.Close() }()
 
 		if dlResp.StatusCode != http.StatusOK {
-			dlBytes, _ := io.ReadAll(dlResp.Body)
+			dlBytes, _ := io.ReadAll(io.LimitReader(dlResp.Body, 1024*1024))
 			return fmt.Errorf("failed to download video content, status %d: %s", dlResp.StatusCode, string(dlBytes))
 		}
 
-		vb, readErr := io.ReadAll(dlResp.Body)
+		// Bound video download size to 100MB to prevent unbounded memory allocation
+		const maxVideoSize = 100 * 1024 * 1024
+		limitReader := io.LimitReader(dlResp.Body, maxVideoSize+1)
+		vb, readErr := io.ReadAll(limitReader)
 		if readErr != nil {
 			return fmt.Errorf("failed to read downloaded video content: %w", readErr)
+		}
+		if len(vb) > maxVideoSize {
+			return fmt.Errorf("downloaded video exceeds maximum allowed size of %d bytes", maxVideoSize)
 		}
 		videoBytes = vb
 		return nil
@@ -679,9 +685,14 @@ func (b *VeoBackend) pollOnceVeo(ctx context.Context, opName string) (bool, []by
 			return fmt.Errorf("veo poll status request failed, status %d", pollResp.StatusCode)
 		}
 
-		body, readErr := io.ReadAll(pollResp.Body)
+		const maxPollResponseSize = 5 * 1024 * 1024
+		limitReader := io.LimitReader(pollResp.Body, maxPollResponseSize+1)
+		body, readErr := io.ReadAll(limitReader)
 		if readErr != nil {
 			return readErr
+		}
+		if len(body) > maxPollResponseSize {
+			return fmt.Errorf("veo poll response exceeds maximum allowed size of %d bytes", maxPollResponseSize)
 		}
 		pBytes = body
 		return nil
@@ -842,7 +853,7 @@ func extractStatusURL(m map[string]interface{}, apiURL, taskID string) string {
 	return statusURL
 }
 
-func (b *MidjourneyBackend) pollOnce(ctx context.Context, statusURL string) (string, string, error) {
+func (b *MidjourneyBackend) fetchPollStatus(ctx context.Context, statusURL string) ([]byte, error) {
 	var pollBody []byte
 	retryErr := llm.Retry(ctx, b.retryConfig, func() error {
 		pollReq, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
@@ -863,17 +874,22 @@ func (b *MidjourneyBackend) pollOnce(ctx context.Context, statusURL string) (str
 			return fmt.Errorf("bad status code: %d", pollResp.StatusCode)
 		}
 
-		body, readErr := io.ReadAll(pollResp.Body)
+		const maxPollResponseSize = 5 * 1024 * 1024
+		limitReader := io.LimitReader(pollResp.Body, maxPollResponseSize+1)
+		body, readErr := io.ReadAll(limitReader)
 		if readErr != nil {
 			return readErr
+		}
+		if len(body) > maxPollResponseSize {
+			return fmt.Errorf("midjourney poll response exceeds maximum allowed size of %d bytes", maxPollResponseSize)
 		}
 		pollBody = body
 		return nil
 	})
-	if retryErr != nil {
-		return "", "", retryErr
-	}
+	return pollBody, retryErr
+}
 
+func parsePollResponse(pollBody []byte) (string, string, error) {
 	var pollMap map[string]interface{}
 	if err := json.Unmarshal(pollBody, &pollMap); err != nil {
 		return "", "", err
@@ -897,6 +913,14 @@ func (b *MidjourneyBackend) pollOnce(ctx context.Context, statusURL string) (str
 	}
 
 	return status, "", nil
+}
+
+func (b *MidjourneyBackend) pollOnce(ctx context.Context, statusURL string) (string, string, error) {
+	pollBody, err := b.fetchPollStatus(ctx, statusURL)
+	if err != nil {
+		return "", "", err
+	}
+	return parsePollResponse(pollBody)
 }
 
 func (b *MidjourneyBackend) initiateGeneration(ctx context.Context, prompt, size string) (string, error) {
@@ -994,6 +1018,7 @@ type ImageGenService struct {
 	workspaceRoot string
 	cfg           *config.Config
 	styleStore    *StyleStore
+	retryConfig   *llm.RetryConfig
 }
 
 // NewImageGenService creates a new ImageGenService.
@@ -1003,6 +1028,28 @@ func NewImageGenService(workspaceRoot string, cfg *config.Config) *ImageGenServi
 		cfg:           cfg,
 		styleStore:    NewStyleStore(workspaceRoot),
 	}
+}
+
+// SetRetryConfig sets custom retry behavior for ImageGenService and its constructed backends.
+func (s *ImageGenService) SetRetryConfig(cfg llm.RetryConfig) {
+	s.retryConfig = &cfg
+}
+
+func (s *ImageGenService) getRetryConfig() llm.RetryConfig {
+	if s.retryConfig != nil {
+		return *s.retryConfig
+	}
+	if s.cfg != nil && s.cfg.Plugins.ImageGen.MaxRetries > 0 {
+		rc := llm.DefaultRetryConfig()
+		rc.MaxRetries = s.cfg.Plugins.ImageGen.MaxRetries
+		if bo := s.cfg.Plugins.ImageGen.RetryBackoff; bo != "" {
+			if d, err := time.ParseDuration(bo); err == nil && d > 0 {
+				rc.MinBackoff = d
+			}
+		}
+		return rc
+	}
+	return llm.NoRetries()
 }
 
 // GetCapabilities returns the features supported by the active imagegen backend.
@@ -1085,6 +1132,7 @@ func (s *ImageGenService) runOpenAI(ctx context.Context, finalPrompt, size strin
 		return "", fmt.Errorf("openai API key is not configured (set plugins.imagegen.openai_api_key or api_keys.openai)")
 	}
 	client := NewOpenAIBackendWithTimeout(apiKey, s.getRequestTimeout())
+	client.SetRetryConfig(s.getRetryConfig())
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
@@ -1119,6 +1167,7 @@ func (s *ImageGenService) runMidjourney(ctx context.Context, finalPrompt, size, 
 		return "", fmt.Errorf("failed to initialize Midjourney backend: %w", newErr)
 	}
 	client.SetTimeout(s.getRequestTimeout())
+	client.SetRetryConfig(s.getRetryConfig())
 	return client.GenerateImage(ctx, finalPrompt, size)
 }
 
@@ -1132,6 +1181,7 @@ func (s *ImageGenService) runGoogle(ctx context.Context, finalPrompt, size strin
 	}
 	client := NewGoogleBackend(apiKey, s.cfg.Plugins.ImageGen.GoogleModel)
 	client.SetTimeout(s.getRequestTimeout())
+	client.SetRetryConfig(s.getRetryConfig())
 	return client.GenerateImage(ctx, finalPrompt, size, crefURL, characterWeight)
 }
 
@@ -1157,6 +1207,7 @@ func (s *ImageGenService) runVeo(ctx context.Context, finalPrompt, size string, 
 		return nil, "", fmt.Errorf("failed to initialize Veo backend: %w", err)
 	}
 	client.SetTimeout(s.getRequestTimeout())
+	client.SetRetryConfig(s.getRetryConfig())
 	return client.GenerateImage(ctx, finalPrompt, size, crefURL, characterWeight)
 }
 

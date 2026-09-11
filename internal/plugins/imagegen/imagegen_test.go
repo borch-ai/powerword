@@ -2367,3 +2367,71 @@ func TestImageGenBackends_DefaultNoRetries(t *testing.T) {
 		t.Errorf("expected MidjourneyBackend to default to NoRetries (Disabled: true)")
 	}
 }
+
+func TestImageGenService_RetryConfig(t *testing.T) {
+	// Default with no config should be NoRetries
+	svc := NewImageGenService(t.TempDir(), &config.Config{})
+	rc := svc.getRetryConfig()
+	if !rc.Disabled {
+		t.Errorf("expected ImageGenService to default to NoRetries, got Disabled=%v", rc.Disabled)
+	}
+
+	// Config with MaxRetries and RetryBackoff
+	cfg := &config.Config{}
+	cfg.Plugins.ImageGen.MaxRetries = 2
+	cfg.Plugins.ImageGen.RetryBackoff = "250ms"
+	svcWithCfg := NewImageGenService(t.TempDir(), cfg)
+	rcCfg := svcWithCfg.getRetryConfig()
+	if rcCfg.Disabled || rcCfg.MaxRetries != 2 || rcCfg.MinBackoff != 250*time.Millisecond {
+		t.Errorf("unexpected retryConfig from config: %+v", rcCfg)
+	}
+
+	// Programmatic override via SetRetryConfig
+	custom := llm.RetryConfig{MaxRetries: 5, MinBackoff: 1 * time.Second}
+	svcWithCfg.SetRetryConfig(custom)
+	rcCustom := svcWithCfg.getRetryConfig()
+	if rcCustom.MaxRetries != 5 || rcCustom.MinBackoff != 1*time.Second {
+		t.Errorf("expected custom retryConfig to override config, got: %+v", rcCustom)
+	}
+}
+
+func TestVeoBackend_DownloadVideo_ExceedsSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		buf := make([]byte, 1024*1024)
+		for i := 0; i < 101; i++ {
+			_, _ = w.Write(buf)
+		}
+	}))
+	defer server.Close()
+
+	b, err := NewVeoBackend("key", "model", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, dlErr := b.downloadVideo(context.Background(), server.URL)
+	if dlErr == nil || !strings.Contains(dlErr.Error(), "exceeds maximum allowed size") {
+		t.Errorf("expected error mentioning maximum allowed size, got: %v", dlErr)
+	}
+}
+
+func TestVeoBackend_PollOnceVeo_ExceedsSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		buf := make([]byte, 1024*1024)
+		for i := 0; i < 6; i++ {
+			_, _ = w.Write(buf)
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	b, err := NewVeoBackend("key", "model", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, pollErr := b.pollOnceVeo(context.Background(), "test-op")
+	if pollErr == nil || !strings.Contains(pollErr.Error(), "exceeds maximum allowed size") {
+		t.Errorf("expected error mentioning maximum allowed size, got: %v", pollErr)
+	}
+}
