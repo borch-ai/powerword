@@ -97,5 +97,5 @@ Create a lightweight request retry helper in the `llm` package:
   ```bash
   make check-coverage
   ```
-  Verified passing with 91.10% coverage (exceeding the >= 91.00% requirement on Go 1.26).
 
+  Verified passing with 91.10% coverage (exceeding the >= 91.00% requirement on Go 1.26).
