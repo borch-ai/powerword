@@ -200,13 +200,8 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 		IncludeUsage: true,
 	}
 
-	stream, firstResp, err := o.initiateStreamWithRetry(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("openai chat completion stream error: %w", err)
-	}
-
 	out := make(chan StreamChunk, 10)
-	go o.executeStream(ctx, stream, firstResp, out)
+	go o.executeStream(ctx, req, out)
 	return out, nil
 }
 
@@ -234,17 +229,31 @@ func (o *OpenAIClient) initiateStreamWithRetry(ctx context.Context, req openai.C
 	return stream, firstResp, retryErr
 }
 
-func (o *OpenAIClient) executeStream(ctx context.Context, stream *openai.ChatCompletionStream, firstResp *openai.ChatCompletionStreamResponse, out chan<- StreamChunk) {
+func (o *OpenAIClient) executeStream(ctx context.Context, req openai.ChatCompletionRequest, out chan<- StreamChunk) {
+	defer close(out)
+
+	stream, firstResp, err := o.initiateStreamWithRetry(ctx, req)
+	if err != nil {
+		emitOpenAIStreamError(out, err)
+		return
+	}
 	defer func() {
 		_ = stream.Close()
 	}()
-	defer close(out)
 
 	if firstResp != nil {
 		handleOpenAIStreamResponse(*firstResp, out)
 	}
 
 	drainOpenAIStream(ctx, stream, out)
+}
+
+func emitOpenAIStreamError(out chan<- StreamChunk, err error) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		out <- StreamChunk{Error: err}
+	} else {
+		out <- StreamChunk{Error: fmt.Errorf("openai chat completion stream error: %w", err)}
+	}
 }
 
 func drainOpenAIStream(ctx context.Context, stream *openai.ChatCompletionStream, out chan<- StreamChunk) {

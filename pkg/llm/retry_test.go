@@ -150,35 +150,30 @@ func TestRetry_ContextCanceledBeforeExecution(t *testing.T) {
 
 func TestRetry_ContextCanceledDuringBackoff(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	var calls int
 	cfg := RetryConfig{
 		MaxRetries: 3,
-		MinBackoff: 400 * time.Millisecond,
+		MinBackoff: 100 * time.Millisecond,
 		MaxBackoff: 1 * time.Second,
 		Retryable:  func(err error) bool { return true },
+		Sleep: func(sCtx context.Context, d time.Duration) error {
+			cancel()
+			return sCtx.Err()
+		},
 	}
 
-	go func() {
-		time.Sleep(25 * time.Millisecond)
-		cancel()
-	}()
-
-	start := time.Now()
 	err := Retry(ctx, cfg, func() error {
 		calls++
 		return errors.New("transient error")
 	})
-	elapsed := time.Since(start)
 
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got: %v", err)
 	}
-	if elapsed > 400*time.Millisecond {
-		t.Errorf("expected fast cancellation, took %v", elapsed)
-	}
-	if calls > 2 {
-		t.Errorf("expected cancellation during backoff before completing retries, got %d calls", calls)
+	if calls != 1 {
+		t.Errorf("expected exactly 1 call before cancellation during sleep, got %d", calls)
 	}
 }
 

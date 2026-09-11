@@ -24,6 +24,7 @@ type RetryConfig struct {
 	MinBackoff time.Duration
 	MaxBackoff time.Duration
 	Retryable  func(err error) bool
+	Sleep      func(ctx context.Context, d time.Duration) error
 }
 
 // DefaultRetryConfig returns a standard retry configuration suitable for GenAI requests.
@@ -68,14 +69,27 @@ func sanitizeConfig(cfg RetryConfig) RetryConfig {
 	return cfg
 }
 
+func defaultSleep(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // Retry executes op, automatically retrying transient errors using exponential backoff with full jitter.
+// If op returns an error that IsRetryableError classifies as non-transient, or if retries are exhausted,
+// Retry returns the last encountered error. If ctx is canceled during execution or backoff, ctx.Err() is returned.
 func Retry(ctx context.Context, cfg RetryConfig, op func() error) error {
 	cfg = sanitizeConfig(cfg)
 
 	var lastErr error
 	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 
 		err := op()
@@ -84,27 +98,24 @@ func Retry(ctx context.Context, cfg RetryConfig, op func() error) error {
 		}
 		lastErr = err
 
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 
-		if cfg.Retryable != nil && !cfg.Retryable(err) {
-			return err
-		}
-
-		if attempt == cfg.MaxRetries {
-			break
+		// Fail fast if not retryable or on the final attempt
+		if cfg.Disabled || attempt == cfg.MaxRetries || !cfg.Retryable(err) {
+			return lastErr
 		}
 
 		backoff := calculateBackoff(cfg.MinBackoff, cfg.MaxBackoff, attempt)
-		sleep := calculateJitterSleep(backoff)
+		sleepDuration := calculateJitterSleep(backoff)
 
-		timer := time.NewTimer(sleep)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return ctx.Err()
-		case <-timer.C:
+		sleeper := cfg.Sleep
+		if sleeper == nil {
+			sleeper = defaultSleep
+		}
+		if sleepErr := sleeper(ctx, sleepDuration); sleepErr != nil {
+			return sleepErr
 		}
 	}
 
@@ -127,10 +138,7 @@ func calculateJitterSleep(backoff time.Duration) time.Duration {
 	if backoff <= 0 {
 		return 0
 	}
-	maxBound := new(big.Int).SetInt64(int64(backoff))
-	if backoff < math.MaxInt64 {
-		maxBound.Add(maxBound, big.NewInt(1))
-	}
+	maxBound := new(big.Int).SetUint64(uint64(backoff) + 1)
 	n, err := crand.Int(crand.Reader, maxBound)
 	if err != nil {
 		return backoff

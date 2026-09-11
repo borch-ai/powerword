@@ -660,26 +660,34 @@ func (b *VeoBackend) pollOnceVeo(ctx context.Context, opName string) (bool, []by
 		opURL = fmt.Sprintf("%s/v1beta/%s?key=%s", baseURL, strings.TrimPrefix(opName, "/"), b.apiKey)
 	}
 
-	//nolint:gosec // opURL is internally verified and constructed from trusted operation name
-	pollReq, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
-	if err != nil {
-		return false, nil, err
-	}
+	var pBytes []byte
+	retryErr := llm.Retry(ctx, b.retryConfig, func() error {
+		//nolint:gosec // opURL is internally verified and constructed from trusted operation name
+		pollReq, err := http.NewRequestWithContext(ctx, "GET", opURL, nil)
+		if err != nil {
+			return err
+		}
 
-	//nolint:gosec // request is sent to trusted Google resource
-	pollResp, err := b.client.Do(pollReq)
-	if err != nil {
-		return false, nil, nil // return no error to retry
-	}
+		//nolint:gosec // request is sent to trusted Google resource
+		pollResp, doErr := b.client.Do(pollReq)
+		if doErr != nil {
+			return doErr
+		}
+		defer func() { _ = pollResp.Body.Close() }()
 
-	pBytes, err := io.ReadAll(pollResp.Body)
-	_ = pollResp.Body.Close()
-	if err != nil {
-		return false, nil, nil // retry
-	}
+		if pollResp.StatusCode != http.StatusOK {
+			return fmt.Errorf("veo poll status request failed, status %d", pollResp.StatusCode)
+		}
 
-	if pollResp.StatusCode != http.StatusOK {
-		return false, nil, nil // retry
+		body, readErr := io.ReadAll(pollResp.Body)
+		if readErr != nil {
+			return readErr
+		}
+		pBytes = body
+		return nil
+	})
+	if retryErr != nil {
+		return false, nil, retryErr
 	}
 
 	var opStatus veoOpStatus
@@ -835,27 +843,35 @@ func extractStatusURL(m map[string]interface{}, apiURL, taskID string) string {
 }
 
 func (b *MidjourneyBackend) pollOnce(ctx context.Context, statusURL string) (string, string, error) {
-	pollReq, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
-	if err != nil {
-		return "", "", err
-	}
-	if b.apiKey != "" {
-		pollReq.Header.Set("Authorization", "Bearer "+b.apiKey)
-	}
+	var pollBody []byte
+	retryErr := llm.Retry(ctx, b.retryConfig, func() error {
+		pollReq, err := http.NewRequestWithContext(ctx, "GET", statusURL, nil)
+		if err != nil {
+			return err
+		}
+		if b.apiKey != "" {
+			pollReq.Header.Set("Authorization", "Bearer "+b.apiKey)
+		}
 
-	pollResp, err := b.httpClient.Do(pollReq)
-	if err != nil {
-		return "", "", err
-	}
-	defer func() { _ = pollResp.Body.Close() }()
+		pollResp, doErr := b.httpClient.Do(pollReq)
+		if doErr != nil {
+			return doErr
+		}
+		defer func() { _ = pollResp.Body.Close() }()
 
-	if pollResp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("bad status code: %d", pollResp.StatusCode)
-	}
+		if pollResp.StatusCode != http.StatusOK {
+			return fmt.Errorf("bad status code: %d", pollResp.StatusCode)
+		}
 
-	pollBody, err := io.ReadAll(pollResp.Body)
-	if err != nil {
-		return "", "", err
+		body, readErr := io.ReadAll(pollResp.Body)
+		if readErr != nil {
+			return readErr
+		}
+		pollBody = body
+		return nil
+	})
+	if retryErr != nil {
+		return "", "", retryErr
 	}
 
 	var pollMap map[string]interface{}
@@ -961,12 +977,9 @@ func (b *MidjourneyBackend) GenerateImage(ctx context.Context, prompt string, si
 		case <-timeoutChan:
 			return "", fmt.Errorf("polling timed out after %v", b.pollingTimeout)
 		case <-ticker.C:
-			status, imgURL, err := b.pollOnce(ctx, statusURL)
+			_, imgURL, err := b.pollOnce(ctx, statusURL)
 			if err != nil {
-				if status == "failed" || status == "error" {
-					return "", err
-				}
-				continue
+				return "", err
 			}
 
 			if imgURL != "" {
@@ -1250,7 +1263,12 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 	derivedCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	var data []byte
+	dir := filepath.Join(workspaceRoot, "generated_images")
+	if mkdirErr := os.MkdirAll(dir, 0750); mkdirErr != nil {
+		return "", fmt.Errorf("failed to create generated_images folder: %w", mkdirErr)
+	}
+
+	var tempFilePath string
 	var contentType string
 	err := llm.Retry(derivedCtx, llm.DefaultRetryConfig(), func() error {
 		req, reqErr := http.NewRequestWithContext(derivedCtx, "GET", urlStr, nil)
@@ -1268,12 +1286,33 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 			return fmt.Errorf("failed to download image, status %d", r.StatusCode)
 		}
 
-		bodyBytes, readErr := io.ReadAll(r.Body)
-		if readErr != nil {
-			return fmt.Errorf("failed to read image body: %w", readErr)
+		tmpFile, createErr := os.CreateTemp(dir, "img-download-*.tmp")
+		if createErr != nil {
+			return fmt.Errorf("failed to create temporary image file: %w", createErr)
+		}
+		tmpName := tmpFile.Name()
+
+		success := false
+		defer func() {
+			_ = tmpFile.Close()
+			if !success {
+				_ = os.Remove(tmpName)
+			}
+		}()
+
+		// Bound download size to 50MB to prevent unbounded memory or disk DoS
+		const maxDownloadSize = 50 * 1024 * 1024
+		limitReader := io.LimitReader(r.Body, maxDownloadSize+1)
+		written, copyErr := io.Copy(tmpFile, limitReader)
+		if copyErr != nil {
+			return fmt.Errorf("failed to write image stream to temp file: %w", copyErr)
+		}
+		if written > maxDownloadSize {
+			return fmt.Errorf("downloaded image exceeds maximum allowed size of %d bytes", maxDownloadSize)
 		}
 
-		data = bodyBytes
+		success = true
+		tempFilePath = tmpName
 		contentType = r.Header.Get("Content-Type")
 		return nil
 	})
@@ -1291,28 +1330,16 @@ func downloadImage(ctx context.Context, urlStr string, workspaceRoot string, pro
 		ext = ".webp"
 	}
 
-	dir := filepath.Join(workspaceRoot, "generated_images")
-	if mkdirErr := os.MkdirAll(dir, 0750); mkdirErr != nil {
-		return "", fmt.Errorf("failed to create generated_images folder: %w", mkdirErr)
-	}
-
 	slug := slugify(prompt)
 	filename := fmt.Sprintf("image_%d_%s%s", time.Now().Unix(), slug, ext)
-	filePath := filepath.Join(dir, filename)
+	finalPath := filepath.Join(dir, filename)
 
-	//nolint:gosec // path is safely localized inside workspace root directory
-	out, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return "", fmt.Errorf("failed to open local destination file: %w", err)
-	}
-	defer func() { _ = out.Close() }()
-
-	_, err = out.Write(data)
-	if err != nil {
-		return "", fmt.Errorf("failed to write image bytes to file: %w", err)
+	if renameErr := os.Rename(tempFilePath, finalPath); renameErr != nil {
+		_ = os.Remove(tempFilePath)
+		return "", fmt.Errorf("failed to commit downloaded image file: %w", renameErr)
 	}
 
-	return filePath, nil
+	return finalPath, nil
 }
 
 func slugify(s string) string {
