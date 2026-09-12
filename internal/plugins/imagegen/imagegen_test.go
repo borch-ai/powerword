@@ -18,6 +18,7 @@ import (
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 func TestSlugify(t *testing.T) {
@@ -2050,5 +2051,547 @@ func TestGenerateImage_ImagenCrefValidation(t *testing.T) {
 	_, err = serviceForce.GenerateImage(context.Background(), "prompt", "1024x1024", "", "http://example.com/cref.png", nil)
 	if err != nil {
 		t.Errorf("expected ForceCref generate to succeed with mock server, got: %v", err)
+	}
+}
+
+func TestOpenAIBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"message":"Rate limit exceeded","code":"rate_limit_exceeded"}}`))
+			return
+		}
+		resp := openai.ImageResponse{
+			Data: []openai.ImageResponseDataInner{
+				{URL: "http://example.com/success_retry.png"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("OPENAI_BASE_URL", server.URL)
+	backend := NewOpenAIBackendWithTimeout("dummy", 10*time.Second)
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	url, err := backend.GenerateImage(context.Background(), "prompt", "1024x1024")
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if url != "http://example.com/success_retry.png" {
+		t.Errorf("unexpected image URL: %s", url)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestGoogleBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	b64 := base64.StdEncoding.EncodeToString([]byte("fake-png-data"))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		resp := map[string]interface{}{
+			"predictions": []map[string]string{
+				{"bytesBase64Encoded": b64, "mimeType": "image/png"},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend := NewGoogleBackend("dummy-key", "imagen-3.0-generate-002")
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	bytes, mime, err := backend.GenerateImage(context.Background(), "prompt", "1024x1024", "", nil)
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if string(bytes) != "fake-png-data" || mime != "image/png" {
+		t.Errorf("unexpected output: bytes=%s, mime=%s", string(bytes), mime)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestVeoBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		// Second attempt succeeds
+		resp := map[string]string{
+			"name": "operations/test_op_123",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	backend, err := NewVeoBackend("dummy-key", "veo-2.0-generate-001", "100ms", "5s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	opName, err := backend.initiateVeo(context.Background(), "prompt", "16:9", "", nil)
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if opName != "operations/test_op_123" {
+		t.Errorf("unexpected operation name: %s", opName)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestMidjourneyBackend_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte("502 Bad Gateway"))
+			return
+		}
+		resp := map[string]string{
+			"task_id": "mj_task_456",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	backend, err := NewMidjourneyBackend(server.URL, "dummy-key", "100ms", "5s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	statusURL, err := backend.initiateGeneration(context.Background(), "prompt", "1:1")
+	if err != nil {
+		t.Fatalf("expected success on retry, got: %v", err)
+	}
+	if !strings.Contains(statusURL, "mj_task_456") {
+		t.Errorf("unexpected status URL: %s", statusURL)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestDownloadImage_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("503 Service Unavailable"))
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("fake-downloaded-bytes"))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	path, err := downloadImage(context.Background(), server.URL, tmpDir, "retry-prompt", 10*time.Second)
+	if err != nil {
+		t.Fatalf("expected downloadImage to succeed after retry, got: %v", err)
+	}
+	if path == "" {
+		t.Error("expected non-empty file path")
+	}
+	//nolint:gosec // G304: path is created inside test temp directory
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read downloaded file: %v", err)
+	}
+	if string(data) != "fake-downloaded-bytes" {
+		t.Errorf("unexpected file content: %s", string(data))
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestVeoBackend_PollingRetrySuccess(t *testing.T) {
+	var pollAttempts int
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "video.mp4") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("fake-video-bytes"))
+			return
+		}
+		pollAttempts++
+		if pollAttempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":{"code":503,"message":"service temporarily unavailable"}}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		resp := fmt.Sprintf(`{"done":true,"response":{"generatedVideos":[{"video":{"uri":"%s/video.mp4"}}]}}`, server.URL)
+		_, _ = w.Write([]byte(resp))
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	b, err := NewVeoBackend("test-key", "veo-2.0", "10ms", "5s")
+	if err != nil {
+		t.Fatalf("failed to initialize VeoBackend: %v", err)
+	}
+	b.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 10 * time.Millisecond,
+		MaxBackoff: 50 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	done, videoBytes, pollErr := b.pollOnceVeo(context.Background(), "operations/test-op")
+	if pollErr != nil {
+		t.Fatalf("expected pollOnceVeo to succeed after retry, got: %v", pollErr)
+	}
+	if !done {
+		t.Error("expected done to be true")
+	}
+	if string(videoBytes) != "fake-video-bytes" {
+		t.Errorf("unexpected videoBytes: %s", string(videoBytes))
+	}
+	if pollAttempts != 2 {
+		t.Errorf("expected 2 poll attempts, got %d", pollAttempts)
+	}
+}
+
+func TestMidjourneyBackend_PollingRetrySuccess(t *testing.T) {
+	var pollAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pollAttempts++
+		if pollAttempts == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte("502 Bad Gateway"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"completed","imageUrl":"https://example.com/mj.png"}`))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "test-key", "10ms", "5s")
+	if err != nil {
+		t.Fatalf("failed to initialize MidjourneyBackend: %v", err)
+	}
+	b.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 10 * time.Millisecond,
+		MaxBackoff: 50 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	status, imgURL, pollErr := b.pollOnce(context.Background(), server.URL+"/task-123")
+	if pollErr != nil {
+		t.Fatalf("expected pollOnce to succeed after retry, got: %v", pollErr)
+	}
+	if status != "completed" {
+		t.Errorf("expected status 'completed', got: %s", status)
+	}
+	if imgURL != "https://example.com/mj.png" {
+		t.Errorf("expected imgURL 'https://example.com/mj.png', got: %s", imgURL)
+	}
+	if pollAttempts != 2 {
+		t.Errorf("expected 2 poll attempts, got %d", pollAttempts)
+	}
+}
+
+func TestImageGenBackends_DefaultNoRetries(t *testing.T) {
+	oa := NewOpenAIBackendWithTimeout("key", 10*time.Second)
+	if !oa.retryConfig.Disabled {
+		t.Errorf("expected OpenAIBackend to default to NoRetries (Disabled: true)")
+	}
+
+	gb := NewGoogleBackend("key", "model")
+	if !gb.retryConfig.Disabled {
+		t.Errorf("expected GoogleBackend to default to NoRetries (Disabled: true)")
+	}
+
+	vb, err := NewVeoBackend("key", "model", "", "")
+	if err != nil {
+		t.Fatalf("unexpected error creating VeoBackend: %v", err)
+	}
+	if !vb.retryConfig.Disabled {
+		t.Errorf("expected VeoBackend to default to NoRetries (Disabled: true)")
+	}
+
+	mb, err := NewMidjourneyBackend("http://localhost", "key", "", "")
+	if err != nil {
+		t.Fatalf("unexpected error creating MidjourneyBackend: %v", err)
+	}
+	if !mb.retryConfig.Disabled {
+		t.Errorf("expected MidjourneyBackend to default to NoRetries (Disabled: true)")
+	}
+}
+
+func TestImageGenService_RetryConfig(t *testing.T) {
+	// Default with no config should be NoRetries
+	svc := NewImageGenService(t.TempDir(), &config.Config{})
+	rc := svc.getRetryConfig()
+	if !rc.Disabled {
+		t.Errorf("expected ImageGenService to default to NoRetries, got Disabled=%v", rc.Disabled)
+	}
+
+	// Config with MaxRetries and RetryBackoff
+	cfg := &config.Config{}
+	cfg.Plugins.ImageGen.MaxRetries = 2
+	cfg.Plugins.ImageGen.RetryBackoff = "250ms"
+	svcWithCfg := NewImageGenService(t.TempDir(), cfg)
+	rcCfg := svcWithCfg.getRetryConfig()
+	if rcCfg.Disabled || rcCfg.MaxRetries != 2 || rcCfg.MinBackoff != 250*time.Millisecond {
+		t.Errorf("unexpected retryConfig from config: %+v", rcCfg)
+	}
+
+	// Programmatic override via SetRetryConfig
+	custom := llm.RetryConfig{MaxRetries: 5, MinBackoff: 1 * time.Second}
+	svcWithCfg.SetRetryConfig(custom)
+	rcCustom := svcWithCfg.getRetryConfig()
+	if rcCustom.MaxRetries != 5 || rcCustom.MinBackoff != 1*time.Second {
+		t.Errorf("expected custom retryConfig to override config, got: %+v", rcCustom)
+	}
+}
+
+func TestRetryConfigFromConfig(t *testing.T) {
+	// Zero MaxRetries returns NoRetries
+	rcZero := RetryConfigFromConfig(config.ImageGenConfig{})
+	if !rcZero.Disabled {
+		t.Errorf("expected NoRetries for empty config, got Disabled=%v", rcZero.Disabled)
+	}
+
+	// Valid MaxRetries and backoff
+	cfg := config.ImageGenConfig{
+		MaxRetries:   3,
+		RetryBackoff: "500ms",
+	}
+	rc := RetryConfigFromConfig(cfg)
+	if rc.Disabled || rc.MaxRetries != 3 || rc.MinBackoff != 500*time.Millisecond {
+		t.Errorf("unexpected retry config: %+v", rc)
+	}
+
+	// Invalid backoff falls back to default MinBackoff
+	cfgInvalid := config.ImageGenConfig{
+		MaxRetries:   2,
+		RetryBackoff: "invalid-duration",
+	}
+	rcInvalid := RetryConfigFromConfig(cfgInvalid)
+	if rcInvalid.Disabled || rcInvalid.MaxRetries != 2 || rcInvalid.MinBackoff != 100*time.Millisecond {
+		t.Errorf("unexpected fallback retry config: %+v", rcInvalid)
+	}
+}
+
+func TestVeoBackend_DownloadVideo_ExceedsSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		buf := make([]byte, 1024*1024)
+		for i := 0; i < 101; i++ {
+			_, _ = w.Write(buf)
+		}
+	}))
+	defer server.Close()
+
+	b, err := NewVeoBackend("key", "model", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, dlErr := b.downloadVideo(context.Background(), server.URL)
+	if dlErr == nil || !strings.Contains(dlErr.Error(), "exceeds maximum allowed size") {
+		t.Errorf("expected error mentioning maximum allowed size, got: %v", dlErr)
+	}
+}
+
+func TestVeoBackend_PollOnceVeo_ExceedsSizeLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		buf := make([]byte, 1024*1024)
+		for i := 0; i < 6; i++ {
+			_, _ = w.Write(buf)
+		}
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	b, err := NewVeoBackend("key", "model", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, pollErr := b.pollOnceVeo(context.Background(), "test-op")
+	if pollErr == nil || !strings.Contains(pollErr.Error(), "exceeds maximum allowed size") {
+		t.Errorf("expected error mentioning maximum allowed size, got: %v", pollErr)
+	}
+}
+
+func TestDownloadImage_CustomRetryConfig(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("503 Service Unavailable"))
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	// When llm.NoRetries() is passed, attempts should be exactly 1
+	_, err := downloadImage(context.Background(), server.URL, tmpDir, "no-retry-prompt", 5*time.Second, llm.NoRetries())
+	if err == nil {
+		t.Fatal("expected downloadImage to fail on 503")
+	}
+	if attempts != 1 {
+		t.Errorf("expected exactly 1 attempt with NoRetries(), got %d", attempts)
+	}
+}
+
+func TestVeoBackend_PollVeo_PollingTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Never done
+		_, _ = w.Write([]byte(`{"done":false}`))
+	}))
+	defer server.Close()
+
+	t.Setenv("GOOGLE_BASE_URL", server.URL)
+	b, err := NewVeoBackend("key", "model", "5ms", "25ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, pollErr := b.pollVeo(context.Background(), "test-op")
+	if pollErr == nil || !strings.Contains(pollErr.Error(), "polling timed out after") {
+		t.Errorf("expected error containing 'polling timed out after', got: %v", pollErr)
+	}
+}
+
+func TestMidjourneyBackend_GenerateImage_PollingTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "POST" {
+			_, _ = w.Write([]byte(`{"task_id":"mj_timeout_task"}`))
+			return
+		}
+		// Polling GET: always pending
+		_, _ = w.Write([]byte(`{"status":"pending"}`))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "key", "5ms", "25ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, genErr := b.GenerateImage(context.Background(), "prompt", "1:1")
+	if genErr == nil || !strings.Contains(genErr.Error(), "polling timed out after") {
+		t.Errorf("expected error containing 'polling timed out after', got: %v", genErr)
+	}
+}
+
+func TestMidjourneyBackend_GenerateImage_MalformedPayloadResilient(t *testing.T) {
+	var pollAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"mj_resilient_task"}`))
+			return
+		}
+		pollAttempts++
+		w.Header().Set("Content-Type", "application/json")
+		if pollAttempts == 1 {
+			// Malformed JSON payload on first poll attempt
+			_, _ = w.Write([]byte(`{invalid-json`))
+			return
+		}
+		// Valid completed response on second attempt
+		_, _ = w.Write([]byte(`{"status":"completed","imageUrl":"https://example.com/resilient.png"}`))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "key", "5ms", "500ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	imgURL, err := b.GenerateImage(context.Background(), "prompt", "1:1")
+	if err != nil {
+		t.Fatalf("expected GenerateImage to recover from malformed payload, got err: %v", err)
+	}
+	if imgURL != "https://example.com/resilient.png" {
+		t.Errorf("unexpected image URL: %s", imgURL)
+	}
+	if pollAttempts < 2 {
+		t.Errorf("expected at least 2 poll attempts, got %d", pollAttempts)
+	}
+}
+
+func TestMidjourneyBackend_GenerateImage_ExhaustedRetryError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"mj_exhaust_task"}`))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("500 Internal Server Error"))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "key", "5ms", "500ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 1,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	_, err = b.GenerateImage(context.Background(), "prompt", "1:1")
+	if err == nil {
+		t.Fatal("expected error on exhausted polling retries, got nil")
+	}
+	if strings.Contains(err.Error(), "polling timed out after") {
+		t.Errorf("expected request error, but got polling timed out: %v", err)
 	}
 }

@@ -15,12 +15,14 @@ import (
 
 	"github.com/borch-ai/powerword/internal/plugins/imagegen"
 	"github.com/borch-ai/powerword/pkg/config"
+	"github.com/borch-ai/powerword/pkg/llm"
 )
 
 // ViralService coordinates voiceover generation, video generation, and ffmpeg stitching.
 type ViralService struct {
 	workspaceRoot string
 	cfg           *config.Config
+	retryConfig   *llm.RetryConfig
 }
 
 // NewViralService creates a new ViralService.
@@ -29,6 +31,21 @@ func NewViralService(workspaceRoot string, cfg *config.Config) *ViralService {
 		workspaceRoot: workspaceRoot,
 		cfg:           cfg,
 	}
+}
+
+// SetRetryConfig sets custom retry behavior for ViralService and its constructed backends.
+func (s *ViralService) SetRetryConfig(cfg llm.RetryConfig) {
+	s.retryConfig = &cfg
+}
+
+func (s *ViralService) getRetryConfig() llm.RetryConfig {
+	if s.retryConfig != nil {
+		return *s.retryConfig
+	}
+	if s.cfg != nil {
+		return imagegen.RetryConfigFromConfig(s.cfg.Plugins.ImageGen)
+	}
+	return llm.NoRetries()
 }
 
 // checkFFmpeg verifies if the ffmpeg binary is available in the path.
@@ -231,7 +248,9 @@ func (s *ViralService) runVeo(ctx context.Context, prompt, size string) ([]byte,
 		return nil, fmt.Errorf("failed to initialize Veo backend: %w", err)
 	}
 
-	if s.cfg.Plugins.ImageGen.RequestTimeout != "" {
+	backend.SetRetryConfig(s.getRetryConfig())
+
+	if s.cfg != nil && s.cfg.Plugins.ImageGen.RequestTimeout != "" {
 		if d, errParse := time.ParseDuration(s.cfg.Plugins.ImageGen.RequestTimeout); errParse == nil && d > 0 {
 			backend.SetTimeout(d)
 		}

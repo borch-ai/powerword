@@ -13,9 +13,10 @@ import (
 )
 
 type GeminiClient struct {
-	client    *genai.Client
-	modelName string
-	opts      []option.ClientOption
+	client      *genai.Client
+	modelName   string
+	opts        []option.ClientOption
+	retryConfig RetryConfig
 }
 
 // NewGeminiClient creates a new Gemini client.
@@ -28,9 +29,10 @@ func NewGeminiClient(apiKey string, modelName string) (*GeminiClient, error) {
 	}
 
 	return &GeminiClient{
-		client:    client,
-		modelName: modelName,
-		opts:      opts,
+		client:      client,
+		modelName:   modelName,
+		opts:        opts,
+		retryConfig: DefaultRetryConfig(),
 	}, nil
 }
 
@@ -43,10 +45,16 @@ func NewGeminiClientWithOpts(modelName string, opts ...option.ClientOption) (*Ge
 	}
 
 	return &GeminiClient{
-		client:    client,
-		modelName: modelName,
-		opts:      opts,
+		client:      client,
+		modelName:   modelName,
+		opts:        opts,
+		retryConfig: DefaultRetryConfig(),
 	}, nil
+}
+
+// SetRetryConfig configures custom retry behavior for the Gemini client.
+func (g *GeminiClient) SetRetryConfig(cfg RetryConfig) {
+	g.retryConfig = cfg
 }
 
 func (g *GeminiClient) prepareModel(messages []Message, tools []ToolDefinition) (*genai.GenerativeModel, []*genai.Content, []genai.Part, error) {
@@ -147,10 +155,14 @@ func (g *GeminiClient) Generate(ctx context.Context, messages []Message, tools [
 		model.ResponseMIMEType = cfg.ResponseMIMEType
 	}
 
-	chat := model.StartChat()
-	chat.History = history
-
-	resp, err := chat.SendMessage(ctx, lastParts...)
+	var resp *genai.GenerateContentResponse
+	err = Retry(ctx, g.retryConfig, func() error {
+		chat := model.StartChat()
+		chat.History = history
+		var sendErr error
+		resp, sendErr = chat.SendMessage(ctx, lastParts...)
+		return sendErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("gemini message error: %w", err)
 	}
@@ -200,35 +212,71 @@ func (g *GeminiClient) Stream(ctx context.Context, messages []Message, tools []T
 		return nil, err
 	}
 
-	chat := model.StartChat()
-	chat.History = history
-
-	iter := chat.SendMessageStream(ctx, lastParts...)
-
 	out := make(chan StreamChunk, 10)
-
-	go func() {
-		defer close(out)
-		for {
-			select {
-			case <-ctx.Done():
-				out <- StreamChunk{Error: ctx.Err()}
-				return
-			default:
-				resp, err := iter.Next()
-				if errors.Is(err, iterator.Done) {
-					return
-				}
-				if err != nil {
-					out <- StreamChunk{Error: fmt.Errorf("gemini stream error: %w", err)}
-					return
-				}
-				handleStreamChunk(resp, out)
-			}
-		}
-	}()
-
+	go g.executeStream(ctx, model, history, lastParts, out)
 	return out, nil
+}
+
+func (g *GeminiClient) executeStream(ctx context.Context, model *genai.GenerativeModel, history []*genai.Content, lastParts []genai.Part, out chan<- StreamChunk) {
+	defer close(out)
+
+	iter, firstResp, err := g.initiateStreamWithRetry(ctx, model, history, lastParts)
+	if err != nil {
+		emitGeminiStreamError(out, err)
+		return
+	}
+
+	if firstResp != nil {
+		handleStreamChunk(firstResp, out)
+	}
+
+	drainGeminiStream(ctx, iter, out)
+}
+
+func (g *GeminiClient) initiateStreamWithRetry(ctx context.Context, model *genai.GenerativeModel, history []*genai.Content, lastParts []genai.Part) (*genai.GenerateContentResponseIterator, *genai.GenerateContentResponse, error) {
+	var iter *genai.GenerateContentResponseIterator
+	var firstResp *genai.GenerateContentResponse
+
+	retryErr := Retry(ctx, g.retryConfig, func() error {
+		chat := model.StartChat()
+		chat.History = history
+		iter = chat.SendMessageStream(ctx, lastParts...)
+		var nextErr error
+		firstResp, nextErr = iter.Next()
+		if errors.Is(nextErr, iterator.Done) {
+			return nil
+		}
+		return nextErr
+	})
+	return iter, firstResp, retryErr
+}
+
+func emitGeminiStreamError(out chan<- StreamChunk, err error) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		out <- StreamChunk{Error: err}
+	} else {
+		out <- StreamChunk{Error: fmt.Errorf("gemini stream error: %w", err)}
+	}
+}
+
+func drainGeminiStream(ctx context.Context, iter *genai.GenerateContentResponseIterator, out chan<- StreamChunk) {
+	for {
+		select {
+		case <-ctx.Done():
+			out <- StreamChunk{Error: ctx.Err()}
+			return
+		default:
+			resp, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				return
+			}
+			if err != nil {
+				out <- StreamChunk{Error: fmt.Errorf("gemini stream error: %w", err)}
+				return
+			}
+			handleStreamChunk(resp, out)
+		}
+	}
 }
 
 func handleStreamChunk(resp *genai.GenerateContentResponse, out chan<- StreamChunk) {

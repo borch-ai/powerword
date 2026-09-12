@@ -666,3 +666,129 @@ func TestGeminiClient_Embed_Error(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+func TestGeminiClient_Generate_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted","status":"RESOURCE_EXHAUSTED"}}`))
+			return
+		}
+
+		resp := []any{
+			map[string]any{
+				"candidates": []any{
+					map[string]any{
+						"content": map[string]any{
+							"parts": []any{
+								map[string]any{
+									"text": "Hello after retry!",
+								},
+							},
+							"role": "model",
+						},
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  IsRetryableError,
+	})
+
+	msg, err := client.Generate(context.Background(), []Message{{Role: RoleUser, Content: "Hi"}}, nil)
+	if err != nil {
+		t.Fatalf("expected success after retry, got: %v", err)
+	}
+	if msg.Content != "Hello after retry!" {
+		t.Errorf("unexpected content: %s", msg.Content)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestGeminiClient_Stream_RetrySuccess(t *testing.T) {
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":{"code":503,"message":"Service unavailable","status":"UNAVAILABLE"}}`))
+			return
+		}
+
+		resp := []any{
+			map[string]any{
+				"candidates": []any{
+					map[string]any{
+						"content": map[string]any{
+							"parts": []any{
+								map[string]any{
+									"text": "Stream after retry!",
+								},
+							},
+							"role": "model",
+						},
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	opts := []option.ClientOption{
+		option.WithEndpoint(server.URL),
+		option.WithAPIKey("dummy-key"),
+	}
+
+	client, err := NewGeminiClientWithOpts("gemini-1.5-pro", opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetRetryConfig(RetryConfig{
+		MaxRetries: 3,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  IsRetryableError,
+	})
+
+	ch, err := client.Stream(context.Background(), []Message{{Role: RoleUser, Content: "Hi"}}, nil)
+	if err != nil {
+		t.Fatalf("unexpected stream error: %v", err)
+	}
+
+	var results []string
+	for chunk := range ch {
+		if chunk.Error != nil {
+			t.Fatalf("unexpected chunk error: %v", chunk.Error)
+		}
+		results = append(results, chunk.Content)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+	if len(results) == 0 || results[0] != "Stream after retry!" {
+		t.Errorf("unexpected results: %+v", results)
+	}
+}

@@ -5,23 +5,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 )
 
 type AnthropicClient struct {
-	client    *anthropic.Client
-	modelName string
+	client      *anthropic.Client
+	modelName   string
+	retryConfig RetryConfig
 }
 
 // NewAnthropicClient creates a new Anthropic client.
 func NewAnthropicClient(apiKey string, modelName string) (*AnthropicClient, error) {
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 	return &AnthropicClient{
-		client:    &client,
-		modelName: modelName,
+		client:      &client,
+		modelName:   modelName,
+		retryConfig: DefaultRetryConfig(),
 	}, nil
 }
 
@@ -29,9 +33,15 @@ func NewAnthropicClient(apiKey string, modelName string) (*AnthropicClient, erro
 func NewAnthropicClientWithOpts(modelName string, opts ...option.RequestOption) (*AnthropicClient, error) {
 	client := anthropic.NewClient(opts...)
 	return &AnthropicClient{
-		client:    &client,
-		modelName: modelName,
+		client:      &client,
+		modelName:   modelName,
+		retryConfig: DefaultRetryConfig(),
 	}, nil
+}
+
+// SetRetryConfig configures custom retry behavior for the Anthropic client.
+func (a *AnthropicClient) SetRetryConfig(cfg RetryConfig) {
+	a.retryConfig = cfg
 }
 
 func (a *AnthropicClient) prepareParams(messages []Message, tools []ToolDefinition) (anthropic.MessageNewParams, error) {
@@ -92,7 +102,12 @@ func (a *AnthropicClient) Generate(ctx context.Context, messages []Message, tool
 		return nil, err
 	}
 
-	msg, err := a.client.Messages.New(ctx, params)
+	var msg *anthropic.Message
+	err = Retry(ctx, a.retryConfig, func() error {
+		var callErr error
+		msg, callErr = a.client.Messages.New(ctx, params)
+		return callErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("anthropic messages error: %w", err)
 	}
@@ -129,31 +144,76 @@ func (a *AnthropicClient) Stream(ctx context.Context, messages []Message, tools 
 		return nil, err
 	}
 
-	stream := a.client.Messages.NewStreaming(ctx, params)
 	out := make(chan StreamChunk, 10)
+	go a.executeStream(ctx, params, out)
+	return out, nil
+}
 
-	go func() {
-		defer func() {
-			_ = stream.Close()
-		}()
-		defer close(out)
+func (a *AnthropicClient) executeStream(ctx context.Context, params anthropic.MessageNewParams, out chan<- StreamChunk) {
+	defer close(out)
 
-		for stream.Next() {
-			select {
-			case <-ctx.Done():
-				out <- StreamChunk{Error: ctx.Err()}
-				return
-			default:
-				handleAnthropicStreamEvent(stream.Current(), out)
-			}
-		}
-
-		if err := stream.Err(); err != nil {
-			out <- StreamChunk{Error: fmt.Errorf("anthropic stream error: %w", err)}
-		}
+	stream, hasFirst, err := a.initiateStreamWithRetry(ctx, params)
+	if err != nil {
+		emitAnthropicStreamError(out, err)
+		return
+	}
+	defer func() {
+		_ = stream.Close()
 	}()
 
-	return out, nil
+	if hasFirst {
+		handleAnthropicStreamEvent(stream.Current(), out)
+	}
+
+	drainAnthropicStream(ctx, stream, out)
+}
+
+func (a *AnthropicClient) initiateStreamWithRetry(ctx context.Context, params anthropic.MessageNewParams) (*ssestream.Stream[anthropic.MessageStreamEventUnion], bool, error) {
+	var stream *ssestream.Stream[anthropic.MessageStreamEventUnion]
+	var hasFirst bool
+
+	retryErr := Retry(ctx, a.retryConfig, func() error {
+		stream = a.client.Messages.NewStreaming(ctx, params)
+		if !stream.Next() {
+			if streamErr := stream.Err(); streamErr != nil {
+				if errors.Is(streamErr, io.EOF) {
+					hasFirst = false
+					return nil
+				}
+				_ = stream.Close()
+				return streamErr
+			}
+			hasFirst = false
+			return nil
+		}
+		hasFirst = true
+		return nil
+	})
+	return stream, hasFirst, retryErr
+}
+
+func emitAnthropicStreamError(out chan<- StreamChunk, err error) {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		out <- StreamChunk{Error: err}
+	} else {
+		out <- StreamChunk{Error: fmt.Errorf("anthropic stream error: %w", err)}
+	}
+}
+
+func drainAnthropicStream(ctx context.Context, stream *ssestream.Stream[anthropic.MessageStreamEventUnion], out chan<- StreamChunk) {
+	for stream.Next() {
+		select {
+		case <-ctx.Done():
+			out <- StreamChunk{Error: ctx.Err()}
+			return
+		default:
+			handleAnthropicStreamEvent(stream.Current(), out)
+		}
+	}
+
+	if err := stream.Err(); err != nil && !errors.Is(err, io.EOF) {
+		out <- StreamChunk{Error: fmt.Errorf("anthropic stream error: %w", err)}
+	}
 }
 
 func handleAnthropicStreamEvent(event anthropic.MessageStreamEventUnion, out chan<- StreamChunk) {

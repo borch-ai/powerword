@@ -71,6 +71,8 @@ type ImageGenConfig struct {
 	RequestTimeout            string `mapstructure:"request_timeout"`
 	ForceCref                 bool   `mapstructure:"force_cref"`
 	ForceSref                 bool   `mapstructure:"force_sref"`
+	MaxRetries                int    `mapstructure:"max_retries"`
+	RetryBackoff              string `mapstructure:"retry_backoff"`
 }
 
 // KDPMathConfig holds parameters for the KDP Math plugin.
@@ -457,6 +459,8 @@ func bindPluginEnvVars(v *viper.Viper) {
 	bindEnv(v, "plugins.imagegen.request_timeout", "POWERWORD_IMAGEGEN_REQUEST_TIMEOUT")
 	bindEnv(v, "plugins.imagegen.force_cref", "POWERWORD_IMAGEGEN_FORCE_CREF")
 	bindEnv(v, "plugins.imagegen.force_sref", "POWERWORD_IMAGEGEN_FORCE_SREF")
+	bindEnv(v, "plugins.imagegen.max_retries", "POWERWORD_IMAGEGEN_MAX_RETRIES")
+	bindEnv(v, "plugins.imagegen.retry_backoff", "POWERWORD_IMAGEGEN_RETRY_BACKOFF")
 	bindEnv(v, "plugins.seo.cache_ttl_hours", "POWERWORD_SEO_CACHE_TTL_HOURS")
 	bindEnv(v, "plugins.seo.rate_limit_ms", "POWERWORD_SEO_RATE_LIMIT_MS")
 	bindEnv(v, "plugins.viral.tts_provider", "POWERWORD_VIRAL_TTS_PROVIDER")

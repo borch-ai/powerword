@@ -13,8 +13,9 @@ import (
 )
 
 type OpenAIClient struct {
-	client    *openai.Client
-	modelName string
+	client      *openai.Client
+	modelName   string
+	retryConfig RetryConfig
 }
 
 // NewOpenAIClient creates a new OpenAI client.
@@ -34,8 +35,9 @@ func NewCustomOpenAIClient(apiKey string, modelName string, baseURL string) (*Op
 	}
 	client := openai.NewClientWithConfig(cfg)
 	return &OpenAIClient{
-		client:    client,
-		modelName: modelName,
+		client:      client,
+		modelName:   modelName,
+		retryConfig: DefaultRetryConfig(),
 	}, nil
 }
 
@@ -43,9 +45,15 @@ func NewCustomOpenAIClient(apiKey string, modelName string, baseURL string) (*Op
 func NewOpenAIClientWithConfig(cfg openai.ClientConfig, modelName string) *OpenAIClient {
 	client := openai.NewClientWithConfig(cfg)
 	return &OpenAIClient{
-		client:    client,
-		modelName: modelName,
+		client:      client,
+		modelName:   modelName,
+		retryConfig: DefaultRetryConfig(),
 	}
+}
+
+// SetRetryConfig configures custom retry behavior for the OpenAI client.
+func (o *OpenAIClient) SetRetryConfig(cfg RetryConfig) {
+	o.retryConfig = cfg
 }
 
 func (o *OpenAIClient) prepareRequest(messages []Message, tools []ToolDefinition) (openai.ChatCompletionRequest, error) {
@@ -145,7 +153,12 @@ func (o *OpenAIClient) Generate(ctx context.Context, messages []Message, tools [
 		}
 	}
 
-	resp, err := o.client.CreateChatCompletion(ctx, req)
+	var resp openai.ChatCompletionResponse
+	err = Retry(ctx, o.retryConfig, func() error {
+		var callErr error
+		resp, callErr = o.client.CreateChatCompletion(ctx, req)
+		return callErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("openai chat completion error: %w", err)
 	}
@@ -187,40 +200,73 @@ func (o *OpenAIClient) Stream(ctx context.Context, messages []Message, tools []T
 		IncludeUsage: true,
 	}
 
-	stream, err := o.client.CreateChatCompletionStream(ctx, req)
+	stream, firstResp, err := o.initiateStreamWithRetry(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("openai chat completion stream error: %w", err)
 	}
 
 	out := make(chan StreamChunk, 10)
-
-	go func() {
-		defer func() {
-			_ = stream.Close()
-		}()
-		defer close(out)
-
-		for {
-			select {
-			case <-ctx.Done():
-				out <- StreamChunk{Error: ctx.Err()}
-				return
-			default:
-				response, err := stream.Recv()
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				if err != nil {
-					out <- StreamChunk{Error: fmt.Errorf("openai stream error: %w", err)}
-					return
-				}
-
-				handleOpenAIStreamResponse(response, out)
-			}
-		}
-	}()
-
+	go o.executeStream(ctx, stream, firstResp, out)
 	return out, nil
+}
+
+func (o *OpenAIClient) initiateStreamWithRetry(ctx context.Context, req openai.ChatCompletionRequest) (*openai.ChatCompletionStream, *openai.ChatCompletionStreamResponse, error) {
+	var stream *openai.ChatCompletionStream
+	var firstResp *openai.ChatCompletionStreamResponse
+
+	retryErr := Retry(ctx, o.retryConfig, func() error {
+		var callErr error
+		stream, callErr = o.client.CreateChatCompletionStream(ctx, req)
+		if callErr != nil {
+			return callErr
+		}
+		resp, recvErr := stream.Recv()
+		if recvErr != nil {
+			if errors.Is(recvErr, io.EOF) {
+				firstResp = nil
+				return nil
+			}
+			_ = stream.Close()
+			return recvErr
+		}
+		firstResp = &resp
+		return nil
+	})
+	return stream, firstResp, retryErr
+}
+
+func (o *OpenAIClient) executeStream(ctx context.Context, stream *openai.ChatCompletionStream, firstResp *openai.ChatCompletionStreamResponse, out chan<- StreamChunk) {
+	defer func() {
+		_ = stream.Close()
+	}()
+	defer close(out)
+
+	if firstResp != nil {
+		handleOpenAIStreamResponse(*firstResp, out)
+	}
+
+	drainOpenAIStream(ctx, stream, out)
+}
+
+func drainOpenAIStream(ctx context.Context, stream *openai.ChatCompletionStream, out chan<- StreamChunk) {
+	for {
+		select {
+		case <-ctx.Done():
+			out <- StreamChunk{Error: ctx.Err()}
+			return
+		default:
+			response, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				return
+			}
+			if err != nil {
+				out <- StreamChunk{Error: fmt.Errorf("openai stream error: %w", err)}
+				return
+			}
+
+			handleOpenAIStreamResponse(response, out)
+		}
+	}
 }
 
 func handleOpenAIStreamResponse(response openai.ChatCompletionStreamResponse, out chan<- StreamChunk) {
