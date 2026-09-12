@@ -744,7 +744,7 @@ func (b *VeoBackend) pollVeo(ctx context.Context, opName string) ([]byte, error)
 		case <-ticker.C:
 			done, videoBytes, err := b.pollOnceVeo(pollCtx, opName)
 			if err != nil {
-				if (errors.Is(err, context.DeadlineExceeded) || errors.Is(pollCtx.Err(), context.DeadlineExceeded)) && ctx.Err() == nil {
+				if errors.Is(pollCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
 					return nil, fmt.Errorf("polling timed out after %v", b.pollingTimeout)
 				}
 				return nil, err
@@ -895,10 +895,23 @@ func (b *MidjourneyBackend) fetchPollStatus(ctx context.Context, statusURL strin
 	return pollBody, retryErr
 }
 
+// MalformedPayloadError indicates an incomplete or unparseable JSON payload during status polling.
+type MalformedPayloadError struct {
+	err error
+}
+
+func (e *MalformedPayloadError) Error() string {
+	return fmt.Sprintf("malformed poll response: %v", e.err)
+}
+
+func (e *MalformedPayloadError) Unwrap() error {
+	return e.err
+}
+
 func parsePollResponse(pollBody []byte) (string, string, error) {
 	var pollMap map[string]interface{}
 	if err := json.Unmarshal(pollBody, &pollMap); err != nil {
-		return "", "", err
+		return "", "", &MalformedPayloadError{err: err}
 	}
 
 	status := extractStatus(pollMap)
@@ -988,6 +1001,25 @@ func (b *MidjourneyBackend) initiateGeneration(ctx context.Context, prompt, size
 	return statusURL, nil
 }
 
+func (b *MidjourneyBackend) handlePollTick(ctx, pollCtx context.Context, statusURL string) (string, bool, error) {
+	_, imgURL, err := b.pollOnce(pollCtx, statusURL)
+	if err != nil {
+		if errors.Is(pollCtx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
+			return "", false, fmt.Errorf("polling timed out after %v", b.pollingTimeout)
+		}
+		var malformedErr *MalformedPayloadError
+		if errors.As(err, &malformedErr) {
+			// Incomplete or malformed response payload during polling; continue until timeout
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if imgURL != "" {
+		return imgURL, true, nil
+	}
+	return "", false, nil
+}
+
 // GenerateImage POSTs a generation task, then polls for completion.
 func (b *MidjourneyBackend) GenerateImage(ctx context.Context, prompt string, size string) (string, error) {
 	statusURL, err := b.initiateGeneration(ctx, prompt, size)
@@ -1009,15 +1041,11 @@ func (b *MidjourneyBackend) GenerateImage(ctx context.Context, prompt string, si
 			}
 			return "", pollCtx.Err()
 		case <-ticker.C:
-			_, imgURL, err := b.pollOnce(pollCtx, statusURL)
-			if err != nil {
-				if (errors.Is(err, context.DeadlineExceeded) || errors.Is(pollCtx.Err(), context.DeadlineExceeded)) && ctx.Err() == nil {
-					return "", fmt.Errorf("polling timed out after %v", b.pollingTimeout)
-				}
-				return "", err
+			imgURL, done, pollErr := b.handlePollTick(ctx, pollCtx, statusURL)
+			if pollErr != nil {
+				return "", pollErr
 			}
-
-			if imgURL != "" {
+			if done {
 				return imgURL, nil
 			}
 		}

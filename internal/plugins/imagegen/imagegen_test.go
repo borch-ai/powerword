@@ -2526,3 +2526,72 @@ func TestMidjourneyBackend_GenerateImage_PollingTimeout(t *testing.T) {
 		t.Errorf("expected error containing 'polling timed out after', got: %v", genErr)
 	}
 }
+
+func TestMidjourneyBackend_GenerateImage_MalformedPayloadResilient(t *testing.T) {
+	var pollAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"mj_resilient_task"}`))
+			return
+		}
+		pollAttempts++
+		w.Header().Set("Content-Type", "application/json")
+		if pollAttempts == 1 {
+			// Malformed JSON payload on first poll attempt
+			_, _ = w.Write([]byte(`{invalid-json`))
+			return
+		}
+		// Valid completed response on second attempt
+		_, _ = w.Write([]byte(`{"status":"completed","imageUrl":"https://example.com/resilient.png"}`))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "key", "5ms", "500ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	imgURL, err := b.GenerateImage(context.Background(), "prompt", "1:1")
+	if err != nil {
+		t.Fatalf("expected GenerateImage to recover from malformed payload, got err: %v", err)
+	}
+	if imgURL != "https://example.com/resilient.png" {
+		t.Errorf("unexpected image URL: %s", imgURL)
+	}
+	if pollAttempts < 2 {
+		t.Errorf("expected at least 2 poll attempts, got %d", pollAttempts)
+	}
+}
+
+func TestMidjourneyBackend_GenerateImage_ExhaustedRetryError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"task_id":"mj_exhaust_task"}`))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("500 Internal Server Error"))
+	}))
+	defer server.Close()
+
+	b, err := NewMidjourneyBackend(server.URL, "key", "5ms", "500ms")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.SetRetryConfig(llm.RetryConfig{
+		MaxRetries: 1,
+		MinBackoff: 1 * time.Millisecond,
+		MaxBackoff: 5 * time.Millisecond,
+		Retryable:  llm.IsRetryableError,
+	})
+
+	_, err = b.GenerateImage(context.Background(), "prompt", "1:1")
+	if err == nil {
+		t.Fatal("expected error on exhausted polling retries, got nil")
+	}
+	if strings.Contains(err.Error(), "polling timed out after") {
+		t.Errorf("expected request error, but got polling timed out: %v", err)
+	}
+}
